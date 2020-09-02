@@ -12,14 +12,18 @@ function **compress(level_or_option=None, zstd_dict=None)**
 
     Compress data (a bytes-like object), returning the compressed data as a bytes object.
 
-    See ZstdCompressor below for a description of the *level_or_option*, *zstd_dict* arguments.
+    *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
+
+    *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
 
 
 function **decompress(zstd_dict=None, option=None)**
 
     Decompress data (a bytes-like object), returning the uncompressed data as a bytes object.
 
-    See ZstdDecompressor below for a description of the *zstd_dict* and *option* arguments.
+    *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
+
+    *option* argument is a ``dict`` that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
 
 
 class **ZstdDict(dict_content)**
@@ -74,7 +78,7 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
     Initialize a ZstdCompressor object.
 
-    *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting various advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
+    *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
     *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
     
