@@ -7,7 +7,7 @@ from shutil import copy
 CPYTHON_DIR = r'E:\dev\cpython'
 PYZSTD_DIR = r'E:\dev\pyzstd'
 
-# Copy pyzstd.py
+# Copy pyzstd.py --------------------------------------------
 PY_FILE = r'Lib\zstd.py'
 path1 = os.path.join(CPYTHON_DIR, PY_FILE)
 path2 = os.path.join(PYZSTD_DIR, 'pyzstd.py')
@@ -30,20 +30,10 @@ with open(path2, 'w', encoding='utf-8') as f:
     f.write(text)
 
 
-# Copy _zstdmodule.c
+# Copy _zstdmodule.c --------------------------------------------
 C_FILE = r'Modules\_zstdmodule.c'
 path1 = os.path.join(CPYTHON_DIR, C_FILE)
 path2 = os.path.join(PYZSTD_DIR, r'src')
-try:
-   copy(path1, path2)
-except:
-   print("Unable to copy file. %s" % C_FILE)
-   raise
-
-# Copy _zstdmodule.c.h
-H_FILE = r'Modules\clinic\_zstdmodule.c.h'
-path1 = os.path.join(CPYTHON_DIR, H_FILE)
-path2 = os.path.join(PYZSTD_DIR, r'src\clinic')
 try:
    copy(path1, path2)
 except:
@@ -60,7 +50,7 @@ text = text.replace('#include "lib/zstd.h"',
 text = text.replace('#include "lib/dictBuilder/zdict.h"',
                     '#include "../lib/dictBuilder/zdict.h"')
 
-text = re.sub(r'(\n#include "clinic\\_zstdmodule.c.h")',
+text = re.sub(r'(\n#include "clinic/_zstdmodule.c.h")',
               r'\n#include "pypi1.h"\1',
               text)
 
@@ -89,3 +79,16 @@ with open(path, 'w', encoding='utf-8') as f:
     f.write(text)
 
 print('ok')
+
+# Copy _zstdmodule.c.h --------------------------------------------
+H_FILE = r'Modules\clinic\_zstdmodule.c.h'
+path1 = os.path.join(CPYTHON_DIR, H_FILE)
+path2 = os.path.join(PYZSTD_DIR, r'src\clinic')
+try:
+   copy(path1, path2)
+except:
+   print("Unable to copy file. %s" % C_FILE)
+   raise
+
+path2 = os.path.join(path2, '_zstdmodule.c.h')
+

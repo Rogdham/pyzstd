@@ -45,7 +45,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.1.6',
+    version='0.2.4',
     description='A Zstandard (zstd) module.',
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -59,6 +59,7 @@ setup(
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: System :: Archiving :: Compression",
+        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
