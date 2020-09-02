@@ -8,14 +8,20 @@ exception **ZstdError**
     This exception is raised when an error occurs when calling the zstd library.
 
 
-function **compress(level_or_option=None, zstd_dict=None)**
+function **compress(data, level_or_option=None, zstd_dict=None)**
 
-    Compress data (a bytes-like object), returning the compressed data as a bytes object.
+    Compress *data* (a bytes-like object), returning the compressed data as a bytes object.
 
     *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
     *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
 
+.. sourcecode:: python
+
+    >>> option = {CompressParameter.compressionLevel:10,
+    ...           CompressParameter.checksumFlag:1}
+    >>> d2 = pyzstd.compress(d1, option)
+    
 
 function **decompress(zstd_dict=None, option=None)**
 
@@ -51,7 +57,7 @@ function **train_dict(iterable_of_chunks, dict_size=100*1024)**
 
     In general:
     
-    1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying dict_size argument.
+    1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
     
     2. It's recommended to provide a few thousands samples, though this can vary a lot.
     
@@ -71,7 +77,7 @@ function **train_dict(iterable_of_chunks, dict_size=100*1024)**
                     dat = f.read()
                 yield dat
     
-    dic = train_dict(chunks(), 200*1024)
+    dic = pyzstd.train_dict(chunks(), 200*1024)
 
 
 class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
