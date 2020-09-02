@@ -45,7 +45,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.2.4',
+    version='0.2.5',
     description='A Zstandard (zstd) module.',
     long_description=long_description,
     long_description_content_type='text/x-rst',

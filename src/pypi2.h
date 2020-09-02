@@ -14,6 +14,7 @@ static PyTypeObject ZstdDict_T = {
     .tp_members = _ZstdDict_members,
     .tp_methods = _ZstdDict_methods,
     .tp_doc = (char*)_ZstdDict_dict_doc,
+    .tp_str = _ZstdDict_str,
 };
 
 static PyTypeObject ZstdCompressor_T = {
