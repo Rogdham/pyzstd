@@ -1,20 +1,8 @@
-
-#include "Python.h"
-
-
-/* Return a Python int from the object item.
-   Can return an instance of int subclass.
-   Raise TypeError if the result is not an int
-   or if the object cannot be interpreted as an index.
-*/
-static PyObject *
-_PyNumber_Index(PyObject *item)
-{
-    return PyNumber_Index(item);
-}
+#if PY_VERSION_HEX < 0x03080000
+#include "args.h"
+#endif
 
 /* _zstd_state */
-
 static _zstd_state static_state;
 
 static inline _zstd_state *
@@ -43,3 +31,13 @@ PyType_FromModuleAndSpec(PyObject *module, PyType_Spec *spec, PyObject *bases)
     return NULL;
 }
 #endif
+
+#define _PyTuple_CAST(op) (assert(PyTuple_Check(op)), (PyTupleObject *)(op))
+
+static inline PyObject *
+_PyNumber_Index(PyObject *item)
+{
+    return PyNumber_Index(item);
+}
+
+

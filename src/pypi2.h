@@ -112,7 +112,7 @@ PyInit__zstd(void)
     }
 
     Py_INCREF(&ZstdDict_T);
-    if (PyModule_AddObject(module, "ZstdDict", &ZstdDict_T) < 0) {
+    if (PyModule_AddObject(module, "ZstdDict", (PyObject*)&ZstdDict_T) < 0) {
         Py_DECREF(&ZstdDict_T);
         goto error;
     }
@@ -125,7 +125,7 @@ PyInit__zstd(void)
     }
 
     Py_INCREF(&ZstdCompressor_T);
-    if (PyModule_AddObject(module, "ZstdCompressor", &ZstdCompressor_T) < 0) {
+    if (PyModule_AddObject(module, "ZstdCompressor", (PyObject*)&ZstdCompressor_T) < 0) {
         Py_DECREF(&ZstdCompressor_T);
         goto error;
     }
@@ -138,7 +138,7 @@ PyInit__zstd(void)
     }
 
     Py_INCREF(&ZstdDecompressor_T);
-    if (PyModule_AddObject(module, "ZstdDecompressor", &ZstdDecompressor_T) < 0) {
+    if (PyModule_AddObject(module, "ZstdDecompressor", (PyObject*)&ZstdDecompressor_T) < 0) {
         Py_DECREF(&ZstdDecompressor_T);
         goto error;
     }
