@@ -20,7 +20,7 @@ function **compress(data, level_or_option=None, zstd_dict=None)**
 
     >>> option = {CompressParameter.compressionLevel:10,
     ...           CompressParameter.checksumFlag:1}
-    >>> d2 = pyzstd.compress(d1, option)
+    >>> d2 = compress(d1, option)
     
 
 function **decompress(zstd_dict=None, option=None)**
@@ -134,7 +134,7 @@ class **ZstdDecompressor(zstd_dict=None, option=None)**
     
         Decompress *data*, returning uncompressed data as bytes.
 
-        If all of the input data was decompressed and returned (either because this was less than *max_length* bytes, or because *max_length* was negative), *self.needs_input* will be set to True.
+        If *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the ``needs_input`` attribute will be set to ``False``. In this case, the next call to decompress() may provide data as ``b''`` to obtain more of the output.
         
     **needs_input**
     
