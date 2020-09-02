@@ -55,10 +55,10 @@ path = os.path.join(PYZSTD_DIR, r'src\_zstdmodule.c')
 with open(path, encoding='utf-8') as f:
     text = f.read()
 
-text = text.replace('#include "lib\zstd.h"',
-                    '#include "..\lib\zstd.h"')
-text = text.replace('#include "lib\dictBuilder\zdict.h"',
-                    '#include "..\lib\dictBuilder\zdict.h"')
+text = text.replace('#include "lib/zstd.h"',
+                    '#include "../lib/zstd.h"')
+text = text.replace('#include "lib/dictBuilder/zdict.h"',
+                    '#include "../lib/dictBuilder/zdict.h"')
 
 text = re.sub(r'(\n#include "clinic\\_zstdmodule.c.h")',
               r'\n#include "pypi1.h"\1',
