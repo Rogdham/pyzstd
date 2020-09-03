@@ -33,7 +33,7 @@ PyModule_AddType(PyObject *module, PyTypeObject *type)
     return 0;
 }
 
-static PyObject inline *
+static inline PyObject *
 PyType_FromModuleAndSpec(PyObject *module, PyType_Spec *spec, PyObject *bases)
 {
     return NULL;

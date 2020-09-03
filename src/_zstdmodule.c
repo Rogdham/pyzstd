@@ -1076,7 +1076,7 @@ _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
     }
     self->inited = 1;
 
-    /* Set compressLevel/options to compress context */
+    /* Set compressLevel/option to compress context */
     if (level_or_option != Py_None) {
         if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
             return -1;
@@ -1389,13 +1389,6 @@ _zstd_ZstdDecompressor___init___impl(ZstdDecompressor *self,
     }
     self->inited = 1;
 
-    /* Set decompressLevel/options to decompress context */
-    if (option != Py_None) {
-        if (set_d_parameters(self, option) < 0) {
-            return -1;
-        }
-    }
-
     /* Load dictionary to decompress context */
     if (zstd_dict != Py_None) {
         if (load_d_dict(self, zstd_dict) < 0) {
@@ -1405,6 +1398,13 @@ _zstd_ZstdDecompressor___init___impl(ZstdDecompressor *self,
         /* Py_INCREF the dict */
         Py_INCREF(zstd_dict);
         self->dict = zstd_dict;
+    }
+
+    /* Set option to decompress context */
+    if (option != Py_None) {
+        if (set_d_parameters(self, option) < 0) {
+            return -1;
+        }
     }
 
     return 0;

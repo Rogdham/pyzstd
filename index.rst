@@ -34,7 +34,7 @@ function **decompress(data, zstd_dict=None, option=None)**
 
 class **ZstdDict(dict_content)**
 
-    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object supports pickle, and it is thread-safe.
+    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object is thread-safe, and supports pickle.
     
     Using dictionary, the compression ratio achievable on small data improves dramatically.
     
@@ -42,11 +42,11 @@ class **ZstdDict(dict_content)**
       
     **dict_id**
     
-        ID of Zstd dictionary, a 32-bit unsigned int value.
+        ID of zstd dictionary, a 32-bit unsigned int value.
 
     **dict_content**
     
-        The content of the Zstd dictionary, a bytes object.
+        The content of the zstd dictionary, a bytes object.
 
 
 function **train_dict(iterable_of_chunks, dict_size)**
@@ -73,7 +73,7 @@ function **train_dict(iterable_of_chunks, dict_size)**
         for parent, dirnames, filenames in os.walk(rootdir):
             for filename in filenames:
                 path = os.path.join(parent, filename)
-                with io.open(path, 'rb') as f:
+                with open(path, 'rb') as f:
                     dat = f.read()
                 yield dat
     

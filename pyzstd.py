@@ -106,6 +106,9 @@ def decompress(data, zstd_dict=None, option=None):
 def train_dict(iterable_of_chunks, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
+    iterable_of_chunks argument is an iterable of samples. dict_size argument
+    is the dictinary's size, in bytes.
+
     In general:
     1) A reasonable dictionary has a size of ~100 KB. It's possible to select
        smaller or larger size, just by specifying dict_size argument in bytes.
@@ -120,6 +123,10 @@ def train_dict(iterable_of_chunks, dict_size):
     for chunk in iterable_of_chunks:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
+    
+    if not chunks:
+        raise ValueError("The chunks is empty content, can't train dictionary.")
+
     chunks = b''.join(chunks)
 
     # chunks: samples be stored concatenated in a single flat buffer.

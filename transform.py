@@ -44,18 +44,19 @@ def copy_and_transform(file1, file2, re_list):
        print("Unable to copy file. %s" % file1)
        raise
 
-    if os.path.isdir(path2):
-        dir_name, file_name = os.path.split(file1)
-        path2 = os.path.join(path2, file_name)
+    if re_list:
+        if os.path.isdir(path2):
+            dir_name, file_name = os.path.split(file1)
+            path2 = os.path.join(path2, file_name)
 
-    with open(path2, encoding='utf-8') as f:
-        text = f.read()
-    
-    for pattern, repl in re_list:
-        text = re.sub(pattern, repl, text)
+        with open(path2, encoding='utf-8') as f:
+            text = f.read()
         
-    with open(path2, 'w', encoding='utf-8') as f:
-        f.write(text)
+        for pattern, repl in re_list:
+            text = re.sub(pattern, repl, text)
+            
+        with open(path2, 'w', encoding='utf-8') as f:
+            f.write(text)
 
 
 copy_and_transform(r'Lib\zstd.py', 'pyzstd.py', py_list)
