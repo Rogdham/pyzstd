@@ -58,7 +58,7 @@ PyDoc_STRVAR(_zstd__train_dict__doc__,
 "_train_dict($module, /, dst_data, dst_data_sizes, dict_size)\n"
 "--\n"
 "\n"
-"Internal function, train a Zstd dictionary.");
+"Internal function, train a zstd dictionary.");
 
 #define _ZSTD__TRAIN_DICT_METHODDEF    \
     {"_train_dict", (PyCFunction)(void(*)(void))_zstd__train_dict, METH_FASTCALL|METH_KEYWORDS, _zstd__train_dict__doc__},
@@ -605,4 +605,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=6b02b8eebcc17047 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=b00033ade3952e4c input=a9049054013a1b77]*/

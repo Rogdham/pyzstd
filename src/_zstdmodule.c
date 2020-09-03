@@ -641,7 +641,7 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
     if (self->dict_id == 0) {
         Py_CLEAR(self->dict_content);
         PyErr_SetString(PyExc_ValueError,
-                        "dict_content is not a valid Zstd dictionary content.");
+                        "dict_content is not a valid zstd dictionary content.");
         return -1;
     }
 
@@ -672,10 +672,10 @@ PyDoc_STRVAR(_ZstdDict_dict_doc,
     "Zstd dictionary, used for compress/decompress.");
 
 PyDoc_STRVAR(ZstdDict_dictid_doc,
-    "ID of Zstd dictionary, a 32-bit unsigned int value.");
+    "ID of zstd dictionary, a 32-bit unsigned int value.");
 
 PyDoc_STRVAR(ZstdDict_dictbuffer_doc,
-    "The content of the Zstd dictionary, a bytes object.");
+    "The content of zstd dictionary, a bytes object.");
 
 static PyObject *
 _ZstdDict_str(ZstdDict *dict)
@@ -720,13 +720,13 @@ _zstd._train_dict
     dst_data_sizes: object
     dict_size: Py_ssize_t
 
-Internal function, train a Zstd dictionary.
+Internal function, train a zstd dictionary.
 [clinic start generated code]*/
 
 static PyObject *
 _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
                        PyObject *dst_data_sizes, Py_ssize_t dict_size)
-/*[clinic end generated code: output=d39b262ebfcac776 input=b89015c8464efb81]*/
+/*[clinic end generated code: output=d39b262ebfcac776 input=5e1a70bcf3740a1f]*/
 {
     size_t *chunk_sizes = NULL;
     PyObject *dict_buffer = NULL;
@@ -1313,7 +1313,7 @@ _ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* at_frame_edge flag */
     self->at_frame_edge = 1;
 
-    /* Need input flag */
+    /* needs_input flag */
     self->needs_input = 1;
 
     /* Decompress context */
@@ -1505,7 +1505,7 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
 /*[clinic end generated code: output=a4302b3c940dbec6 input=c745631ba8a11577]*/
 {
     ZSTD_inBuffer in;
-    PyObject *ret;
+    PyObject *ret = NULL;
     char use_input_buffer;
 
     ACQUIRE_LOCK(self);
@@ -1648,7 +1648,7 @@ error:
     self->in_begin = 0;
     self->in_end = 0;
 
-    ret = NULL;
+    Py_CLEAR(ret);
 success:
     RELEASE_LOCK(self);
     return ret;
@@ -1676,7 +1676,8 @@ static PyMethodDef _ZstdDecompressor_methods[] = {
 };
 
 PyDoc_STRVAR(ZstdDecompressor_needs_input_doc,
-"True if more input is needed before more decompressed data can be produced.");
+"False if the decompressor has unconsumed input data, pass b'' to decompress "
+"method will output them.");
 
 PyDoc_STRVAR(ZstdDecompressor_at_frame_edge_doc,
 "True when the output is at a frame edge, means a frame is completely decoded "

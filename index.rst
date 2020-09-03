@@ -138,7 +138,7 @@ class **ZstdDecompressor(zstd_dict=None, option=None)**
         
     **needs_input**
     
-        ``True`` if more input is needed before more decompressed data can be produced.
+        ``False`` if the decompressor has unconsumed input data, pass ``b''`` to decompress method will output them.
     
     **at_frame_edge**
     
