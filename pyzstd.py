@@ -103,12 +103,12 @@ def decompress(data, zstd_dict=None, option=None):
     return decomp.decompress(data)
 
 
-def train_dict(iterable_of_chunks, dict_size=100*1024):
+def train_dict(iterable_of_chunks, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
     In general:
     1) A reasonable dictionary has a size of ~100 KB. It's possible to select
-       smaller or larger size, just by specifying dict_size argument.
+       smaller or larger size, just by specifying dict_size argument in bytes.
     2) It's recommended to provide a few thousands samples, though this can
        vary a lot.
     3) It's recommended that total size of all samples be about ~x100 times the

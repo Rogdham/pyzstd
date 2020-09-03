@@ -640,7 +640,8 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
                                     Py_SIZE(dict_content));
     if (self->dict_id == 0) {
         Py_CLEAR(self->dict_content);
-        PyErr_SetString(PyExc_ValueError, "Not a valid Zstd dictionary content.");
+        PyErr_SetString(PyExc_ValueError,
+                        "dict_content is not a valid Zstd dictionary content.");
         return -1;
     }
 
@@ -734,7 +735,8 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
     /* Prepare chunk_sizes */
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
     if (chunks_number > UINT32_MAX) {
-        PyErr_SetString(PyExc_ValueError, "Number of data chunks is too big, should <= 4294967295.");
+        PyErr_SetString(PyExc_ValueError,
+                        "Number of data chunks is too big, should <= 4294967295.");
         goto error;
     }
 
@@ -872,14 +874,16 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     if (ret < 0) {
         return -1;
     } else if (ret == 0) {
-        PyErr_SetString(PyExc_TypeError, "dict argument should be ZstdDict object.");
+        PyErr_SetString(PyExc_TypeError,
+                        "zstd_dict argument should be ZstdDict object.");
         return -1;
     }
 
     /* Get ZSTD_CDict */
     c_dict = _get_CDict((ZstdDict*)dict, compress_level);
     if (c_dict == NULL) {
-        PyErr_SetString(PyExc_SystemError, "Failed to get ZSTD_CDict.");
+        PyErr_SetString(PyExc_SystemError,
+                        "Failed to get ZSTD_CDict from zstd dictionary content.");
         return -1;
     }
 
@@ -907,7 +911,8 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
     assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
 
     if (!PyDict_Check(option)) {
-        PyErr_SetString(PyExc_TypeError, "option argument wrong type.");
+        PyErr_SetString(PyExc_TypeError,
+                        "option argument should be dict object.");
         return -1;
     }
 
@@ -957,14 +962,16 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
     if (ret < 0) {
         return -1;
     } else if (ret == 0) {
-        PyErr_SetString(PyExc_TypeError, "dict argument should be ZstdDict object.");
+        PyErr_SetString(PyExc_TypeError,
+                        "zstd_dict argument should be ZstdDict object.");
         return -1;
     }
 
     /* Get ZSTD_DDict */
     d_dict = _get_DDict((ZstdDict*)dict);
     if (d_dict == NULL) {
-        PyErr_SetString(PyExc_SystemError, "Failed to get ZSTD_DDict.");
+        PyErr_SetString(PyExc_SystemError,
+                        "Failed to get ZSTD_DDict from zstd dictionary content.");
         return -1;
     }
 
@@ -1148,8 +1155,6 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
                 goto error;
             }
         }
-
-        assert(in.pos <= in.size);
     }
 
 error:
@@ -1610,6 +1615,7 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
                 self->input_buffer_size < data_size) {
                 PyMem_Free(self->input_buffer);
                 self->input_buffer = NULL;
+                self->input_buffer_size = 0;
             }
 
             /* Allocate if necessary */
@@ -1805,10 +1811,10 @@ _zstd_get_frame_info_impl(PyObject *module, Py_buffer *frame_buffer)
     } else if (content_size == ZSTD_CONTENTSIZE_ERROR) {
         _zstd_state *state = get_zstd_state(module);
         PyErr_SetString(state->ZstdError,
-                        "Error when getting frame content size, "
-                        "please make sure that frame_buffer points "
-                        "to the beginning of a frame and provide "
-                        "a size larger than the frame header.");
+                        "Error when getting a frame's decompressed size, make "
+                        "sure that frame_buffer argument starts from the "
+                        "beginning of a frame and its size larger than the "
+                        "frame header (dozen bytes).");
         goto error;
     } else {
         unknown_content_size = 0;
@@ -1921,7 +1927,10 @@ zstd_exec(PyObject *module)
     state->ZstdDecompressor_type = NULL;
 
     /* ZstdError */
-    state->ZstdError = PyErr_NewExceptionWithDoc("_zstd.ZstdError", "Call to zstd failed.", NULL, NULL);
+    state->ZstdError = PyErr_NewExceptionWithDoc(
+                                "_zstd.ZstdError",
+                                "Call to zstd failed.",
+                                NULL, NULL);
     if (state->ZstdError == NULL) {
         goto error;
     }

@@ -10,7 +10,7 @@ exception **ZstdError**
 
 function **compress(data, level_or_option=None, zstd_dict=None)**
 
-    Compress *data* (a bytes-like object), returning the compressed data as a bytes object.
+    Compress *data* (a bytes-like object), return the compressed data as a bytes object.
 
     *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
@@ -23,18 +23,18 @@ function **compress(data, level_or_option=None, zstd_dict=None)**
     >>> d2 = compress(d1, option)
     
 
-function **decompress(zstd_dict=None, option=None)**
+function **decompress(data, zstd_dict=None, option=None)**
 
-    Decompress data (a bytes-like object), returning the uncompressed data as a bytes object.
+    Decompress *data* (a bytes-like object), return the uncompressed data as a bytes object.
 
     *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
 
-    *option* argument is a ``dict`` that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
+    *option* argument is a ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
 
 
 class **ZstdDict(dict_content)**
 
-    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object supports pickle.
+    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object supports pickle, and it is thread-safe.
     
     Using dictionary, the compression ratio achievable on small data improves dramatically.
     
@@ -49,7 +49,7 @@ class **ZstdDict(dict_content)**
         The content of the Zstd dictionary, a bytes object.
 
 
-function **train_dict(iterable_of_chunks, dict_size=100*1024)**
+function **train_dict(iterable_of_chunks, dict_size)**
 
     Train a zstd dictionary, return a ZstdDict object.
     
@@ -77,12 +77,12 @@ function **train_dict(iterable_of_chunks, dict_size=100*1024)**
                     dat = f.read()
                 yield dat
     
-    dic = pyzstd.train_dict(chunks(), 200*1024)
+    dic = pyzstd.train_dict(chunks(), 100*1024)
 
 
 class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
-    Initialize a ZstdCompressor object.
+    Initialize a ZstdCompressor object, it is thread-safe.
 
     *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
@@ -124,7 +124,7 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
 class **ZstdDecompressor(zstd_dict=None, option=None)**
 
-    Initialize a ZstdDecompressor object.
+    Initialize a ZstdDecompressor object, it is thread-safe.
     
     *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
 
