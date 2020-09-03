@@ -45,8 +45,8 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.2.7',
-    description='A Zstandard (zstd) module.',
+    version='0.3.0',
+    description="A Zstandard (zstd) module, the interface is similar to Python's bz2/lzma modules.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',
@@ -55,7 +55,7 @@ setup(
     license='Python Software Foundation License',
 
     classifiers=[
-        "Development Status :: 3 - Alpha",
+        "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: System :: Archiving :: Compression",
@@ -67,7 +67,5 @@ setup(
 
     package_dir={'pyzstd': ''},
     py_modules=['pyzstd.__init__', 'pyzstd.pyzstd'],
-    ext_modules=[
-        Extension('pyzstd._zstd', zstdFiles)
-        ],
+    ext_modules=[Extension('pyzstd._zstd', zstdFiles)],
 )
