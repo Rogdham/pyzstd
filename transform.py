@@ -7,88 +7,57 @@ from shutil import copy
 CPYTHON_DIR = r'E:\dev\cpython'
 PYZSTD_DIR = r'E:\dev\pyzstd'
 
-# Copy pyzstd.py --------------------------------------------
-PY_FILE = r'Lib\zstd.py'
-path1 = os.path.join(CPYTHON_DIR, PY_FILE)
-path2 = os.path.join(PYZSTD_DIR, 'pyzstd.py')
-try:
-   copy(path1, path2)
-except:
-   print("Unable to copy file. %s" % C_FILE)
-   raise
+py_list = (
+    (r'(from )(_zstd import \*)', r'\1.\2'),
+    (r'import _zstd', r'from . import _zstd')
+)
 
-# Transform
-with open(path2, encoding='utf-8') as f:
-    text = f.read()
+c_list = (
+    (r'#include "lib/zstd\.h"', r'#include "../lib/zstd.h"'),
+    (r'#include "lib/dictBuilder/zdict\.h"',
+     r'#include "../lib/dictBuilder/zdict.h"'),
+    (r'(\n#include "clinic/_zstdmodule.c.h")', r'\n#include "pypi1.h"\1'),
+    (r'get_zstd_state\(PyObject \*module\)',
+     r'get_zstd_state_NOUSE(PyObject *module)'),
 
-text = text.replace('from _zstd import *',
-                    'from ._zstd import *')
-text = text.replace('import _zstd',
-                    'from . import _zstd')
-       
-with open(path2, 'w', encoding='utf-8') as f:
-    f.write(text)
-
-
-# Copy _zstdmodule.c --------------------------------------------
-C_FILE = r'Modules\_zstdmodule.c'
-path1 = os.path.join(CPYTHON_DIR, C_FILE)
-path2 = os.path.join(PYZSTD_DIR, r'src')
-try:
-   copy(path1, path2)
-except:
-   print("Unable to copy file. %s" % C_FILE)
-   raise
-
-# Transform
-path = os.path.join(PYZSTD_DIR, r'src\_zstdmodule.c')
-with open(path, encoding='utf-8') as f:
-    text = f.read()
-
-text = text.replace('#include "lib/zstd.h"',
-                    '#include "../lib/zstd.h"')
-text = text.replace('#include "lib/dictBuilder/zdict.h"',
-                    '#include "../lib/dictBuilder/zdict.h"')
-
-text = re.sub(r'(\n#include "clinic/_zstdmodule.c.h")',
-              r'\n#include "pypi1.h"\1',
-              text)
-
-text = text.replace(r'get_zstd_state(PyObject *module)',
-                    r'get_zstd_state_NOUSE(PyObject *module)')
-
-init_1 = \
-"""PyMODINIT_FUNC
-PyInit__zstd(void)
+    (r"""PyMODINIT_FUNC
+PyInit__zstd\(void\)
 {
-    return PyModuleDef_Init(&_zstdmodule);
-}"""
-
-init_2 = \
+    return PyModuleDef_Init\(&_zstdmodule\);
+}""", \
 """#include "pypi2.h"
 
 // PyMODINIT_FUNC
 // PyInit__zstd(void)
 // {
 //     return PyModuleDef_Init(&_zstdmodule);
-// }"""
+// }"""),
+)
 
-text = text.replace(init_1, init_2)
-       
-with open(path, 'w', encoding='utf-8') as f:
-    f.write(text)
+def copy_and_transform(file1, file2, re_list):
+    path1 = os.path.join(CPYTHON_DIR, file1)
+    path2 = os.path.join(PYZSTD_DIR, file2)
+    
+    try:
+       copy(path1, path2)
+    except:
+       print("Unable to copy file. %s" % file1)
+       raise
 
-print('ok')
+    if os.path.isdir(path2):
+        dir_name, file_name = os.path.split(file1)
+        path2 = os.path.join(path2, file_name)
 
-# Copy _zstdmodule.c.h --------------------------------------------
-H_FILE = r'Modules\clinic\_zstdmodule.c.h'
-path1 = os.path.join(CPYTHON_DIR, H_FILE)
-path2 = os.path.join(PYZSTD_DIR, r'src\clinic')
-try:
-   copy(path1, path2)
-except:
-   print("Unable to copy file. %s" % C_FILE)
-   raise
+    with open(path2, encoding='utf-8') as f:
+        text = f.read()
+    
+    for pattern, repl in re_list:
+        text = re.sub(pattern, repl, text)
+        
+    with open(path2, 'w', encoding='utf-8') as f:
+        f.write(text)
 
-path2 = os.path.join(path2, '_zstdmodule.c.h')
 
+copy_and_transform(r'Lib\zstd.py', 'pyzstd.py', py_list)
+copy_and_transform(r'Modules\_zstdmodule.c', r'src', c_list)
+copy_and_transform(r'Modules\clinic\_zstdmodule.c.h', r'src\clinic', [])
