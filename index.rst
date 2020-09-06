@@ -82,7 +82,7 @@ function **train_dict(iterable_of_chunks, dict_size)**
 
 class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
-    Initialize a ZstdCompressor object. Like bz2/lzma/zlib modules, it's thread-safe at method level.
+    Initialize a ZstdCompressor object. It's thread-safe at method level.
 
     *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
@@ -117,14 +117,14 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
             
     **last_end_directive**
     
-        The last end directive, initialized as ``EndDirective.END``.
+        The last end directive used to this compressor, initialized as ``EndDirective.END``.
         
-        You may use this flag to get the current state of the compress stream. Such as, a block ends or a frame ends.
+        It can be used to get the current state, such as, a block ends or a frame ends.
 
 
 class **ZstdDecompressor(zstd_dict=None, option=None)**
 
-    Initialize a ZstdDecompressor object. Like bz2/lzma/zlib modules, it's thread-safe at method level.
+    Initialize a ZstdDecompressor object. It's thread-safe at method level.
     
     *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
 

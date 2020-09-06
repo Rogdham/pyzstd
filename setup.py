@@ -65,7 +65,7 @@ setup(
     ],
     keywords="zstandard zstd compression decompression compress decompress",
 
-    package_dir={'pyzstd': ''},
+    package_dir={'pyzstd': 'src'},
     py_modules=['pyzstd.__init__', 'pyzstd.pyzstd'],
     ext_modules=[Extension('pyzstd._zstd', zstdFiles)],
 )
