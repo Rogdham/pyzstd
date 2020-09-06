@@ -34,7 +34,7 @@ function **decompress(data, zstd_dict=None, option=None)**
 
 class **ZstdDict(dict_content)**
 
-    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object is thread-safe, and supports pickle.
+    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object is thread-safe.
     
     Using dictionary, the compression ratio achievable on small data improves dramatically.
     
@@ -82,7 +82,7 @@ function **train_dict(iterable_of_chunks, dict_size)**
 
 class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
-    Initialize a ZstdCompressor object, it is thread-safe.
+    Initialize a ZstdCompressor object. Like bz2/lzma/zlib modules, it's thread-safe at method level.
 
     *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
@@ -124,7 +124,7 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
 
 class **ZstdDecompressor(zstd_dict=None, option=None)**
 
-    Initialize a ZstdDecompressor object, it is thread-safe.
+    Initialize a ZstdDecompressor object. Like bz2/lzma/zlib modules, it's thread-safe at method level.
     
     *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
 
@@ -163,7 +163,7 @@ function **get_frame_size(frame_buffer)**
 
     Get the size of a zstd frame.
 
-    It will iterate all blocks' header within a frame, to get the size of the frame.
+    It will iterate all blocks' header within a frame, to accumulate the frame's size.
     
     *frame_buffer* argument is a bytes-like object. It should starts from the beginning of a frame, and needs to contain at least one complete frame.
 
@@ -175,7 +175,7 @@ function **get_frame_size(frame_buffer)**
 
 class **EndDirective(IntEnum)**
 
-    Stream compressor's end directive.
+    Stream compressor's end directive, used in ZstdCompressor.compress() method.
     
     **CONTINUE**
         
@@ -183,11 +183,11 @@ class **EndDirective(IntEnum)**
         
     **FLUSH**
     
-        Flush any remaining data, but don't end current frame. Usually used for communication, the receiver can decode immediately.
+        Flush any data provided so far, but doesn't end current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
     
     **END**
     
-        Flush any remaining data and close current frame.
+        Flush any remaining data and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after the frame is closed.
 
 class **Strategy(IntEnum)**
 

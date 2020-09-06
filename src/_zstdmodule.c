@@ -652,14 +652,25 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
 /*[clinic input]
 _zstd.ZstdDict.__reduce__
 
-Return state information for pickling.
+Intentionally not supporting pickle.
+
+If you need to save zstd dictionary to disk, please save .dict_content bytes
+object to disk, so that the zstd dictionary can be used by other programs.
 [clinic start generated code]*/
 
 static PyObject *
 _zstd_ZstdDict___reduce___impl(ZstdDict *self)
-/*[clinic end generated code: output=5c9b8a3550429417 input=1a45441f8f3f7085]*/
+/*[clinic end generated code: output=5c9b8a3550429417 input=17ad1a48928f2be1]*/
 {
-    return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content);
+    // return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content);
+
+    PyErr_SetString(PyExc_TypeError,
+                    "Intentionally not supporting pickle. If you need to "
+                    "save zstd dictionary to disk, please save .dict_content "
+                    "bytes object to disk, so that the zstd dictionary can be "
+                    "used by other programs."
+                    );
+    return NULL;
 }
 
 
@@ -1157,11 +1168,11 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         }
     }
 
-error:
-    OutputBuffer_OnError(&buffer);
-    ret = NULL;
 success:
     return ret;
+error:
+    OutputBuffer_OnError(&buffer);
+    return NULL;
 }
 
 /*[clinic input]
@@ -1866,13 +1877,13 @@ _zstd.get_frame_size
 
 Get the size of a zstd frame.
 
-It will iterate all blocks' header within a frame, to get the size of the
-frame.
+It will iterate all blocks' header within a frame, to accumulate the frame's
+size.
 [clinic start generated code]*/
 
 static PyObject *
 _zstd_get_frame_size_impl(PyObject *module, Py_buffer *frame_buffer)
-/*[clinic end generated code: output=a7384c2f8780f442 input=f21fb47ec793e693]*/
+/*[clinic end generated code: output=a7384c2f8780f442 input=0d1ff1acafe09b0f]*/
 {
     size_t frame_size;
     PyObject *ret;

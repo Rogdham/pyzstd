@@ -40,7 +40,10 @@ PyDoc_STRVAR(_zstd_ZstdDict___reduce____doc__,
 "__reduce__($self, /)\n"
 "--\n"
 "\n"
-"Return state information for pickling.");
+"Intentionally not supporting pickle.\n"
+"\n"
+"If you need to save zstd dictionary to disk, please save .dict_content bytes\n"
+"object to disk, so that the zstd dictionary can be used by other programs.");
 
 #define _ZSTD_ZSTDDICT___REDUCE___METHODDEF    \
     {"__reduce__", (PyCFunction)_zstd_ZstdDict___reduce__, METH_NOARGS, _zstd_ZstdDict___reduce____doc__},
@@ -566,8 +569,8 @@ PyDoc_STRVAR(_zstd_get_frame_size__doc__,
 "    A bytes-like object. It should starts from the beginning of a frame,\n"
 "    and needs to contain at least one complete frame.\n"
 "\n"
-"It will iterate all blocks\' header within a frame, to get the size of the\n"
-"frame.");
+"It will iterate all blocks\' header within a frame, to accumulate the frame\'s\n"
+"size.");
 
 #define _ZSTD_GET_FRAME_SIZE_METHODDEF    \
     {"get_frame_size", (PyCFunction)(void(*)(void))_zstd_get_frame_size, METH_FASTCALL|METH_KEYWORDS, _zstd_get_frame_size__doc__},
@@ -605,4 +608,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=b00033ade3952e4c input=a9049054013a1b77]*/
+/*[clinic end generated code: output=b624366733dea5e5 input=a9049054013a1b77]*/
