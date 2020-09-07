@@ -209,7 +209,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     assert(ob->pos == ob->size);
 
     /* Get block size */
-    if (list_len < Py_ARRAY_LENGTH(BUFFER_BLOCK_SIZE)) {
+    if (list_len < (Py_ssize_t) Py_ARRAY_LENGTH(BUFFER_BLOCK_SIZE)) {
         block_size = BUFFER_BLOCK_SIZE[list_len];
     } else {
         block_size = BUFFER_BLOCK_SIZE[Py_ARRAY_LENGTH(BUFFER_BLOCK_SIZE) - 1];
@@ -277,7 +277,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 
     /* Memory copy */
     if (Py_SIZE(buffer->list) > 0) {
-        offset = PyBytes_AS_STRING(result);
+        offset = (int8_t*) PyBytes_AS_STRING(result);
 
         /* Blocks except the last one */
         Py_ssize_t i = 0;
@@ -314,11 +314,11 @@ get_zstd_state_NOUSE(PyObject *module)
     return (_zstd_state *)state;
 }
 
-#define ACQUIRE_LOCK(obj) do { \
+#define ACQUIRE_LOCK(obj) do {                    \
     if (!PyThread_acquire_lock((obj)->lock, 0)) { \
-        Py_BEGIN_ALLOW_THREADS \
-        PyThread_acquire_lock((obj)->lock, 1); \
-        Py_END_ALLOW_THREADS \
+        Py_BEGIN_ALLOW_THREADS                    \
+        PyThread_acquire_lock((obj)->lock, 1);    \
+        Py_END_ALLOW_THREADS                      \
     } } while (0)
 #define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
 
@@ -759,7 +759,7 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
     for (Py_ssize_t i = 0; i < chunks_number; i++) {
         PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
-        if (chunk_sizes[i] == -1 && PyErr_Occurred()) {
+        if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             goto error;
         }
     }
@@ -1277,9 +1277,6 @@ static PyMemberDef _ZstdCompressor_members[] = {
       READONLY, ZstdCompressor_last_end_directive_doc},
     {NULL}
 };
-
-PyDoc_STRVAR(_ZstdCompressor_doc,
-    "Zstd dictionary, used for compress/decompress.");
 
 static PyType_Slot zstdcompressor_slots[] = {
     {Py_tp_new, _ZstdCompressor_new},

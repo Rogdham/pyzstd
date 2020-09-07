@@ -13,8 +13,8 @@ py_list = (
 )
 
 c_list = (
-    (r'#include "lib/zstd\.h"', r'#include "../lib/zstd.h"'),
-    (r'#include "lib/dictBuilder/zdict\.h"',
+    (r'#include <zstd\.h>', r'#include "../lib/zstd.h"'),
+    (r'#include <zdict\.h>',
      r'#include "../lib/dictBuilder/zdict.h"'),
     (r'(\n#include "clinic/_zstdmodule.c.h")', r'\n#include "pypi1.h"\1'),
     (r'get_zstd_state\(PyObject \*module\)',
