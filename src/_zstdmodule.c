@@ -156,7 +156,7 @@ static const int BUFFER_BLOCK_SIZE[] =
 */
 static int
 OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
-                                ZSTD_outBuffer *ob)
+                         ZSTD_outBuffer *ob)
 {
     PyObject *b;
     int block_size;
@@ -417,26 +417,19 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
                   type, name, bounds.lowerBound, bounds.upperBound, value_v);
 }
 
-static int
-module_add_int_constant(PyObject *m, const char *name, long long value)
-{
-    PyObject *o = PyLong_FromLongLong(value);
-    if (o == NULL) {
-        return -1;
-    }
-    if (PyModule_AddObject(m, name, o) == 0) {
-        return 0;
-    }
-    Py_DECREF(o);
-    return -1;
-}
 
-#define ADD_INT_MACRO(module, macro)                              \
-    do {                                                                 \
-        if (module_add_int_constant(module, #macro, macro) < 0) {  \
-            return -1;                                                   \
-        }                                                                \
+#define ADD_INT_MACRO(module, macro)                      \
+    do {                                                  \
+        PyObject *o = PyLong_FromLong(macro);             \
+        if (o == NULL) {                                  \
+            return -1;                                    \
+        }                                                 \
+        if (PyModule_AddObject(module, #macro, o) < 0) {  \
+            Py_DECREF(o);                                 \
+            return -1;                                    \
+        }                                                 \
     } while(0)
+
 
 static int
 add_parameters(PyObject *module)
