@@ -1194,6 +1194,17 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 {
     PyObject *ret;
 
+    /* Check end_directive value */
+    if (end_directive != ZSTD_e_end &&
+        end_directive != ZSTD_e_flush &&
+        end_directive != ZSTD_e_continue) {
+        PyErr_Format(PyExc_ValueError,
+                     "end_directive argument wrong value: %d.",
+                     end_directive);
+        return NULL;
+    }
+
+    /* Compress */
     ACQUIRE_LOCK(self);
     ret = compress_impl(self, data, end_directive);
 

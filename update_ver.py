@@ -3,7 +3,7 @@
 import re
 import os
 
-PYZSTD_DIR = r'E:\dev\pyzstd'
+PYZSTD_DIR = os.path.dirname(__file__)
 
 init_list = (
     (r"(?P<a>__version__\s*=\s*')\d+\.\d+\.\d+(?P<b>')", r'\g<1>{}\g<2>'),
@@ -29,5 +29,5 @@ def copy_and_transform(file, re_list, new_ver):
 
 input_ver = input('New Version:').strip()
 
-copy_and_transform(r'__init__.py', init_list, input_ver)
-copy_and_transform(r'setup.py', setup_list, input_ver)
+copy_and_transform(os.path.join('src', '__init__.py'), init_list, input_ver)
+copy_and_transform('setup.py', setup_list, input_ver)
