@@ -27,7 +27,7 @@ function **decompress(data, zstd_dict=None, option=None)**
 
     Decompress *data* (a bytes-like object), return the uncompressed data as a bytes object.
 
-    *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
+    *zstd_dict* argument is pre-trained dictionary for decompression, a ``ZstdDict`` object.
 
     *option* argument is a ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
 
