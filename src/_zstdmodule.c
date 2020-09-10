@@ -1518,10 +1518,15 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
 {
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
+    char at_frame_edge;   /* Backup at_frame_edge flag */
     char use_input_buffer;
 
     ACQUIRE_LOCK(self);
 
+    /* Backup at_frame_edge flag before any goto error statement */
+    at_frame_edge = self->at_frame_edge;
+
+    /* Prepare input buffer w/wo unconsumed data */
     if (self->in_begin == self->in_end) {
         /* No unconsumed data */
         use_input_buffer = 0;
@@ -1653,10 +1658,13 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
     goto success;
 
 error:
+    /* Restore at_frame_edge flag */
+    self->at_frame_edge = at_frame_edge;
+
     /* Reset needs_input */
     self->needs_input = 1;
 
-    /* Clear input buffer */
+    /* Discard input buffer */
     self->in_begin = 0;
     self->in_end = 0;
 
