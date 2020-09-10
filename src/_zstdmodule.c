@@ -1274,7 +1274,7 @@ static PyMethodDef _ZstdCompressor_methods[] = {
 };
 
 PyDoc_STRVAR(ZstdCompressor_last_mode_doc,
-"The last end directive, initialized as ZSTD_e_end.");
+"The last mode used to this compressor, initialized to FLUSH_FRAME.");
 
 static PyMemberDef _ZstdCompressor_members[] = {
     {"last_mode", T_INT, offsetof(ZstdCompressor, last_mode),

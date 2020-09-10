@@ -209,9 +209,9 @@ class **CParameter(IntEnum)**
         
     .. sourcecode:: python
 
-        >>> CompressParameter.compressionLevel.bounds()
+        >>> CParameter.compressionLevel.bounds()
         (-131072, 22)
-        >>> CompressParameter.enableLongDistanceMatching.bounds()
+        >>> CParameter.enableLongDistanceMatching.bounds()
         (0, 1)
 
 
@@ -400,7 +400,7 @@ class **DParameter(IntEnum)**
         
     .. sourcecode:: python
 
-        >>> DecompressParameter.windowLogMax.bounds()
+        >>> DParameter.windowLogMax.bounds()
         (10, 31)
 
 
