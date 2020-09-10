@@ -1,67 +1,108 @@
-``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <https://github.com/facebook/zstd>`_ (or ``zstd`` as short version) algorithm.
+.. title:: pyzstd moudle
 
-The interface provided by this module is very similar to that of Python's bz2/lzma module.
+``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <https://github.com/facebook/zstd>`_ (or zstd as short version) algorithm.
 
-
-exception **ZstdError**
-
-    This exception is raised when an error occurs when calling the zstd library.
+The interface provided by this module is very similar to Python's bz2/lzma module.
 
 
-function **compress(data, level_or_option=None, zstd_dict=None)**
+.. py:exception:: ZstdError
 
-    Compress *data* (a bytes-like object), return the compressed data as a bytes object.
+    This exception is raised when an error occurs when calling the underlying zstd library.
 
-    *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
 
-    *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
+.. py:function:: compress(data, level_or_option=None, zstd_dict=None)
+
+    Compress *data*, return the compressed data.
+
+    :param data: Data to be compressed.
+    :type data: bytes-like object
+    :param level_or_option: When it's an ``int`` object, it represents the compression level. When it's a ``dict`` object, it contains advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
+    :type level_or_option: int or dict
+    :param zstd_dict: Pre-trained dictionary for compression.
+    :type zstd_dict: ZstdDict
+    :return: Compressed data
+    :rtype: bytes
 
 .. sourcecode:: python
 
-    >>> option = {CompressParameter.compressionLevel:10,
-    ...           CompressParameter.checksumFlag:1}
-    >>> d2 = compress(d1, option)
+    >>> # use compression level
+    >>> compressed_dat = compress(raw_dat, 12)
+    >>> # use option
+    >>> option = {CParameter.compressionLevel : 10,
+    ...           CParameter.checksumFlag : 1}
+    >>> compressed_dat = compress(raw_dat, option)
+
+.. note:: Compression level
+
+    Compression levels are just numbers that map to a set of compress parameters. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
     
-
-function **decompress(data, zstd_dict=None, option=None)**
-
-    Decompress *data* (a bytes-like object), return the uncompressed data as a bytes object.
-
-    *zstd_dict* argument is pre-trained dictionary for decompression, a ``ZstdDict`` object.
-
-    *option* argument is a ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
-
-
-class **ZstdDict(dict_content)**
-
-    Initialize a ZstdDict object, it can be used for compress/decompress. ZstdDict object is thread-safe.
+    zstd library supports regular compression levels from 1 up to 22 (currently). Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
     
-    Using dictionary, the compression ratio achievable on small data improves dramatically.
+    zstd library also offers negative compression levels, which extend the range of speed vs. ratio preferences.
     
-    *dict_content* argument is dictionary's content, a bytes-like object.
+    The lower the level, the faster the speed (at the cost of compression).
+    
+    ``0`` means use default compression level, which is currently 3.
+    The minimum/maximum avaliable value :py:data:`compressionLevel_bounds`, both inclusive.
+
+
+.. py:function:: decompress(data, zstd_dict=None, option=None)
+
+    Decompress *data*, return the decompressed data.
+
+    :param data: Data to be decompressed.
+    :type data: bytes-like object
+    :param zstd_dict: Pre-trained dictionary for decompression.
+    :type zstd_dict: ZstdDict
+    :param option: A ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
+    :type option: dict
+    :return: Decompressed data
+    :rtype: bytes
+
+
+.. py:class:: ZstdDict
+
+    Represents a pre-trained zstd dictinary, it can be used for compression/decompression. Using zstd dictionary, the compression ratio achievable on small data improves dramatically.
+    
+    ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor`/:py:class:`ZstdCompressor`.
+    
+    .. py:method:: __init__(dict_content)
+    
+        Initialize a ZstdDict object.
+        
+        :param dict_content: Dictionary's content.
+        :type dict_content: bytes-like object
+        :raises ValueError: If *dict_content* is not a valid zstd dictionary.
       
-    **dict_id**
+    .. py:attribute:: dict_id
     
-        ID of zstd dictionary, a 32-bit unsigned int value.
+        ID of zstd dictionary, a 32-bit unsigned integer value.
 
-    **dict_content**
+    .. py:attribute:: dict_content
     
-        The content of the zstd dictionary, a bytes object.
+        The content of the zstd dictionary, a bytes object. Can be used with other programs.
 
+.. attention:: Using zstd dictionary
 
-function **train_dict(iterable_of_chunks, dict_size)**
+    1. If you lose a zstd dictionary, you can't decompress the corresponding data.
+    2. zstd dictionary is vulnerable.
+    3. zstd dictionary can dramatically improve the compression ratio for small data (dozens of KB), but the effect on big data is not obvious.
 
-    Train a zstd dictionary, return a ZstdDict object.
-    
-    *iterable_of_chunks* is an iterable of samples. *dict_size* is the dictinary's size, in bytes.
+.. py:function:: train_dict(iterable_of_chunks, dict_size)
 
-    In general:
+    Train a zstd dictionary.
     
-    1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
-    
-    2. It's recommended to provide a few thousands samples, though this can vary a lot.
-    
-    3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
+    :param iterable_of_chunks: An iterable of samples.
+    :type iterable_of_chunks: iterable
+    :param int dict_size: The zstd dictinary's size, in bytes.
+    :return: Trained zstd dictinary.
+    :rtype: ZstdDict
+
+.. tip:: Training a zstd dictionary
+
+   1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
+   2. It's recommended to provide a few thousands samples, though this can vary a lot.
+   3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
 
 .. sourcecode:: python
 
@@ -80,80 +121,108 @@ function **train_dict(iterable_of_chunks, dict_size)**
     dic = pyzstd.train_dict(chunks(), 100*1024)
 
 
-class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
+.. py:class:: ZstdCompressor
 
-    Initialize a ZstdCompressor object. It's thread-safe at method level.
-
-    *level_or_option* argument can be an ``int`` object, in this case represents the compression level. It can also be a ``dict`` object for setting advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
-
-    *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
+    A stream compressor. It's thread-safe at method level.
     
+    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
     
-    **compress(data, mode=ZstdCompressor.CONTINUE)**
+        Initialize a ZstdCompressor object.
+
+        :param level_or_option: When it's an ``int`` object, it represents the compression level. When it's a ``dict`` object, it contains advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
+        :type level_or_option: int or dict
+        :param zstd_dict: Pre-trained dictionary for compression.
+        :type zstd_dict: ZstdDict
+
+    .. py:method:: compress(self, data, mode=ZstdCompressor.CONTINUE)
     
         Provide data to the compressor object.
-        Returns a chunk of compressed data if possible, or b'' otherwise.
         
-        *data* argument is data to be compressed, a bytes-like object.
+        :param data: Data to be compressed.
+        :type data: bytes-like object
+        :param mode: Can be these values: :py:attr:`ZstdCompressor.CONTINUE`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`, :py:attr:`ZstdCompressor.FLUSH_FRAME`.
+        :return: A chunk of compressed data if possible, or ``b''`` otherwise.
+        :rtype: bytes
 
-        *mode* can be these values:
+    .. py:method:: flush(self, end_frame=True)
 
-            ``ZstdCompressor.CONTINUE``: Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
-            
-            ``ZstdCompressor.FLUSH_BLOCK``: Flush any remaining data, but don't close current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
-            
-            ``ZstdCompressor.FLUSH_FRAME``: Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
-   
-
-    **flush(end_frame=True)**
-
-        Finish the compression process.
-        Returns the compressed data left in internal buffers.
+        Flush the data in internal buffer.
 
         Since zstd data consists of one or more independent frames, the compressor object can be used after this method is called.
 
-        When *end_frame* argument is ``True``, flush data and end the frame.
-        When ``False`` flush data, but don't end the frame, usually used for communication, the receiver can decode the data immediately.
+        :param end_frame: When ``True``, flush data and end the frame. When ``False`` flush data, but don't end the frame, usually used for communication, the receiver can decode the data immediately.
+        :type end_frame: bool
+        :return: Flushed data
+        :rtype: bytes
             
-    **last_mode**
+    .. py:attribute:: last_mode
     
-        The last mode used to this compressor, its value can be ``ZstdCompressor.CONTINUE``, ``ZstdCompressor.FLUSH_BLOCK``, ``ZstdCompressor.FLUSH_FRAME``.
+        The last mode used to this compressor, its value can be :py:attr:`~ZstdCompressor.CONTINUE`, :py:attr:`~ZstdCompressor.FLUSH_BLOCK`, :py:attr:`~ZstdCompressor.FLUSH_FRAME`.
         
-        Initialized to ``ZstdCompressor.FLUSH_FRAME``.
+        Initialized to :py:attr:`~ZstdCompressor.FLUSH_FRAME`.
         
         It can be used to get the current state of a compressor, such as, a block ends, a frame ends.
 
-
-class **ZstdDecompressor(zstd_dict=None, option=None)**
-
-    Initialize a ZstdDecompressor object. It's thread-safe at method level.
+    .. py:attribute:: CONTINUE
     
-    *zstd_dict* argument is re-trained dictionary for decompression, a ``ZstdDict`` object.
+        Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
 
-    *option* argument is a ``dict`` that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
+    .. py:attribute:: FLUSH_BLOCK
+    
+        Flush any remaining data, but don't close current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
 
-    **decompress(data, max_length=-1)**
+    .. py:attribute:: FLUSH_FRAME
+    
+        Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
+
+.. note:: Frame and block
+
+    zstd data consists of one or more independent "frames", so a zstd data doesn't have an end marker like other compression algorithms.
+    
+    A frame is completely independent, has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
+
+    A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters. Unlike frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor, allowing streaming operations.
+
+
+.. py:class:: ZstdDecompressor
+
+    A stream decompressor. It's thread-safe at method level.
+    
+    .. py:method:: __init__(self, zstd_dict=None, option=None)
+    
+        Initialize a ZstdDecompressor object.
+        
+        :param zstd_dict: Pre-trained dictionary for decompression.
+        :type zstd_dict: ZstdDict
+        :param dict option: A ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
+
+    .. py:method:: decompress(self, data, max_length=-1)
     
         Decompress *data*, returning uncompressed data as bytes.
 
-        If *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the ``needs_input`` attribute will be set to ``False``. In this case, the next call to decompress() may provide data as ``b''`` to obtain more of the output.
+        :param int max_length: When *max_length* is negative, the size of output buffer is unlimited. When *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to :py:meth:`~ZstdDecompressor.decompress` may provide data as ``b''`` to obtain more of the output.
         
-    **needs_input**
+    .. py:attribute:: needs_input
     
-        ``False`` if the decompressor has unconsumed input data, pass ``b''`` to decompress method will output them.
+        ``False`` if the decompressor has unconsumed input data, if pass ``b''`` to :py:meth:`~ZstdDecompressor.decompress` method will output them.
     
-    **at_frame_edge**
+    .. py:attribute:: at_frame_edge
     
         ``True`` when the output is at a frame edge, means a frame is completely decoded and fully flushed, or the decompressor just be initialized. Note that the input stream is not necessarily at a frame edge.
 
 
-function **get_frame_info(frame_buffer)**
+.. py:function:: get_frame_info(frame_buffer)
 
     Get zstd frame infomation from a frame header.
 
     Return a two-items tuple: (decompressed_size, dictinary_id). If decompressed size is unknown (generated by stream compression), it will be ``None``. If no dictionary, dictinary_id will be ``0``.
     
-    *frame_buffer* argument is a bytes-like object. It should starts from the beginning of a frame, and needs to include at least the frame header (6 to 18 bytes).
+    It's possible to add more items to the tuple in the future.
+    
+    :param frame_buffer: It should starts from the beginning of a frame, and contain at least the frame header (6 to 18 bytes).
+    :type frame_buffer: bytes-like object
+    :return: Information about a frame.
+    :rtype: tuple
 
 .. sourcecode:: python
 
@@ -161,13 +230,16 @@ function **get_frame_info(frame_buffer)**
     (1437307, 1602083250)
 
 
-function **get_frame_size(frame_buffer)**
+.. py:function:: get_frame_size(frame_buffer)
 
     Get the size of a zstd frame.
 
     It will iterate all blocks' header within a frame, to accumulate the frame's size.
     
-    *frame_buffer* argument is a bytes-like object. It should starts from the beginning of a frame, and needs to contain at least one complete frame.
+    :param frame_buffer: It should starts from the beginning of a frame, and contain at least one complete frame.
+    :type frame_buffer: bytes-like object
+    :return: The size of a zstd frame.
+    :rtype: int
 
 .. sourcecode:: python
 
@@ -175,61 +247,41 @@ function **get_frame_size(frame_buffer)**
     252874
 
 
-class **Strategy(IntEnum)**
+.. :py:data: compressionLevel_bounds
 
-    Used for ``CompressParameter.strategy``.
+    Minimum and maximum values of ``compressionLevel``, both inclusive.
 
-    Note : new strategies **might** be added in the future, only the order (from fast to strong) is guaranteed
+.. py:class:: CParameter(IntEnum)
 
-    **fast**
+    Advanced compress parameters.
     
-    **dfast**
+    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
     
-    **greedy**
-    
-    **lazy**
-    
-    **lazy2**
-    
-    **btlazy2**
-    
-    **btopt**
-    
-    **btultra**
-    
-    **btultra2**
-
-class **CParameter(IntEnum)**
-
-    Advanced compress Parameters.
-    
-    function **bounds(self)**
+    .. py:method:: bounds(self)
         
         Return lower and upper bounds of a parameter, both inclusive.
         
-    .. sourcecode:: python
+        .. sourcecode:: python
 
-        >>> CParameter.compressionLevel.bounds()
-        (-131072, 22)
-        >>> CParameter.enableLongDistanceMatching.bounds()
-        (0, 1)
+            >>> CParameter.compressionLevel.bounds()
+            (-131072, 22)
+            >>> CParameter.enableLongDistanceMatching.bounds()
+            (0, 1)
 
 
-    **compressionLevel**
+    .. py:attribute:: compressionLevel
     
         Set compression parameters according to pre-defined cLevel table.
 
         Note that exact compression parameters are dynamically determined, depending on both compression level and srcSize (when known).
-
-        Default level is ZSTD_CLEVEL_DEFAULT==3.
-        
-        Special: value 0 means default, which is controlled by ZSTD_CLEVEL_DEFAULT.
+       
+        Special: value ``0`` means use default compression level, which is currently ``3``.
         
         Note 1 : it's possible to pass a negative compression level.
         
         Note 2 : setting a level does not automatically set all other compression parameters to default. Setting this will however eventually dynamically impact the compression parameters which have not been manually set. The manually set ones will 'stick'.
         
-    **windowLog**
+    .. py:attribute:: windowLog
     
         Maximum allowed back-reference distance, expressed as power of 2.
         
@@ -237,29 +289,29 @@ class **CParameter(IntEnum)**
         
         Must be clamped between ZSTD_WINDOWLOG_MIN and ZSTD_WINDOWLOG_MAX.
         
-        Special: value 0 means "use default windowLog".
+        Special: value ``0`` means "use default windowLog".
         
         Note: Using a windowLog greater than ZSTD_WINDOWLOG_LIMIT_DEFAULT requires explicitly allowing such size at streaming decompression stage.
     
-    **hashLog**
+    .. py:attribute:: hashLog
     
         Size of the initial probe table, as a power of 2.
         
         Resulting memory usage is ``(1 << (hashLog+2))``.
         
-        Must be clamped between ZSTD_HASHLOG_MIN and ZSTD_HASHLOG_MAX.
+        Must be clamped between lower and upper bounds.
         
         Larger tables improve compression ratio of strategies <= dFast, and improve speed of strategies > dFast.
         
-        Special: value 0 means "use default hashLog".
+        Special: value ``0`` means "use default hashLog".
         
-    **chainLog**
+    .. py:attribute:: chainLog
     
         Size of the multi-probe search table, as a power of 2.
         
         Resulting memory usage is ``(1 << (chainLog+2))``.
         
-        Must be clamped between ZSTD_CHAINLOG_MIN and ZSTD_CHAINLOG_MAX.
+        Must be clamped between lower and upper bounds.
         
         Larger tables result in better and slower compression.
         
@@ -267,9 +319,9 @@ class **CParameter(IntEnum)**
         
         It's still useful when using "dfast" strategy, in which case it defines a secondary probe table.
         
-        Special: value 0 means "use default chainLog".
+        Special: value ``0`` means "use default chainLog".
     
-    **searchLog**
+    .. py:attribute:: searchLog
     
         Number of search attempts, as a power of 2.
         
@@ -277,9 +329,9 @@ class **CParameter(IntEnum)**
         
         This parameter is useless for "fast" and "dFast" strategies.
         
-        Special: value 0 means "use default searchLog".
+        Special: value ``0`` means "use default searchLog".
         
-    **minMatch**
+    .. py:attribute:: minMatch
     
         Minimum size of searched matches.
         
@@ -287,39 +339,39 @@ class **CParameter(IntEnum)**
         
         Larger values increase compression and decompression speed, but decrease ratio.
         
-        Must be clamped between ZSTD_MINMATCH_MIN and ZSTD_MINMATCH_MAX.
+        Must be clamped between lower and upper bounds.
         
-        Note that currently, for all strategies < btopt, effective minimum is 4, for all strategies > fast, effective maximum is 6.
+        Note that currently, for all strategies < :py:attr:`~Strategy.btopt`, effective minimum is ``4``, for all strategies > :py:attr:`~Strategy.fast`, effective maximum is ``6``.
         
-        Special: value 0 means "use default minMatchLength".
+        Special: value ``0`` means "use default minMatchLength".
     
-    **targetLength**
+    .. py:attribute:: targetLength
     
         Impact of this field depends on strategy.
         
-        For strategies btopt, btultra & btultra2:
+        For strategies :py:attr:`~Strategy.btopt`, :py:attr:`~Strategy.btultra` & :py:attr:`~Strategy.btultra2`:
         
             Length of Match considered "good enough" to stop search.
             
             Larger values make compression stronger, and slower.
         
-        For strategy fast:
+        For strategy :py:attr:`~Strategy.fast`:
         
             Distance between match sampling.
             
             Larger values make compression faster, and weaker.
             
-        Special: value 0 means "use default targetLength".
+        Special: value ``0`` means "use default targetLength".
     
-    **strategy**
+    .. py:attribute:: strategy
     
-        See ZSTD_strategy class definition.
+        See :py:attr:`Strategy` class definition.
         
         The higher the value of selected strategy, the more complex it is, resulting in stronger and slower compression.
         
-        Special: value 0 means "use default strategy".
+        Special: value ``0`` means "use default strategy".
     
-    **enableLongDistanceMatching**
+    .. py:attribute:: enableLongDistanceMatching
     
         Enable long distance matching.
         
@@ -329,25 +381,25 @@ class **CParameter(IntEnum)**
         
         Note: enabling this parameter increases default ZSTD_c_windowLog to 128 MB except when expressly set to a different value.
     
-    **ldmHashLog**
+    .. py:attribute:: ldmHashLog
     
         Size of the table for long distance matching, as a power of 2.
         
         Larger values increase memory usage and compression ratio, but decrease compression speed.
         
-        Must be clamped between ZSTD_HASHLOG_MIN and ZSTD_HASHLOG_MAX, default: windowlog - 7.
+        Must be clamped between lower and upper bounds, default: windowlog - 7.
     
-        Special: value 0 means "automatically determine hashlog".
+        Special: value ``0`` means "automatically determine hashlog".
     
-    **ldmMinMatch**
+    .. py:attribute:: ldmMinMatch
     
         Minimum match size for long distance matcher.
         
-        Must be clamped between ZSTD_LDM_MINMATCH_MIN and ZSTD_LDM_MINMATCH_MAX.
+        Must be clamped between lower and upper bounds.
         
-        Special: value 0 means "use default value" (default: 64).
+        Special: value ``0`` means "use default value" (default: 64).
     
-    **ldmBucketSizeLog**
+    .. py:attribute:: ldmBucketSizeLog
     
         Log size of each bucket in the LDM hash table for collision resolution.
         
@@ -355,9 +407,9 @@ class **CParameter(IntEnum)**
         
         The maximum value is ZSTD_LDM_BUCKETSIZELOG_MAX.
         
-        Special: value 0 means "use default value" (default: 3). 
+        Special: value ``0`` means "use default value" (default: 3). 
     
-    **ldmHashRateLog**
+    .. py:attribute:: ldmHashRateLog
     
         Frequency of inserting/looking up entries into the LDM hash table.
         
@@ -369,9 +421,9 @@ class **CParameter(IntEnum)**
         
         Deviating far from default value will likely result in a compression ratio decrease.
         
-        Special: value 0 means "automatically determine hashRateLog".
+        Special: value ``0`` means "automatically determine hashRateLog".
     
-    **contentSizeFlag**
+    .. py:attribute:: contentSizeFlag
     
         Content size will be written into frame header *whenever known* (default:1)
         
@@ -381,30 +433,32 @@ class **CParameter(IntEnum)**
         
         For streaming scenarios, content size must be provided with ZSTD_CCtx_setPledgedSrcSize()
     
-    **checksumFlag**
+    .. py:attribute:: checksumFlag
     
         A 32-bits checksum of content is written at end of frame (default:0)
     
-    **dictIDFlag**
+    .. py:attribute:: dictIDFlag
     
         When applicable, dictionary's ID is written into frame header (default:1)
 
 
-class **DParameter(IntEnum)**
+.. py:class:: DParameter(IntEnum)
 
-    Advanced decompress Parameters.
+    Advanced decompress parameters.
 
-    function **bounds(self)**
+    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
+
+    .. py:method:: bounds(self)
         
         Return lower and upper bounds of a parameter, both inclusive.
         
-    .. sourcecode:: python
+        .. sourcecode:: python
 
-        >>> DParameter.windowLogMax.bounds()
-        (10, 31)
+            >>> DParameter.windowLogMax.bounds()
+            (10, 31)
 
 
-    **windowLogMax**
+    .. py:attribute:: windowLogMax
     
         Select a size limit (in power of 2) beyond which the streaming API will refuse to allocate memory buffer in order to protect the host from unreasonable memory requirements.
         
@@ -412,5 +466,31 @@ class **DParameter(IntEnum)**
         
         By default, a decompression context accepts window sizes <= (1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT).
         
-        Special: value 0 means "use default maximum windowLog".
-                              
+        Special: value ``0`` means "use default maximum windowLog".
+
+    .. sourcecode:: python
+
+        >>> option = {DParameter.windowLogMax : 20}
+        >>> # decompress() function
+        >>> decompressed_dat = decompress(dat, option=option)
+        >>> # ZstdDecompressor object
+        >>> d = ZstdDecompressor(option=option)
+        >>> decompressed_dat = d.decompress(dat)
+
+
+.. py:class:: Strategy(IntEnum)
+
+    Used for :py:attr:`CParameter.strategy`.
+
+    Note : new strategies **might** be added in the future, only the order (from fast to strong) is guaranteed.
+
+    .. py:attribute:: fast
+    .. py:attribute:: dfast
+    .. py:attribute:: greedy
+    .. py:attribute:: lazy
+    .. py:attribute:: lazy2
+    .. py:attribute:: btlazy2
+    .. py:attribute:: btopt
+    .. py:attribute:: btultra
+    .. py:attribute:: btultra2
+    
