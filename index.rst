@@ -89,20 +89,20 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
     *zstd_dict* argument is pre-trained dictionary for compression, a ``ZstdDict`` object.
     
     
-    **compress(data, end_directive=EndDirective.CONTINUE)**
+    **compress(data, mode=ZstdCompressor.CONTINUE)**
     
         Provide data to the compressor object.
         Returns a chunk of compressed data if possible, or b'' otherwise.
         
         *data* argument is data to be compressed, a bytes-like object.
 
-        *end_directive* can be these values:
+        *mode* can be these values:
 
-            ``EndDirective.CONTINUE``: Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
+            ``ZstdCompressor.CONTINUE``: Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
             
-            ``EndDirective.FLUSH``: Flush any remaining data, but don't end current frame. Usually used for communication, the receiver can decode the data immediately.
+            ``ZstdCompressor.FLUSH_BLOCK``: Flush any remaining data, but don't close current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
             
-            ``EndDirective.END``: Flush any remaining data **and** close current frame.
+            ``ZstdCompressor.FLUSH_FRAME``: Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
    
 
     **flush(end_frame=True)**
@@ -115,11 +115,13 @@ class **ZstdCompressor(level_or_option=None, zstd_dict=None)**
         When *end_frame* argument is ``True``, flush data and end the frame.
         When ``False`` flush data, but don't end the frame, usually used for communication, the receiver can decode the data immediately.
             
-    **last_end_directive**
+    **last_mode**
     
-        The last end directive used to this compressor, initialized as ``EndDirective.END``.
+        The last mode used to this compressor, its value can be ``ZstdCompressor.CONTINUE``, ``ZstdCompressor.FLUSH_BLOCK``, ``ZstdCompressor.FLUSH_FRAME``.
         
-        It can be used to get the current state, such as, a block ends or a frame ends.
+        Initialized to ``ZstdCompressor.FLUSH_FRAME``.
+        
+        It can be used to get the current state of a compressor, such as, a block ends, a frame ends.
 
 
 class **ZstdDecompressor(zstd_dict=None, option=None)**
@@ -173,22 +175,6 @@ function **get_frame_size(frame_buffer)**
     252874
 
 
-class **EndDirective(IntEnum)**
-
-    Stream compressor's end directive, used in ZstdCompressor.compress() method.
-    
-    **CONTINUE**
-        
-        Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
-        
-    **FLUSH**
-    
-        Flush any data provided so far, but doesn't end current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
-    
-    **END**
-    
-        Flush any remaining data and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after the frame is closed.
-
 class **Strategy(IntEnum)**
 
     Used for ``CompressParameter.strategy``.
@@ -213,7 +199,7 @@ class **Strategy(IntEnum)**
     
     **btultra2**
 
-class **CompressParameter(IntEnum)**
+class **CParameter(IntEnum)**
 
     Advanced compress Parameters.
     
@@ -404,7 +390,7 @@ class **CompressParameter(IntEnum)**
         When applicable, dictionary's ID is written into frame header (default:1)
 
 
-class **DecompressParameter(IntEnum)**
+class **DParameter(IntEnum)**
 
     Advanced decompress Parameters.
 

@@ -163,20 +163,21 @@ exit:
 }
 
 PyDoc_STRVAR(_zstd_ZstdCompressor_compress__doc__,
-"compress($self, /, data, end_directive=EndDirective.CONTINUE)\n"
+"compress($self, /, data, mode=ZstdCompressor.CONTINUE)\n"
 "--\n"
 "\n"
 "Provide data to the compressor object.\n"
 "\n"
 "  data\n"
 "    Data to be compressed, a bytes-like object.\n"
-"  end_directive\n"
-"    EndDirective.CONTINUE: Collect more data, encoder decides when to output\n"
-"    compressed result, for optimal compression ratio. Usually used for ordinary\n"
-"    streaming compression.\n"
-"    EndDirective.FLUSH: Flush any remaining data, but don\'t end current frame.\n"
-"    Usually used for communication, the receiver can decode the data immediately.\n"
-"    EndDirective.END: Flush any remaining data _and_ close current frame.\n"
+"  mode\n"
+"    ZstdCompressor.CONTINUE: Collect more data, encoder decides when to\n"
+"    output compressed result, for optimal compression ratio. Usually used\n"
+"    for ordinary streaming compression.\n"
+"    ZstdCompressor.FLUSH: Flush any remaining data, but don\'t end current\n"
+"    frame. Usually used for communication, the receiver can decode the data\n"
+"    immediately.\n"
+"    ZstdCompressor.END: Flush any remaining data _and_ close current frame.\n"
 "\n"
 "Returns a chunk of compressed data if possible, or b\'\' otherwise.");
 
@@ -185,18 +186,18 @@ PyDoc_STRVAR(_zstd_ZstdCompressor_compress__doc__,
 
 static PyObject *
 _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
-                                   int end_directive);
+                                   int mode);
 
 static PyObject *
 _zstd_ZstdCompressor_compress(ZstdCompressor *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     PyObject *return_value = NULL;
-    static const char * const _keywords[] = {"data", "end_directive", NULL};
+    static const char * const _keywords[] = {"data", "mode", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "compress", 0};
     PyObject *argsbuf[2];
     Py_ssize_t noptargs = nargs + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0) - 1;
     Py_buffer data = {NULL, NULL};
-    int end_directive = ZSTD_e_continue;
+    int mode = ZSTD_e_continue;
 
     args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 1, 2, 0, argsbuf);
     if (!args) {
@@ -212,12 +213,12 @@ _zstd_ZstdCompressor_compress(ZstdCompressor *self, PyObject *const *args, Py_ss
     if (!noptargs) {
         goto skip_optional_pos;
     }
-    end_directive = _PyLong_AsInt(args[1]);
-    if (end_directive == -1 && PyErr_Occurred()) {
+    mode = _PyLong_AsInt(args[1]);
+    if (mode == -1 && PyErr_Occurred()) {
         goto exit;
     }
 skip_optional_pos:
-    return_value = _zstd_ZstdCompressor_compress_impl(self, &data, end_directive);
+    return_value = _zstd_ZstdCompressor_compress_impl(self, &data, mode);
 
 exit:
     /* Cleanup for data */
@@ -608,4 +609,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=b624366733dea5e5 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=7da34f367b3d1e0b input=a9049054013a1b77]*/

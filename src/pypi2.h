@@ -52,20 +52,15 @@ add_constants(PyObject *module)
     }
 
     /* ZSTD_strategy enum */
-    ADD_INT_MACRO(module, ZSTD_fast);
-    ADD_INT_MACRO(module, ZSTD_dfast);
-    ADD_INT_MACRO(module, ZSTD_greedy);
-    ADD_INT_MACRO(module, ZSTD_lazy);
-    ADD_INT_MACRO(module, ZSTD_lazy2);
-    ADD_INT_MACRO(module, ZSTD_btlazy2);
-    ADD_INT_MACRO(module, ZSTD_btopt);
-    ADD_INT_MACRO(module, ZSTD_btultra);
-    ADD_INT_MACRO(module, ZSTD_btultra2);
-
-    /* EndDirective enum */
-    ADD_INT_MACRO(module, ZSTD_e_continue);
-    ADD_INT_MACRO(module, ZSTD_e_flush);
-    ADD_INT_MACRO(module, ZSTD_e_end);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_fast);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_dfast);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_greedy);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy2);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btlazy2);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btopt);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
     
     return 0;
 }
@@ -132,6 +127,31 @@ PyInit__zstd(void)
     }
     
     static_state.ZstdCompressor_type = &ZstdCompressor_T;
+    
+    /* Add EndDirective enum to ZstdCompressor */
+    temp = PyLong_FromLong(ZSTD_e_continue);
+    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
+                               "CONTINUE", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+    Py_DECREF(temp);
+
+    temp = PyLong_FromLong(ZSTD_e_flush);
+    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
+                               "FLUSH_BLOCK", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+    Py_DECREF(temp);
+
+    temp = PyLong_FromLong(ZSTD_e_end);
+    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
+                               "FLUSH_FRAME", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+    Py_DECREF(temp);
 
     /* ZstdDecompressor */
     if (PyType_Ready(&ZstdDecompressor_T) < 0) {
