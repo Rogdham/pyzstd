@@ -4,6 +4,7 @@
 
 The interface provided by this module is similar to Python's bz2/lzma module.
 
+Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
 Exception
 ---------
@@ -76,6 +77,8 @@ Stream classes
 
     A stream compressor. It's thread-safe at method level.
     
+    It would be nice to understand :ref:`some knowledge<frame_and_block>` about zstd data.
+    
     .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
     
         Initialize a ZstdCompressor object.
@@ -133,11 +136,13 @@ Stream classes
     
         Used for :py:meth:`ZstdCompressor.compress` *mode* argument. Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
 
+.. _frame_and_block:
+
 .. note:: Frame and block
 
     zstd data consists of one or more independent "frames", so a zstd data doesn't have an end marker like other compression algorithms.
     
-    A frame is completely independent, has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
+    A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
 
     A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters. Unlike frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor, allowing streaming operations.
 
@@ -225,7 +230,7 @@ Dictionary
 .. sourcecode:: python
 
     def chunks():
-        rootdir = r"C:\data"
+        rootdir = r"E:\data"
         
         # Note that the order of the files may be different,
         # therefore the generated dictionary may be different.
@@ -265,7 +270,7 @@ Module-level functions
 
 .. py:function:: get_frame_size(frame_buffer)
 
-    Get the size of a zstd frame.
+    Get the size of a zstd frame, including frame header and epilogue.
 
     It will iterate all blocks' header within a frame, to accumulate the frame's size.
     
@@ -283,7 +288,7 @@ Module-level functions
 Module-level variables
 ----------------------
 
-    This section contains :py:data:`zstd_version`, :py:data:`zstd_version_info`, :py:data:`compressionLevel_bounds`.
+    This section contains :py:data:`zstd_version`, :py:data:`zstd_version_info`, :py:data:`compressionLevel_values`.
 
 .. py:data:: zstd_version
 
