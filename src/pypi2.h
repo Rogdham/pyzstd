@@ -142,6 +142,7 @@ PyInit__zstd(void)
         goto error;
     }
 
+    return module;
 error:
     return NULL;
 }
