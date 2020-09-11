@@ -2031,13 +2031,13 @@ zstd_exec(PyObject *module)
         goto error;
     }
 
-    /* compress_level_bounds */
+    /* compressionLevel_bounds */
     if (!(temp = PyTuple_New(2))) {
         goto error;
     }
     PyTuple_SET_ITEM(temp, 0, PyLong_FromLong(ZSTD_minCLevel()));
     PyTuple_SET_ITEM(temp, 1, PyLong_FromLong(ZSTD_maxCLevel()));
-    if (PyModule_AddObject(module, "compress_level_bounds", temp) < 0) {
+    if (PyModule_AddObject(module, "compressionLevel_bounds", temp) < 0) {
         Py_DECREF(temp);
         goto error;
     }
