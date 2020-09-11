@@ -307,11 +307,11 @@ Module-level variables
 
 .. py:data:: compressionLevel_values
 
-    A three-items namedtuple, values about :ref:`compression level<compression_level>`. 
+    A three-items namedtuple, values defined by underlying zstd library, see :ref:`compression level<compression_level>` for details.
     
-    ``default`` is the default compression level defined by underlying zstd library, it is used when compression level is set to ``0``.
+    ``default`` is default compression level, it is used when compression level is set to ``0``.
     
-    ``min``/``max`` are minimum/maximum avaliable values of compression level defined by underlying zstd library, both inclusive.
+    ``min``/``max`` are minimum/maximum avaliable values of compression level, both inclusive.
 
 .. sourcecode:: python
 
