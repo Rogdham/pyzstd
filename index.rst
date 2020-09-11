@@ -1,14 +1,22 @@
 .. title:: pyzstd moudle
 
-``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <https://github.com/facebook/zstd>`_ (or zstd as short version) algorithm.
+``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <https://github.com/facebook/zstd>`_ (or zstd as short name) algorithm.
 
-The interface provided by this module is very similar to Python's bz2/lzma module.
+The interface provided by this module is similar to Python's bz2/lzma module.
 
+
+Exception
+---------
 
 .. py:exception:: ZstdError
 
     This exception is raised when an error occurs when calling the underlying zstd library.
 
+
+Common functions
+----------------
+
+    This section contains function :py:func:`compress`, :py:func:`decompress`.
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
 
@@ -16,7 +24,7 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
 
     :param data: Data to be compressed.
     :type data: bytes-like object
-    :param level_or_option: When it's an ``int`` object, it represents the compression level. When it's a ``dict`` object, it contains advanced parameters. The default value ``None`` means to use zstd's default compression level/parameters.
+    :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
@@ -32,18 +40,17 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
     ...           CParameter.checksumFlag : 1}
     >>> compressed_dat = compress(raw_dat, option)
 
-.. note:: Compression level
+.. _compression_level:
+
+.. note:: About compression level
 
     Compression levels are just numbers that map to a set of compress parameters. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
     
-    zstd library supports regular compression levels from 1 up to 22 (currently). Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
+    zstd library supports regular compression levels from ``1`` up to ``22`` (currently). Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
     
-    zstd library also offers negative compression levels, which extend the range of speed vs. ratio preferences.
+    ``0`` means use default compression level, which is currently ``3`` defined by underlying zstd library. zstd library also offers negative compression levels, which extend the range of speed vs ratio preferences. The lower the level, the faster the speed (at the cost of compression).
     
-    The lower the level, the faster the speed (at the cost of compression).
-    
-    ``0`` means use default compression level, which is currently 3.
-    The minimum/maximum avaliable value :py:data:`compressionLevel_bounds`, both inclusive.
+    :py:data:`compressionLevel_bounds` is the minimum/maximum avaliable values defined by underlying zstd library.
 
 
 .. py:function:: decompress(data, zstd_dict=None, option=None)
@@ -54,72 +61,16 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
     :type data: bytes-like object
     :param zstd_dict: Pre-trained dictionary for decompression.
     :type zstd_dict: ZstdDict
-    :param option: A ``dict`` object that contains advanced parameters. The default value ``None`` means to use zstd's default decompression parameters.
+    :param option: A ``dict`` object that contains :py:ref:`advanced parameters<DParameter>`. The default value ``None`` means to use zstd's default decompression parameters.
     :type option: dict
     :return: Decompressed data
     :rtype: bytes
 
 
-.. py:class:: ZstdDict
+Stream classes
+--------------
 
-    Represents a pre-trained zstd dictinary, it can be used for compression/decompression. Using zstd dictionary, the compression ratio achievable on small data improves dramatically.
-    
-    ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor`/:py:class:`ZstdCompressor`.
-    
-    .. py:method:: __init__(dict_content)
-    
-        Initialize a ZstdDict object.
-        
-        :param dict_content: Dictionary's content.
-        :type dict_content: bytes-like object
-        :raises ValueError: If *dict_content* is not a valid zstd dictionary.
-      
-    .. py:attribute:: dict_id
-    
-        ID of zstd dictionary, a 32-bit unsigned integer value.
-
-    .. py:attribute:: dict_content
-    
-        The content of the zstd dictionary, a bytes object. Can be used with other programs.
-
-.. attention:: Using zstd dictionary
-
-    1. If you lose a zstd dictionary, you can't decompress the corresponding data.
-    2. zstd dictionary is vulnerable.
-    3. zstd dictionary can dramatically improve the compression ratio for small data (dozens of KB), but the effect on big data is not obvious.
-
-.. py:function:: train_dict(iterable_of_chunks, dict_size)
-
-    Train a zstd dictionary.
-    
-    :param iterable_of_chunks: An iterable of samples.
-    :type iterable_of_chunks: iterable
-    :param int dict_size: The zstd dictinary's size, in bytes.
-    :return: Trained zstd dictinary.
-    :rtype: ZstdDict
-
-.. tip:: Training a zstd dictionary
-
-   1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
-   2. It's recommended to provide a few thousands samples, though this can vary a lot.
-   3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
-
-.. sourcecode:: python
-
-    def chunks():
-        rootdir = r"C:\data"
-        
-        # Note that the order of the files may be different,
-        # therefore the generated dictionary may be different.
-        for parent, dirnames, filenames in os.walk(rootdir):
-            for filename in filenames:
-                path = os.path.join(parent, filename)
-                with open(path, 'rb') as f:
-                    dat = f.read()
-                yield dat
-    
-    dic = pyzstd.train_dict(chunks(), 100*1024)
-
+    This section contains class :py:class:`ZstdCompressor`, :py:class:`ZstdDecompressor`.
 
 .. py:class:: ZstdCompressor
 
@@ -143,6 +94,13 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
         :param mode: Can be these values: :py:attr:`ZstdCompressor.CONTINUE`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`, :py:attr:`ZstdCompressor.FLUSH_FRAME`.
         :return: A chunk of compressed data if possible, or ``b''`` otherwise.
         :rtype: bytes
+        
+        .. hint:: Why there is a *mode* parameter?
+        
+            #. Can generate frames flexibly.
+            #. Can reuse :py:class:`ZstdCompressor` object for big number of individual data.
+
+            In addition, if data is generated by a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode, the size of the uncompressed data will be recorded in frame header.
 
     .. py:method:: flush(self, end_frame=True)
 
@@ -150,7 +108,7 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
 
         Since zstd data consists of one or more independent frames, the compressor object can be used after this method is called.
 
-        :param end_frame: When ``True``, flush data and end the frame. When ``False`` flush data, but don't end the frame, usually used for communication, the receiver can decode the data immediately.
+        :param end_frame: When ``True``, flush data and end the frame, equivalent to ``c.compress(b'', c.FLUSH_FRAME)``, usually used for classical flush() operation. When ``False``, flush data but don't end the frame, equivalent to ``c.compress(b'', c.FLUSH_BLOCK)``, usually used for communication, the receiver can decode the data immediately.
         :type end_frame: bool
         :return: Flushed data
         :rtype: bytes
@@ -165,15 +123,15 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
 
     .. py:attribute:: CONTINUE
     
-        Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
+        Used for :py:meth:`ZstdCompressor.compress` *mode* argument. Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
 
     .. py:attribute:: FLUSH_BLOCK
     
-        Flush any remaining data, but don't close current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
+        Used for :py:meth:`ZstdCompressor.compress` *mode* argument. Flush any remaining data, but don't close current frame. If there is data, it creates at least one new block, that can be decoded immediately on reception. Usually used for communication.
 
     .. py:attribute:: FLUSH_FRAME
     
-        Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
+        Used for :py:meth:`ZstdCompressor.compress` *mode* argument. Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
 
 .. note:: Frame and block
 
@@ -200,7 +158,7 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
     
         Decompress *data*, returning uncompressed data as bytes.
 
-        :param int max_length: When *max_length* is negative, the size of output buffer is unlimited. When *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to :py:meth:`~ZstdDecompressor.decompress` may provide data as ``b''`` to obtain more of the output.
+        :param int max_length: When *max_length* is negative, the size of output buffer is unlimited. When *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to this method may provide *data* as ``b''`` to obtain more of the output.
         
     .. py:attribute:: needs_input
     
@@ -210,6 +168,81 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
     
         ``True`` when the output is at a frame edge, means a frame is completely decoded and fully flushed, or the decompressor just be initialized. Note that the input stream is not necessarily at a frame edge.
 
+
+Dictionary
+----------
+
+    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`.
+
+.. attention::
+    Using zstd dictionary, the compression ratio achievable on small data (dozens of KB) improves dramatically. Please note:
+
+        #. If you lose a zstd dictionary, then can't decompress the corresponding data.
+        #. zstd dictionary is vulnerable.
+        #. zstd dictionary has very little effect on big data.
+
+
+.. py:class:: ZstdDict
+
+    Represents a pre-trained zstd dictinary, it can be used for compression/decompression. 
+    
+    ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
+    
+    .. py:method:: __init__(dict_content)
+    
+        Initialize a ZstdDict object.
+        
+        :param dict_content: Dictionary's content.
+        :type dict_content: bytes-like object
+        :raises ValueError: If *dict_content* is not a valid zstd dictionary.
+
+    .. py:attribute:: dict_content
+    
+        The content of the zstd dictionary, a bytes object. Can be used with other programs.
+
+    .. py:attribute:: dict_id
+    
+        ID of zstd dictionary, a 32-bit unsigned integer value.
+
+
+.. py:function:: train_dict(iterable_of_chunks, dict_size)
+
+    Train a zstd dictionary.
+    
+    :param iterable_of_chunks: An iterable of samples.
+    :type iterable_of_chunks: iterable
+    :param int dict_size: The zstd dictinary's size, in bytes.
+    :return: Trained zstd dictinary.
+    :rtype: ZstdDict
+
+.. tip:: Training a zstd dictionary
+
+   1. A reasonable dictionary has a size of ~100 KB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
+   2. It's recommended to provide a few thousands samples, though this can vary a lot.
+   3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
+   4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways. 
+
+.. sourcecode:: python
+
+    def chunks():
+        rootdir = r"C:\data"
+        
+        # Note that the order of the files may be different,
+        # therefore the generated dictionary may be different.
+        for parent, dirnames, filenames in os.walk(rootdir):
+            for filename in filenames:
+                path = os.path.join(parent, filename)
+                with open(path, 'rb') as f:
+                    dat = f.read()
+                yield dat
+    
+    dic = pyzstd.train_dict(chunks(), 100*1024)
+
+
+Module-level functions
+----------------------
+
+    This section contains function :py:func:`get_frame_info`, :py:func:`get_frame_size`.
 
 .. py:function:: get_frame_info(frame_buffer)
 
@@ -226,7 +259,7 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
 
 .. sourcecode:: python
 
-    >>> pyzstd.get_frame_info(frame_buffer)
+    >>> pyzstd.get_frame_info(compressed_dat)
     (1437307, 1602083250)
 
 
@@ -243,13 +276,51 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
 
 .. sourcecode:: python
 
-    >>> pyzstd.get_frame_size(frame_buffer)
+    >>> pyzstd.get_frame_size(compressed_dat)
     252874
 
 
-.. :py:data: compressionLevel_bounds
+Module-level variables
+----------------------
 
-    Minimum and maximum values of ``compressionLevel``, both inclusive.
+    This section contains :py:data:`zstd_version`, :py:data:`zstd_version_info`, :py:data:`compressionLevel_bounds`.
+
+.. py:data:: zstd_version
+
+    Underlying zstd library's version, ``str`` form.
+
+.. sourcecode:: python
+
+    >>> pyzstd.zstd_version
+    '1.4.5'
+
+
+.. py:data:: zstd_version_info
+
+    Underlying zstd library's version, ``tuple`` form.
+
+.. sourcecode:: python
+
+    >>> pyzstd.zstd_version_info
+    (1, 4, 5)
+
+
+.. py:data:: compressionLevel_bounds
+
+    A two-items tuple, minimum and maximum avaliable values of :ref:`compression level<compression_level>` defined by underlying zstd library, both inclusive.
+
+.. sourcecode:: python
+
+    >>> pyzstd.compressionLevel_bounds
+    (-131072, 22)
+
+
+Advanced parameters
+-------------------
+
+    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`.
+
+.. _CParameter:
 
 .. py:class:: CParameter(IntEnum)
 
@@ -441,6 +512,8 @@ The interface provided by this module is very similar to Python's bz2/lzma modul
     
         When applicable, dictionary's ID is written into frame header (default:1)
 
+
+.. _DParameter:
 
 .. py:class:: DParameter(IntEnum)
 
