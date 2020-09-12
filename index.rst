@@ -88,6 +88,8 @@ Stream classes
 
     A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
 
+    In ``pyzstd`` module, :py:class:`ZstdCompressor` can still compress data after end a frame. :py:class:`ZstdDecompressor` doesn't have an ``eof`` maker, can decompress data endlessly as long as data is provided.
+
     A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters. Unlike frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor, allowing streaming operations.
 
 .. py:class:: ZstdCompressor
@@ -364,6 +366,8 @@ Advanced parameters
 
     Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
 
+    View the constant values defined in `zstd.h <https://github.com/facebook/zstd/blob/master/lib/zstd.h>`_, note that these values may be different in different zstd versions.
+
     .. sourcecode:: python
 
         option = {CParameter.compressionLevel : 10,
@@ -374,7 +378,8 @@ Advanced parameters
 
         # used with ZstdCompressor object
         c = ZstdCompressor(option=option)
-        compressed_dat = c.compress(raw_dat, c.FLUSH_FRAME)
+        compressed_dat1 = c.compress(raw_dat)
+        compressed_dat2 = c.flush()
 
     .. py:method:: bounds(self)
 
@@ -391,15 +396,17 @@ Advanced parameters
 
     .. py:attribute:: compressionLevel
 
-        Set compression parameters according to pre-defined cLevel table.
+        Set compression parameters according to pre-defined cLevel table, see :ref:`compression level<compression_level>` for details.
 
         Note that exact compression parameters are dynamically determined, depending on both compression level and data size (when known).
 
-        Special: value ``0`` means use default compression level, which is currently ``3``.
+        Special: value ``0`` means use default compression level, which is controlled by ZSTD_CLEVEL_DEFAULT \*.
 
         Note 1 : it's possible to pass a negative compression level.
 
         Note 2 : setting a level does not automatically set all other compression parameters to default. Setting this will however eventually dynamically impact the compression parameters which have not been manually set. The manually set ones will 'stick'.
+
+        \* ZSTD_CLEVEL_DEFAULT is ``3`` in zstd v1.4.5
 
     .. py:attribute:: windowLog
 
@@ -407,11 +414,13 @@ Advanced parameters
 
         This will set a memory budget for streaming decompression, with larger values requiring more memory and typically compressing more.
 
-        Must be clamped between lower and upper bounds.
+        Must be clamped between ZSTD_WINDOWLOG_MIN and ZSTD_WINDOWLOG_MAX.
 
         Special: value ``0`` means "use default windowLog".
 
-        Note: Using a windowLog greater than ZSTD_WINDOWLOG_LIMIT_DEFAULT requires explicitly allowing such size at streaming decompression stage.
+        Note: Using a windowLog greater than ZSTD_WINDOWLOG_LIMIT_DEFAULT \* requires explicitly allowing such size at streaming decompression stage.
+
+        \* ZSTD_WINDOWLOG_LIMIT_DEFAULT is ``27`` in zstd v1.4.5
 
     .. py:attribute:: hashLog
 
@@ -419,7 +428,7 @@ Advanced parameters
 
         Resulting memory usage is ``(1 << (hashLog+2))``.
 
-        Must be clamped between lower and upper bounds.
+        Must be clamped between ZSTD_HASHLOG_MIN and ZSTD_HASHLOG_MAX.
 
         Larger tables improve compression ratio of strategies <= :py:attr:`~Strategy.dfast`, and improve speed of strategies > :py:attr:`~Strategy.dfast`.
 
@@ -431,7 +440,7 @@ Advanced parameters
 
         Resulting memory usage is ``(1 << (chainLog+2))``.
 
-        Must be clamped between lower and upper bounds.
+        Must be clamped between ZSTD_CHAINLOG_MIN and ZSTD_CHAINLOG_MAX.
 
         Larger tables result in better and slower compression.
 
@@ -459,7 +468,7 @@ Advanced parameters
 
         Larger values increase compression and decompression speed, but decrease ratio.
 
-        Must be clamped between lower and upper bounds.
+        Must be clamped between ZSTD_MINMATCH_MIN and ZSTD_MINMATCH_MAX.
 
         Note that currently, for all strategies < :py:attr:`~Strategy.btopt`, effective minimum is ``4``, for all strategies > :py:attr:`~Strategy.fast`, effective maximum is ``6``.
 
@@ -499,7 +508,7 @@ Advanced parameters
 
         It increases memory usage and window size.
 
-        Note: enabling this parameter increases default ZSTD_c_windowLog to 128 MB except when expressly set to a different value.
+        Note: enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MB except when expressly set to a different value.
 
     .. py:attribute:: ldmHashLog
 
@@ -507,7 +516,7 @@ Advanced parameters
 
         Larger values increase memory usage and compression ratio, but decrease compression speed.
 
-        Must be clamped between lower and upper bounds, default: windowlog - 7.
+        Must be clamped between ZSTD_HASHLOG_MIN and ZSTD_HASHLOG_MAX, default: :py:attr:`~CParameter.windowLog` - 7.
 
         Special: value ``0`` means "automatically determine hashlog".
 
@@ -515,7 +524,9 @@ Advanced parameters
 
         Minimum match size for long distance matcher.
 
-        Must be clamped between lower and upper bounds.
+        Larger/too small values usually decrease compression ratio.
+
+        Must be clamped between ZSTD_LDM_MINMATCH_MIN and ZSTD_LDM_MINMATCH_MAX.
 
         Special: value ``0`` means "use default value" (default: 64).
 
@@ -535,7 +546,7 @@ Advanced parameters
 
         Must be clamped between 0 and (ZSTD_WINDOWLOG_MAX - ZSTD_HASHLOG_MIN).
 
-        Default is MAX(0, (windowLog - ldmHashLog)), optimizing hash table usage.
+        Default is MAX(0, (:py:attr:`~CParameter.windowLog` - :py:attr:`~CParameter.ldmHashLog`)), optimizing hash table usage.
 
         Larger values improve compression speed.
 
@@ -545,7 +556,7 @@ Advanced parameters
 
     .. py:attribute:: contentSizeFlag
 
-        Content size will be written into frame header *whenever known* (default:1)
+        Content size will be written into frame header **whenever known** (default:1)
 
         Content size must be known at the beginning of compression, such as using :py:func:`compress` function, or using :py:meth:`ZstdCompressor.compress` with a single :py:attr:`ZstdCompressor.FLUSH_FRAME` mode.
 
@@ -565,6 +576,8 @@ Advanced parameters
     Advanced decompress parameters.
 
     Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
+
+    View the constant values defined in `zstd.h <https://github.com/facebook/zstd/blob/master/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. sourcecode:: python
 
@@ -590,11 +603,15 @@ Advanced parameters
 
         Select a size limit (in power of 2) beyond which the streaming API will refuse to allocate memory buffer in order to protect the host from unreasonable memory requirements.
 
-        This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode.
+        This parameter is only useful in streaming mode \*, since no internal buffer is allocated in single-pass mode.
 
-        By default, a decompression context accepts window sizes <= (1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT).
+        By default, a decompression context accepts window sizes <= (1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT). \*
 
         Special: value ``0`` means "use default maximum windowLog".
+
+        \* pyzstd module uses streaming mode internally.
+
+        \* ZSTD_WINDOWLOG_LIMIT_DEFAULT ``27`` in zstd v1.4.5
 
 
 .. py:class:: Strategy(IntEnum)
