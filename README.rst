@@ -1,7 +1,7 @@
 Introduction
 ------------
 
-``pyzstd`` module provides classes and functions for compressing and decompressing data, using Facebook's `Zstandard <https://github.com/facebook/zstd>`_ (or zstd as short name) algorithm.
+``pyzstd`` module provides classes and functions for compressing and decompressing data, using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
 The interface is similar to Python's bz2/lzma module.
 
