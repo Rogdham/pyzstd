@@ -40,6 +40,7 @@ Common functions
 
     # use compression level
     compressed_dat = compress(raw_dat, 12)
+
     # use option
     option = {CParameter.compressionLevel : 10,
               CParameter.checksumFlag : 1}
@@ -97,7 +98,7 @@ Stream classes
 
         Initialize a ZstdCompressor object.
 
-        :param level_or_option: When it's an ``int`` object, it represents the compression level. When it's a ``dict`` object, it contains :ref:`advanced compress parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
+        :param level_or_option: When it's an ``int`` object, it represents the :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compress parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
         :type level_or_option: int or dict
         :param zstd_dict: Pre-trained dictionary for compression.
         :type zstd_dict: ZstdDict
@@ -125,7 +126,11 @@ Stream classes
 
         Since zstd data consists of one or more independent frames, the compressor object can be used after this method is called.
 
-        :param end_frame: When ``True``, flush data and end the frame, equivalent to ``c.compress(b'', c.FLUSH_FRAME)``, usually used for classical flush() operation. When ``False``, flush data but don't end the frame, equivalent to ``c.compress(b'', c.FLUSH_BLOCK)``, usually used for communication, the receiver can decode the data immediately.
+        ``c.flush(True)`` is equivalent to ``c.compress(b'', c.FLUSH_FRAME)``
+
+        ``c.flush(False)`` is equivalent to ``c.compress(b'', c.FLUSH_BLOCK)``
+
+        :param end_frame: When ``True``, flush data and end the frame, usually used for classical flush() operation. When ``False``, flush data but don't end the frame, usually used for communication, the receiver can decode the data immediately.
         :type end_frame: bool
         :return: Flushed data
         :rtype: bytes
@@ -388,7 +393,7 @@ Advanced parameters
 
         Set compression parameters according to pre-defined cLevel table.
 
-        Note that exact compression parameters are dynamically determined, depending on both compression level and srcSize (when known).
+        Note that exact compression parameters are dynamically determined, depending on both compression level and data size (when known).
 
         Special: value ``0`` means use default compression level, which is currently ``3``.
 
@@ -416,7 +421,7 @@ Advanced parameters
 
         Must be clamped between lower and upper bounds.
 
-        Larger tables improve compression ratio of strategies <= dFast, and improve speed of strategies > dFast.
+        Larger tables improve compression ratio of strategies <= :py:attr:`~Strategy.dfast`, and improve speed of strategies > :py:attr:`~Strategy.dfast`.
 
         Special: value ``0`` means "use default hashLog".
 
@@ -430,9 +435,9 @@ Advanced parameters
 
         Larger tables result in better and slower compression.
 
-        This parameter is useless for "fast" strategy.
+        This parameter is useless for :py:attr:`~Strategy.fast` strategy.
 
-        It's still useful when using "dfast" strategy, in which case it defines a secondary probe table.
+        It's still useful when using :py:attr:`~Strategy.dfast` strategy, in which case it defines a secondary probe table.
 
         Special: value ``0`` means "use default chainLog".
 
@@ -442,7 +447,7 @@ Advanced parameters
 
         More attempts result in better and slower compression.
 
-        This parameter is useless for "fast" and "dFast" strategies.
+        This parameter is useless for :py:attr:`~Strategy.fast` and :py:attr:`~Strategy.dfast` strategies.
 
         Special: value ``0`` means "use default searchLog".
 
@@ -594,7 +599,7 @@ Advanced parameters
 
 .. py:class:: Strategy(IntEnum)
 
-    Used for :py:attr:`CParameter.strategy`.
+    Used for :py:attr:`CParameter.strategy`, listed from fastest to strongest.
 
     Note : new strategies **might** be added in the future, only the order (from fast to strong) is guaranteed.
 
