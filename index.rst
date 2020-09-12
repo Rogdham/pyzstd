@@ -73,11 +73,19 @@ Stream classes
 
     This section contains class :py:class:`ZstdCompressor`, :py:class:`ZstdDecompressor`.
 
+    It would be nice to know some knowledge about zstd data:
+    
+.. note:: Frame and block
+
+    zstd data consists of one or more independent "frames", so a zstd data doesn't have an end marker like other compression algorithms.
+    
+    A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
+
+    A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters. Unlike frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor, allowing streaming operations.
+
 .. py:class:: ZstdCompressor
 
     A stream compressor. It's thread-safe at method level.
-    
-    It would be nice to understand :ref:`some knowledge<frame_and_block>` about zstd data.
     
     .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
     
@@ -135,16 +143,6 @@ Stream classes
     .. py:attribute:: FLUSH_FRAME
     
         Used for :py:meth:`ZstdCompressor.compress` *mode* argument. Flush any remaining data, and close current frame. Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed. Usually used for classical flush.
-
-.. _frame_and_block:
-
-.. note:: Frame and block
-
-    zstd data consists of one or more independent "frames", so a zstd data doesn't have an end marker like other compression algorithms.
-    
-    A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
-
-    A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters. Unlike frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor, allowing streaming operations.
 
 
 .. py:class:: ZstdDecompressor
@@ -321,7 +319,7 @@ Module-level variables
 .. sourcecode:: python
 
     >>> pyzstd.compressionLevel_values
-    compressionLevel_values(default=3, min=-131072, max=22)
+    values(default=3, min=-131072, max=22)
 
 
 Advanced parameters

@@ -16,8 +16,8 @@ from ._zstd import *
 from . import _zstd
 
 
-_nt_compressionLevel = namedtuple('compressionLevel_values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_compressionLevel(*_zstd._compressionLevel_values())
+_nt_values = namedtuple('values', ['default', 'min', 'max'])
+compressionLevel_values = _nt_values(*_zstd._compressionLevel_values())
 
 
 _nt_frame_info = namedtuple('frame_info', ['decompressed_size', 'dictinary_id'])
