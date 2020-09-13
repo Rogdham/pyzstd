@@ -1914,31 +1914,6 @@ error:
 }
 
 
-/*[clinic input]
-_zstd._compressionLevel_values
-
-Internal function, get default/min/max value of compressionLevel.
-[clinic start generated code]*/
-
-static PyObject *
-_zstd__compressionLevel_values_impl(PyObject *module)
-/*[clinic end generated code: output=141bb4a48c90e6ad input=a898bbc783073ae1]*/
-{
-    PyObject *ret;
-
-    if (!(ret = PyTuple_New(3))) {
-        PyErr_NoMemory();
-        return NULL;
-    }
-
-    PyTuple_SET_ITEM(ret, 0, PyLong_FromLong(ZSTD_CLEVEL_DEFAULT));
-    PyTuple_SET_ITEM(ret, 1, PyLong_FromLong(ZSTD_minCLevel()));
-    PyTuple_SET_ITEM(ret, 2, PyLong_FromLong(ZSTD_maxCLevel()));
-
-    return ret;
-}
-
-
 static int
 zstd_exec(PyObject *module)
 {
@@ -2056,6 +2031,34 @@ zstd_exec(PyObject *module)
         goto error;
     }
 
+    /* compressionLevel values */
+    temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
+    temp = PyLong_FromLong(ZSTD_minCLevel());
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_minCLevel", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
+    temp = PyLong_FromLong(ZSTD_maxCLevel());
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
     return 0;
 
 error:
@@ -2072,7 +2075,6 @@ static PyMethodDef _zstd_methods[] = {
     _ZSTD__GET_DPARAM_BOUNDS_METHODDEF
     _ZSTD_GET_FRAME_SIZE_METHODDEF
     _ZSTD__GET_FRAME_INFO_METHODDEF
-    _ZSTD__COMPRESSIONLEVEL_VALUES_METHODDEF
     {NULL}
 };
 

@@ -1,7 +1,7 @@
 
 #include "Python.h"
 
-static int
+static inline int
 add_constants(PyObject *module)
 {
     /* Add zstd parameters */
@@ -19,8 +19,38 @@ add_constants(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_btopt);
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
-    
+
+    /* compressionLevel values */
+    temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
+    temp = PyLong_FromLong(ZSTD_minCLevel());
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_minCLevel", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
+    temp = PyLong_FromLong(ZSTD_maxCLevel());
+    if (temp == NULL) {
+        goto error;
+    }
+    if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+
     return 0;
+error:
+    return -1;
 }
 
 static PyModuleDef _zstdmodule2 = {

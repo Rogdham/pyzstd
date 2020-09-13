@@ -604,22 +604,4 @@ exit:
 
     return return_value;
 }
-
-PyDoc_STRVAR(_zstd__compressionLevel_values__doc__,
-"_compressionLevel_values($module, /)\n"
-"--\n"
-"\n"
-"Internal function, get default/min/max value of compressionLevel.");
-
-#define _ZSTD__COMPRESSIONLEVEL_VALUES_METHODDEF    \
-    {"_compressionLevel_values", (PyCFunction)_zstd__compressionLevel_values, METH_NOARGS, _zstd__compressionLevel_values__doc__},
-
-static PyObject *
-_zstd__compressionLevel_values_impl(PyObject *module);
-
-static PyObject *
-_zstd__compressionLevel_values(PyObject *module, PyObject *Py_UNUSED(ignored))
-{
-    return _zstd__compressionLevel_values_impl(module);
-}
-/*[clinic end generated code: output=a12f04df9e88dcd0 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=f409b95cc5842172 input=a9049054013a1b77]*/
