@@ -4,6 +4,8 @@
 static inline int
 add_constants(PyObject *module)
 {
+    PyObject *temp;
+
     /* Add zstd parameters */
     if (add_parameters(module) < 0) {
         return -1;
@@ -66,7 +68,7 @@ PyInit__zstd(void)
     PyObject *module;
     PyObject *temp;
     _zstd_state *state;
-    
+
     module = PyModule_Create(&_zstdmodule2);
     if (!module) {
         goto error;
@@ -101,7 +103,7 @@ PyInit__zstd(void)
         goto error;
     }
     static_state.ZstdDict_type = temp;
-    
+
     /* ZstdCompressor */
     temp = PyType_FromSpec(&zstdcompressor_type_spec);
     if (temp == NULL) {
@@ -113,7 +115,7 @@ PyInit__zstd(void)
         goto error;
     }
     static_state.ZstdCompressor_type = temp;
-    
+
     /* Add EndDirective enum to ZstdCompressor */
     temp = PyLong_FromLong(ZSTD_e_continue);
     if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,

@@ -45,7 +45,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.6.3',
+    version='0.6.4',
     description="A Zstandard (zstd) module, the interface is similar to Python's bz2/lzma modules.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
