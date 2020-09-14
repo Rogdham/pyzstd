@@ -198,7 +198,7 @@ Stream classes
 
         Decompress *data*, returning uncompressed data as bytes.
 
-        :param int max_length: When *max_length* is negative, the size of output buffer is unlimited. When *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to this method may provide *data* as ``b''`` to obtain more of the output.
+        :param int max_length: When *max_length* is negative, the size of output buffer is unlimited. When *max_length* is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can (or may) be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to this method may provide *data* as ``b''`` to obtain more of the output.
 
     .. py:attribute:: needs_input
 
@@ -208,7 +208,7 @@ Stream classes
 
         ``True`` when the output is at a frame edge, means a frame is completely decoded and fully flushed, or the decompressor just be initialized.
 
-        You may use this flag to check data integrity.
+        Since zstd data doesn't have an end marker, it could be used to check data integrity.
 
         Note that the input stream is not necessarily at a frame edge.
 
@@ -366,8 +366,23 @@ Module-level variables
 Advanced parameters
 -------------------
 
-    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`.
+    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclass of IntEnum, used for setting advanced parameters.
 
+    :py:class:`CParameter` class' attributes:
+
+        - Compression level (:py:attr:`~CParameter.compressionLevel`)
+        - Compress algorithm parameters (:py:attr:`~CParameter.windowLog`, :py:attr:`~CParameter.hashLog`, :py:attr:`~CParameter.chainLog`, :py:attr:`~CParameter.searchLog`, :py:attr:`~CParameter.minMatch`, :py:attr:`~CParameter.targetLength`, :py:attr:`~CParameter.strategy`)
+        - Long distance matching (:py:attr:`~CParameter.enableLongDistanceMatching`, :py:attr:`~CParameter.ldmHashLog`, :py:attr:`~CParameter.ldmMinMatch`, :py:attr:`~CParameter.ldmBucketSizeLog`, :py:attr:`~CParameter.ldmHashRateLog`)
+        - Misc (:py:attr:`~CParameter.contentSizeFlag`, :py:attr:`~CParameter.checksumFlag`, :py:attr:`~CParameter.dictIDFlag`)
+        - Multi-threading compression (:py:attr:`~CParameter.nbWorkers`, :py:attr:`~CParameter.jobSize`, :py:attr:`~CParameter.overlapLog`)
+
+    :py:class:`DParameter` class' attribute:
+
+        - Decompress parameter (:py:attr:`~DParameter.windowLogMax`)
+
+    :py:class:`Strategy` class' attributes:
+
+        :py:attr:`~Strategy.fast`, :py:attr:`~Strategy.dfast`, :py:attr:`~Strategy.greedy`, :py:attr:`~Strategy.lazy`, :py:attr:`~Strategy.lazy2`, :py:attr:`~Strategy.btlazy2`, :py:attr:`~Strategy.btopt`, :py:attr:`~Strategy.btultra`, :py:attr:`~Strategy.btultra2`.
 
 .. _CParameter:
 
@@ -583,11 +598,11 @@ Advanced parameters
 
         Select how many threads will be spawned to compress in parallel.
 
-        When nbWorkers > 1, enables multi-threading compression, see :ref:`zstd multi-threading compression<mt_compression>` for details.
+        When nbWorkers > ``1``, enables multi-threading compression, see :ref:`zstd multi-threading compression<mt_compression>` for details.
 
         More workers improve speed, but also increase memory usage.
 
-        Default value is `0`, aka "single-threaded mode" : no worker is spawned, compression is performed inside caller's thread, all invocations are blocking.
+        Default value is `0`, aka "single-threaded mode" : no worker is spawned, compression is performed inside caller's thread.
 
     .. py:attribute:: jobSize
 
