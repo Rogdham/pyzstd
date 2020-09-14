@@ -212,6 +212,29 @@ Stream classes
 
         Note that the input stream is not necessarily at a frame edge.
 
+    .. sourcecode:: python
+
+        d = ZstdDecompressor()
+
+        # unlimited output
+        ret = d.decompress(dat)
+
+        # limited output buffer to 10 MB
+        lst = []
+        while True:
+            if d.needs_input:
+                dat = fp.read(1*1024*1024)
+                if not dat:
+                    break
+            else:
+                dat = b''
+
+            chunk = d.decompress(dat, 10*1024*1024)
+            lst.append(chunk)
+
+        decompressed_dat = b''.join(lst)
+        assert d.at_frame_edge, 'data is not integrate.'
+
 
 Dictionary
 ----------
