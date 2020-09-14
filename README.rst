@@ -5,8 +5,8 @@ Introduction
 
 The interface is similar to Python's bz2/lzma module.
 
-* Bind with zstd v1.4.5
-* Due to the use of Argument Clinic, only supports Python 3.7+.
+* Binds zstd v1.4.5
+* Due to the use of `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, only supports Python 3.7+
 
 
 Installtion

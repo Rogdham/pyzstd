@@ -44,6 +44,9 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
+    /* Enabled zstd multi-threading compression */
+    int zstd_multi_threading;
+
     /* __init__ has been called */
     int inited;
 } ZstdCompressor;
@@ -342,14 +345,20 @@ static const ParameterInfo cp_list[] =
     {ZSTD_c_minMatch,         "minMatch"},
     {ZSTD_c_targetLength,     "targetLength"},
     {ZSTD_c_strategy,         "strategy"},
+
     {ZSTD_c_enableLongDistanceMatching, "enableLongDistanceMatching"},
     {ZSTD_c_ldmHashLog,       "ldmHashLog"},
     {ZSTD_c_ldmMinMatch,      "ldmMinMatch"},
     {ZSTD_c_ldmBucketSizeLog, "ldmBucketSizeLog"},
     {ZSTD_c_ldmHashRateLog,   "ldmHashRateLog"},
+
     {ZSTD_c_contentSizeFlag,  "contentSizeFlag"},
     {ZSTD_c_checksumFlag,     "checksumFlag"},
-    {ZSTD_c_dictIDFlag,       "dictIDFlag"}
+    {ZSTD_c_dictIDFlag,       "dictIDFlag"},
+
+    {ZSTD_c_nbWorkers,        "nbWorkers"},
+    {ZSTD_c_jobSize,          "jobSize"},
+    {ZSTD_c_overlapLog,       "overlapLog"}
 };
 
 static const ParameterInfo dp_list[] =
@@ -445,14 +454,20 @@ add_parameters(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_minMatch);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_targetLength);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_strategy);
+
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_enableLongDistanceMatching);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_ldmHashLog);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_ldmMinMatch);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_ldmBucketSizeLog);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_ldmHashRateLog);
+
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_contentSizeFlag);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_checksumFlag);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_dictIDFlag);
+
+    ADD_INT_PREFIX_MACRO(module, ZSTD_c_nbWorkers);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_c_jobSize);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_c_overlapLog);
 
     /* Decompress parameters */
     ADD_INT_PREFIX_MACRO(module, ZSTD_d_windowLogMax);
@@ -840,9 +855,22 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option, int *compress_
                 return -1;
             }
 
-            /* Get ZSTD_c_compressionLevel for generating ZSTD_CDICT */
             if (key_v == ZSTD_c_compressionLevel) {
+                /* Get compressionLevel for generating ZSTD_CDICT */
                 *compress_level = value_v;
+            } else if (key_v == ZSTD_c_nbWorkers) {
+                /* From zstd library doc:
+                   1. When nbWorkers >= 1, triggers asynchronous mode when
+                      used with ZSTD_compressStream2().
+                   2, Default value is `0`, aka "single-threaded mode" : no
+                      worker is spawned, compression is performed inside
+                      caller's thread, all invocations are blocking*/
+                if (value_v > 1) {
+                    self->zstd_multi_threading = 1;
+                } else if (value_v == 1) {
+                    /* Use single-threaded mode */
+                    value_v = 0;
+                }
             }
 
             /* Set parameter to compress context */
@@ -1001,6 +1029,7 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(self->dict == NULL);
+    assert(self->zstd_multi_threading == 0);
     assert(self->inited == 0);
 
     /* Compress context */
@@ -1200,6 +1229,18 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
         mode != ZSTD_e_continue) {
         PyErr_Format(PyExc_ValueError,
                      "mode argument wrong value: %d.", mode);
+        return NULL;
+    }
+
+    /* Check zstd multi-threading with ZSTD_e_continue mode */
+    if (self->zstd_multi_threading && mode == ZSTD_e_continue) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "ZstdCompressor.CONTINUE mode is not supported when "
+                        "using zstd multi-threading compression (set compress "
+                        "parameter \"nbWorkers\" > 1), supporting this mode "
+                        "will make the code greatly complicated. Please use "
+                        "ZstdCompressor.FLUSH_BLOCK mode or "
+                        "ZstdCompressor.FLUSH_FRAME mode.");
         return NULL;
     }
 

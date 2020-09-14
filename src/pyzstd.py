@@ -51,14 +51,20 @@ class CParameter(enum.IntEnum):
     minMatch                   = _zstd._ZSTD_c_minMatch
     targetLength               = _zstd._ZSTD_c_targetLength
     strategy                   = _zstd._ZSTD_c_strategy
+
     enableLongDistanceMatching = _zstd._ZSTD_c_enableLongDistanceMatching
     ldmHashLog                 = _zstd._ZSTD_c_ldmHashLog
     ldmMinMatch                = _zstd._ZSTD_c_ldmMinMatch
     ldmBucketSizeLog           = _zstd._ZSTD_c_ldmBucketSizeLog
     ldmHashRateLog             = _zstd._ZSTD_c_ldmHashRateLog
+
     contentSizeFlag            = _zstd._ZSTD_c_contentSizeFlag
     checksumFlag               = _zstd._ZSTD_c_checksumFlag
     dictIDFlag                 = _zstd._ZSTD_c_dictIDFlag
+
+    nbWorkers                  = _zstd._ZSTD_c_nbWorkers
+    jobSize                    = _zstd._ZSTD_c_jobSize
+    overlapLog                 = _zstd._ZSTD_c_overlapLog
 
     def bounds(self):
         """Return lower and upper bounds of a parameter, both inclusive."""
