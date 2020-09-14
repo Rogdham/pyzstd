@@ -1,6 +1,6 @@
 
 #include "Python.h"
-#include "structmember.h"         // PyMemberDef
+#include "structmember.h"      // PyMemberDef
 
 #include "../lib/zstd.h"
 #include "../lib/dictBuilder/zdict.h"
@@ -175,7 +175,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     /* The first block */
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
-        buffer->list = NULL; // For _BlocksOutputBuffer_OnError()
+        buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
         return -1;
     }
 
@@ -669,7 +669,7 @@ static PyObject *
 _zstd_ZstdDict___reduce___impl(ZstdDict *self)
 /*[clinic end generated code: output=5c9b8a3550429417 input=3b3bf01bc131f928]*/
 {
-    // return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content);
+    /* return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content); */
 
     PyErr_SetString(PyExc_TypeError,
                     "Intentionally not supporting pickle. If need to save zstd "
@@ -1524,9 +1524,12 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     }
 
 success:
-    /* Set at_frame_edge flag when outputted.
+    /* check (out.pos > 0):
+           set at_frame_edge flag when outputted.
+       check (zstd_ret == 0):
+           in rare cases, frame epilogue is decoded, but no output data.
        (zstd_ret == 0) means a frame is completely decoded and fully flushed */
-    if (out.pos > 0) {
+    if (out.pos > 0 || zstd_ret == 0) {
         self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
     }
     return ret;
