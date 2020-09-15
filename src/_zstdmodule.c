@@ -286,7 +286,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         Py_ssize_t i = 0;
         for (; i < Py_SIZE(buffer->list)-1; i++) {
             block = PyList_GET_ITEM(buffer->list, i);
-            memcpy(offset,  PyBytes_AS_STRING(block), Py_SIZE(block));
+            memcpy(offset, PyBytes_AS_STRING(block), Py_SIZE(block));
             offset += Py_SIZE(block);
         }
         /* The last block */
@@ -804,7 +804,9 @@ error:
 
 /* Set compressLevel or compress parameters to compress context. */
 static int
-set_c_parameters(ZstdCompressor *self, PyObject *level_or_option, int *compress_level)
+set_c_parameters(ZstdCompressor *self,
+                 PyObject *level_or_option,
+                 int *compress_level)
 {
     size_t zstd_ret;
     char msg_buf[160];
@@ -820,8 +822,10 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option, int *compress_
             return -1;
         }
 
-        /* Set ZSTD_c_compressionLevel to compress context */
-        zstd_ret = ZSTD_CCtx_setParameter(self->cctx, ZSTD_c_compressionLevel, *compress_level);
+        /* Set compressionLevel to compress context */
+        zstd_ret = ZSTD_CCtx_setParameter(self->cctx,
+                                          ZSTD_c_compressionLevel,
+                                          *compress_level);
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
@@ -877,7 +881,8 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option, int *compress_
             zstd_ret = ZSTD_CCtx_setParameter(self->cctx, key_v, value_v);
             if (ZSTD_isError(zstd_ret)) {
                 _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
-                get_parameter_error_msg(msg_buf, sizeof(msg_buf), pos, key_v, value_v, 1),
+                get_parameter_error_msg(msg_buf, sizeof(msg_buf),
+                                        pos, key_v, value_v, 1);
                 PyErr_Format(state->ZstdError, msg_buf);
                 return -1;
             }
@@ -970,7 +975,8 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
             _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
-            get_parameter_error_msg(msg_buf, sizeof(msg_buf), pos, key_v, value_v, 0),
+            get_parameter_error_msg(msg_buf, sizeof(msg_buf),
+                                    pos, key_v, value_v, 0);
             PyErr_Format(state->ZstdError, msg_buf);
             return -1;
         }
