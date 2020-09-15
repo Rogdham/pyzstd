@@ -86,15 +86,17 @@ Stream classes
 
     **Frame**
 
-    zstd data consists of one or more independent "frames", so a zstd data doesn't have an end marker like other compression algorithms.
+    zstd data consists of one or more independent "frames". The decompressed content of multiple concatenated frames is the concatenation of each frame decompressed content.
 
     A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
+
+    So a zstd data doesn't have an end marker like other compression format.
 
     Due to zstd's this characteristic, :py:class:`ZstdCompressor` object can still compress data after flushing a frame. :py:class:`ZstdDecompressor` object doesn't have a .eof maker, can decompress data endlessly as long as data is provided.
 
     **Block**
 
-    A frame encapsulates one or multiple "blocks". Each block contains arbitrary content, which is described by its header, and has a guaranteed maximum content size, which depends on frame parameters.
+    A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (128KB+3 at most), the maximum size depends on frame parameters.
 
     Unlike independent frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor. So flushing a block may be used in communication scenarios.
 
@@ -219,7 +221,7 @@ Stream classes
         # unlimited output
         ret = d.decompress(dat)
 
-        # limited output buffer to 10 MB
+        # limit output buffer to 10 MB
         lst = []
         while True:
             if d.needs_input:
@@ -242,7 +244,9 @@ Dictionary
     This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`.
 
 .. attention::
-    Using zstd dictionary, the compression ratio achievable on small data (a few KB) improves dramatically. Please note:
+    Using pre-trained zstd dictionary, the compression ratio achievable on small data (a few KB) improves dramatically, has best effect on data that smaller than 1 KB.
+
+    Please note:
 
         #. If you lose a zstd dictionary, then can't decompress the corresponding data.
         #. zstd dictionary is vulnerable.
@@ -475,7 +479,7 @@ Advanced parameters
 
         Size of the initial probe table, as a power of 2.
 
-        Resulting memory usage is ``(1 << (hashLog+2))``.
+        Resulting memory usage is ``(1 << (hashLog+2))`` bytes.
 
         Must be clamped between ``ZSTD_HASHLOG_MIN`` and ``ZSTD_HASHLOG_MAX``.
 
@@ -487,7 +491,7 @@ Advanced parameters
 
         Size of the multi-probe search table, as a power of 2.
 
-        Resulting memory usage is ``(1 << (chainLog+2))``.
+        Resulting memory usage is ``(1 << (chainLog+2))`` bytes.
 
         Must be clamped between ``ZSTD_CHAINLOG_MIN`` and ``ZSTD_CHAINLOG_MAX``.
 
@@ -653,7 +657,7 @@ Advanced parameters
 
         Possible values range from 0 to 9 :
 
-        - 0 means "default" : value will be determined by the library, depending on strategy
+        - 0 means "default" : value will be determined by the library, depending on :py:attr:`~CParameter.strategy`
         - 1 means "no overlap"
         - 9 means "full overlap", using a full window size.
 
