@@ -26,7 +26,7 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* __init__ has been called */
-    int inited;
+    char inited;
 } ZstdDict;
 
 typedef struct {
@@ -45,10 +45,10 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* Enabled zstd multi-threading compression */
-    int zstd_multi_threading;
+    char zstd_multi_threading;
 
     /* __init__ has been called */
-    int inited;
+    char inited;
 } ZstdCompressor;
 
 typedef struct {
@@ -77,7 +77,7 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* __init__ has been called */
-    int inited;
+    char inited;
 } ZstdDecompressor;
 
 typedef struct {

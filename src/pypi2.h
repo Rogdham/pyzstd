@@ -102,7 +102,7 @@ PyInit__zstd(void)
         Py_DECREF(temp);
         goto error;
     }
-    static_state.ZstdDict_type = temp;
+    static_state.ZstdDict_type = (PyTypeObject*) temp;
 
     /* ZstdCompressor */
     temp = PyType_FromSpec(&zstdcompressor_type_spec);
@@ -114,7 +114,7 @@ PyInit__zstd(void)
         Py_DECREF(temp);
         goto error;
     }
-    static_state.ZstdCompressor_type = temp;
+    static_state.ZstdCompressor_type = (PyTypeObject*) temp;
 
     /* Add EndDirective enum to ZstdCompressor */
     temp = PyLong_FromLong(ZSTD_e_continue);
@@ -151,7 +151,7 @@ PyInit__zstd(void)
         Py_DECREF(temp);
         goto error;
     }
-    static_state.ZstdDecompressor_type = temp;
+    static_state.ZstdDecompressor_type = (PyTypeObject*) temp;
 
     /* zstd_version, ZSTD_versionString() requires zstd v1.3.0+ */
     if (!(temp = PyUnicode_FromString(ZSTD_versionString()))) {

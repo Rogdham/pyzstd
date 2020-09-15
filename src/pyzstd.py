@@ -117,7 +117,12 @@ def decompress(data, zstd_dict=None, option=None):
     For incremental decompression, use an ZstdDecompressor instead.
     """
     decomp = ZstdDecompressor(zstd_dict, option)
-    return decomp.decompress(data)
+    ret = decomp.decompress(data)
+
+    if not decomp.at_frame_edge:
+        raise ZstdError("The zstd data ends in an incomplete frame.")
+
+    return ret
 
 
 def train_dict(iterable_of_chunks, dict_size):
@@ -125,14 +130,6 @@ def train_dict(iterable_of_chunks, dict_size):
 
     iterable_of_chunks argument is an iterable of samples. dict_size argument
     is the dictionary's size, in bytes.
-
-    In general:
-    1) A reasonable dictionary has a size of ~100 KB. It's possible to select
-       smaller or larger size, just by specifying dict_size argument in bytes.
-    2) It's recommended to provide a few thousands samples, though this can
-       vary a lot.
-    3) It's recommended that total size of all samples be about ~x100 times the
-       target size of dictionary.
     """
     chunks = []
     chunk_sizes = []
@@ -183,6 +180,9 @@ class EndlessDecompressReader(_compression.DecompressReader):
 
         # self._fp ends
         if not data:
+            if not self._decompressor.at_frame_edge:
+                raise ZstdError("The zstd data ends in an incomplete frame.")
+
             self._eof = True
             self._size = self._pos  # decompressed size
             return b""
