@@ -760,6 +760,7 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
 
     chunk_sizes = PyMem_Malloc(chunks_number * sizeof(size_t));
     if (chunk_sizes == NULL) {
+        PyErr_NoMemory();
         goto error;
     }
 
@@ -774,6 +775,7 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
     /* Allocate dict buffer */
     dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
     if (dict_buffer == NULL) {
+        PyErr_NoMemory();
         goto error;
     }
 
@@ -791,6 +793,11 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
         goto error;
     }
 
+    /* Resize dict_buffer */
+    if (_PyBytes_Resize(&dict_buffer, zstd_ret) < 0) {
+        goto error;
+    }
+
     PyMem_Free(chunk_sizes);
     return dict_buffer;
 
@@ -801,6 +808,128 @@ error:
     Py_XDECREF(dict_buffer);
     return NULL;
 }
+
+
+/*[clinic input]
+_zstd._finalize_dict
+
+    custom_dict: PyBytesObject
+    dst_data: PyBytesObject
+    dst_data_sizes: object
+    dict_size: Py_ssize_t
+    compression_level: int
+
+Internal function, train a zstd dictionary.
+[clinic start generated code]*/
+
+static PyObject *
+_zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
+                          PyBytesObject *dst_data, PyObject *dst_data_sizes,
+                          Py_ssize_t dict_size, int compression_level)
+/*[clinic end generated code: output=cbe4de35afab79bf input=78d544ce4f1c2be6]*/
+{
+#if ZSTD_VERSION_NUMBER < 10405
+    PyErr_Format(PyExc_NotImplementedError,
+                 "This function only available when the underlying zstd "
+                 "library's version is greater than or equal to v1.4.5, "
+                 "the current underlying zstd library's version is v%s.",
+                 ZSTD_versionString());
+    return NULL;
+#else
+    char *custom_dict_buffer = NULL;
+    Py_ssize_t custom_dict_size;
+    size_t *chunk_sizes = NULL;
+    PyObject *dict_buffer = NULL;
+    size_t zstd_ret;
+    ZDICT_params_t params;
+
+    /* Get a copy of custom_dict content */
+    custom_dict_size = Py_SIZE(custom_dict);
+    custom_dict_buffer = PyMem_Malloc(custom_dict_size);
+    if (custom_dict_buffer == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+
+    memcpy(custom_dict_buffer,
+           PyBytes_AS_STRING(custom_dict),
+           custom_dict_size);
+
+    /* Prepare chunk_sizes */
+    const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
+    if (chunks_number > UINT32_MAX) {
+        PyErr_SetString(PyExc_ValueError,
+                        "Number of data chunks is too big, should <= 4294967295.");
+        goto error;
+    }
+
+    chunk_sizes = PyMem_Malloc(chunks_number * sizeof(size_t));
+    if (chunk_sizes == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+
+    for (Py_ssize_t i = 0; i < chunks_number; i++) {
+        PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
+        chunk_sizes[i] = PyLong_AsSize_t(size);
+        if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
+            goto error;
+        }
+    }
+
+    /* Allocate dict buffer */
+    dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
+    if (dict_buffer == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+
+    /* Parameters */
+
+    /* Optimize for a specific zstd compression level, 0 means default. */
+    params.compressionLevel = compression_level;
+    /* Write log to stderr, 0 = none. */
+    params.notificationLevel = 0;
+    /* Force dictID value, 0 means auto mode (32-bits random value). */
+    params.dictID = 0;
+
+    /* Train the dictionary. */
+    Py_BEGIN_ALLOW_THREADS
+    zstd_ret = ZDICT_finalizeDictionary(PyBytes_AS_STRING(dict_buffer), dict_size,
+                                        custom_dict_buffer, custom_dict_size,
+                                        PyBytes_AS_STRING(dst_data),
+                                        chunk_sizes, (uint32_t)chunks_number,
+                                        params);
+    Py_END_ALLOW_THREADS
+
+    /* Check zstd dict error. */
+    if (ZDICT_isError(zstd_ret)) {
+        _zstd_state *state = get_zstd_state(module);
+        PyErr_SetString(state->ZstdError, ZDICT_getErrorName(zstd_ret));
+        goto error;
+    }
+
+    /* Resize dict_buffer */
+    if (_PyBytes_Resize(&dict_buffer, zstd_ret) < 0) {
+        goto error;
+    }
+
+    PyMem_Free(custom_dict_buffer);
+    PyMem_Free(chunk_sizes);
+    return dict_buffer;
+
+error:
+    if (custom_dict_buffer != NULL) {
+        PyMem_Free(custom_dict_buffer);
+    }
+    if (chunk_sizes != NULL) {
+        PyMem_Free(chunk_sizes);
+    }
+    Py_XDECREF(dict_buffer);
+    return NULL;
+#endif
+}
+
 
 /* Set compressLevel or compress parameters to compress context. */
 static int
@@ -2130,6 +2259,7 @@ zstd_exec(PyObject *module)
 
 static PyMethodDef _zstd_methods[] = {
     _ZSTD__TRAIN_DICT_METHODDEF
+    _ZSTD__FINALIZE_DICT_METHODDEF
     _ZSTD__GET_CPARAM_BOUNDS_METHODDEF
     _ZSTD__GET_DPARAM_BOUNDS_METHODDEF
     _ZSTD_GET_FRAME_SIZE_METHODDEF

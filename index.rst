@@ -241,7 +241,7 @@ Stream classes
 Dictionary
 ----------
 
-    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`.
+    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`, advanced function :py:func:`finalize_dict`.
 
 .. attention::
     Using pre-trained zstd dictionary, the compression ratio achievable on small data (a few KB) improves dramatically, has best effect on data that smaller than 1 KB.
@@ -276,15 +276,33 @@ Dictionary
         ID of zstd dictionary, a 32-bit unsigned integer value.
 
 
-.. py:function:: train_dict(iterable_of_chunks, dict_size)
+.. py:function:: train_dict(iterable_of_samples, dict_size)
 
-    Train a zstd dictionary.
+    Train a zstd dictionary, see :ref:`tips<train_tips>` for training a zstd dictionary.
 
-    :param iterable_of_chunks: An iterable of samples.
-    :type iterable_of_chunks: iterable
-    :param int dict_size: The zstd dictionary's size, in bytes.
+    :param iterable_of_samples: An iterable of samples.
+    :type iterable_of_samples: iterable
+    :param int dict_size: Returned zstd dictionary's **maximal** size, in bytes.
     :return: Trained zstd dictionary.
     :rtype: ZstdDict
+
+    .. sourcecode:: python
+
+        def samples():
+            rootdir = r"E:\data"
+
+            # Note that the order of the files may be different,
+            # therefore the generated dictionary may be different.
+            for parent, dirnames, filenames in os.walk(rootdir):
+                for filename in filenames:
+                    path = os.path.join(parent, filename)
+                    with open(path, 'rb') as f:
+                        dat = f.read()
+                    yield dat
+
+        dic = pyzstd.train_dict(samples(), 100*1024)
+
+.. _train_tips:
 
 .. tip:: Training a zstd dictionary
 
@@ -293,21 +311,23 @@ Dictionary
    3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
    4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
 
-.. sourcecode:: python
 
-    def chunks():
-        rootdir = r"E:\data"
+.. py:function:: finalize_dict(zstd_dict, iterable_of_samples, dict_size, level)
 
-        # Note that the order of the files may be different,
-        # therefore the generated dictionary may be different.
-        for parent, dirnames, filenames in os.walk(rootdir):
-            for filename in filenames:
-                path = os.path.join(parent, filename)
-                with open(path, 'rb') as f:
-                    dat = f.read()
-                yield dat
+    Finalize a zstd dictionary.
 
-    dic = pyzstd.train_dict(chunks(), 100*1024)
+    This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
+
+    Only available when the underlying zstd library's version is greater than or equal to v1.4.5, raise a ``NotImplementedError`` exception otherwise.
+
+    :param zstd_dict: An existing zstd dictionary.
+    :type zstd_dict: ZstdDict
+    :param iterable_of_samples: An iterable of samples.
+    :type iterable_of_samples: iterable
+    :param int dict_size: Returned zstd dictionary's **maximal** size, in bytes.
+    :param int level: The compression level expected to use in production.
+    :return: Finalized zstd dictionary.
+    :rtype: ZstdDict
 
 
 Module-level functions
@@ -749,7 +769,7 @@ Advanced parameters
 
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
 
-    When zstd multi-threading compression is enabled, using :py:meth:`ZstdCompressor.compress` method with :py:attr:`ZstdCompressor.CONTINUE` mode is not supported, supporting this mode will make the code complicated greatly, it will raise a RuntimeError in this case.
+    When zstd multi-threading compression is enabled, using :py:meth:`ZstdCompressor.compress` method with :py:attr:`ZstdCompressor.CONTINUE` mode is not supported, supporting this mode will make the code complicated greatly, it will raise a ``RuntimeError`` in this case.
 
     .. sourcecode:: python
 

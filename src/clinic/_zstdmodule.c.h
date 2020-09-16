@@ -106,6 +106,71 @@ exit:
     return return_value;
 }
 
+PyDoc_STRVAR(_zstd__finalize_dict__doc__,
+"_finalize_dict($module, /, custom_dict, dst_data, dst_data_sizes,\n"
+"               dict_size, compression_level)\n"
+"--\n"
+"\n"
+"Internal function, train a zstd dictionary.");
+
+#define _ZSTD__FINALIZE_DICT_METHODDEF    \
+    {"_finalize_dict", (PyCFunction)(void(*)(void))_zstd__finalize_dict, METH_FASTCALL|METH_KEYWORDS, _zstd__finalize_dict__doc__},
+
+static PyObject *
+_zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
+                          PyBytesObject *dst_data, PyObject *dst_data_sizes,
+                          Py_ssize_t dict_size, int compression_level);
+
+static PyObject *
+_zstd__finalize_dict(PyObject *module, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"custom_dict", "dst_data", "dst_data_sizes", "dict_size", "compression_level", NULL};
+    static _PyArg_Parser _parser = {NULL, _keywords, "_finalize_dict", 0};
+    PyObject *argsbuf[5];
+    PyBytesObject *custom_dict;
+    PyBytesObject *dst_data;
+    PyObject *dst_data_sizes;
+    Py_ssize_t dict_size;
+    int compression_level;
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 5, 5, 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    if (!PyBytes_Check(args[0])) {
+        _PyArg_BadArgument("_finalize_dict", "argument 'custom_dict'", "bytes", args[0]);
+        goto exit;
+    }
+    custom_dict = (PyBytesObject *)args[0];
+    if (!PyBytes_Check(args[1])) {
+        _PyArg_BadArgument("_finalize_dict", "argument 'dst_data'", "bytes", args[1]);
+        goto exit;
+    }
+    dst_data = (PyBytesObject *)args[1];
+    dst_data_sizes = args[2];
+    {
+        Py_ssize_t ival = -1;
+        PyObject *iobj = _PyNumber_Index(args[3]);
+        if (iobj != NULL) {
+            ival = PyLong_AsSsize_t(iobj);
+            Py_DECREF(iobj);
+        }
+        if (ival == -1 && PyErr_Occurred()) {
+            goto exit;
+        }
+        dict_size = ival;
+    }
+    compression_level = _PyLong_AsInt(args[4]);
+    if (compression_level == -1 && PyErr_Occurred()) {
+        goto exit;
+    }
+    return_value = _zstd__finalize_dict_impl(module, custom_dict, dst_data, dst_data_sizes, dict_size, compression_level);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(_zstd_ZstdCompressor___init____doc__,
 "ZstdCompressor(level_or_option=None, zstd_dict=None)\n"
 "--\n"
@@ -604,4 +669,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=f409b95cc5842172 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=ff1cb6070e836112 input=a9049054013a1b77]*/

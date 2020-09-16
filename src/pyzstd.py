@@ -1,5 +1,5 @@
 
-__all__ = ('compress', 'decompress', 'train_dict',
+__all__ = ('compress', 'decompress', 'train_dict', 'finalize_dict',
            'ZstdCompressor', 'ZstdDecompressor', 'ZstdDict', 'ZstdError',
            'ZstdFile', 'zstd_open',
            'CParameter', 'DParameter', 'Strategy',
@@ -125,16 +125,16 @@ def decompress(data, zstd_dict=None, option=None):
     return ret
 
 
-def train_dict(iterable_of_chunks, dict_size):
+def train_dict(iterable_of_samples, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
-    iterable_of_chunks argument is an iterable of samples. dict_size argument
-    is the dictionary's size, in bytes.
+    iterable_of_samples argument is an iterable of samples.
+    dict_size argument is the dictionary's maximal size, in bytes.
     """
     chunks = []
     chunk_sizes = []
 
-    for chunk in iterable_of_chunks:
+    for chunk in iterable_of_samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
@@ -147,6 +147,48 @@ def train_dict(iterable_of_chunks, dict_size):
     # chunk_sizes: a list of each sample's size.
     # dict_size: size of the dictionary, in bytes.
     dict_content = _zstd._train_dict(chunks, chunk_sizes, dict_size)
+
+    return ZstdDict(dict_content)
+
+
+def finalize_dict(zstd_dict, iterable_of_samples, dict_size, level):
+    """Finalize a zstd dictionary, return a ZstdDict object.
+
+    This is an advanced function, see zstd documentation for usage.
+    Only available when the underlying zstd library's version is
+    greater than or equal to v1.4.5
+
+    zstd_dict argument is a ZstdDict object.
+    iterable_of_samples argument is an iterable of samples.
+    dict_size argument is the dictionary's maximal size, in bytes.
+    level argument is the compression level expected to use in production.
+    """
+    if zstd_version_info < (1, 4, 5):
+        msg = ("This function only available when the underlying zstd "
+               "library's version is greater than or equal to v1.4.5, "
+               "the current underlying zstd library's version is v%s.") % zstd_version
+        raise NotImplementedError(msg)
+
+    chunks = []
+    chunk_sizes = []
+
+    for chunk in iterable_of_samples:
+        chunks.append(chunk)
+        chunk_sizes.append(len(chunk))
+
+    if not chunks:
+        raise ValueError("The chunks is empty content, can't train dictionary.")
+
+    chunks = b''.join(chunks)
+
+    # zstd_dict: existing dictionary.
+    # chunks: samples be stored concatenated in a single flat buffer.
+    # chunk_sizes: a list of each sample's size.
+    # dict_size: maximal size of the dictionary, in bytes.
+    # level: compression level expected to use in production.
+    dict_content = _zstd._finalize_dict(zstd_dict.dict_content,
+                                        chunks, chunk_sizes,
+                                        dict_size, level)
 
     return ZstdDict(dict_content)
 
