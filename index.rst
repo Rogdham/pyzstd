@@ -52,7 +52,7 @@ Common functions
 
     Compression levels are just numbers that map to a set of compress parameters. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
 
-    zstd library supports regular compression levels from ``1`` up to ``22`` (currently). Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
+    Zstd library supports regular compression levels from ``1`` up to ``22`` (currently). Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
 
     ``0`` means use default compression level, which is currently ``3`` defined by underlying zstd library. zstd library also offers negative compression levels, which extend the range of speed vs ratio preferences. The lower the level, the faster the speed (at the cost of compression).
 
@@ -120,7 +120,7 @@ Stream classes
 
         :param data: Data to be compressed.
         :type data: bytes-like object
-        :param mode: Can be these values: :py:attr:`ZstdCompressor.CONTINUE`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`, :py:attr:`ZstdCompressor.FLUSH_FRAME`. **Note that** when :ref:`underlying zstd library's multi-threading compression<mt_compression>` is enabled, :py:attr:`~ZstdCompressor.CONTINUE` mode is not supported.
+        :param mode: Can be these values: :py:attr:`ZstdCompressor.CONTINUE`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`, :py:attr:`ZstdCompressor.FLUSH_FRAME`. (**Note that** when :ref:`underlying zstd library's multi-threading compression<mt_compression>` is enabled, :py:attr:`~ZstdCompressor.CONTINUE` mode is not supported.)
         :return: A chunk of compressed data if possible, or ``b''`` otherwise.
         :rtype: bytes
 
@@ -249,8 +249,8 @@ Dictionary
     Please note:
 
         #. If you lose a zstd dictionary, then can't decompress the corresponding data.
-        #. zstd dictionary is vulnerable.
-        #. zstd dictionary has negligible effect on large data (multi-MB).
+        #. Zstd dictionary is vulnerable.
+        #. Zstd dictionary has negligible effect on large data (multi-MB).
 
 
 .. py:class:: ZstdDict
@@ -259,23 +259,22 @@ Dictionary
 
     ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
-    .. py:method:: __init__(self, dict_content, is_raw_content=False)
+    .. py:method:: __init__(self, dict_content)
 
         Initialize a ZstdDict object.
 
         :param dict_content: Dictionary's content.
         :type dict_content: bytes-like object
-        :param is_raw_content: **This argument is only for advanced user.** When ``False``, the dictionary was created by zstd functions, follow a specified format. When ``True``, it's "raw content" dictionary, free of any format restriction.
-        :type is_raw_content: bool
-        :raises ValueError: If *dict_content* is not a valid zstd dictionary.
 
     .. py:attribute:: dict_content
 
-        The content of the zstd dictionary, a bytes object. Can be used with other programs.
+        The content of the zstd dictionary, a bytes object, it's same as the *dict_content* argument in :py:meth:`~ZstdDict.__init__`. Can be used with other programs.
 
     .. py:attribute:: dict_id
 
-        ID of zstd dictionary, a 32-bit unsigned integer value. ``0`` means a "raw content" dictionary.
+        ID of zstd dictionary, a 32-bit unsigned integer value.
+
+        Non-zero means ordinary dictionary, was created by zstd functions, follow a specified format. ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user.
 
     .. sourcecode:: python
 
@@ -294,7 +293,7 @@ Dictionary
 
     :param iterable_of_samples: An iterable of samples.
     :type iterable_of_samples: iterable
-    :param int dict_size: Returned zstd dictionary's **maximal** size, in bytes.
+    :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
     :return: Trained zstd dictionary.
     :rtype: ZstdDict
 
@@ -334,7 +333,7 @@ Dictionary
     :type zstd_dict: ZstdDict
     :param iterable_of_samples: An iterable of samples.
     :type iterable_of_samples: iterable
-    :param int dict_size: Returned zstd dictionary's **maximal** size, in bytes.
+    :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
     :param int level: The compression level expected to use in production.
     :return: Finalized zstd dictionary.
     :rtype: ZstdDict
@@ -773,7 +772,7 @@ Advanced parameters
 
 .. note:: zstd multi-threading compression
 
-    zstd library supports multi-threading compression. Note that **the threads are spawned by underlying zstd library**, not by pyzstd module.
+    Zstd library supports multi-threading compression. Note that **the threads are spawned by underlying zstd library**, not by pyzstd module.
 
     Set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression. Since there is some extra overhead, it is not recommended to use this for small size data.
 

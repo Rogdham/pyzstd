@@ -622,17 +622,13 @@ _zstd.ZstdDict.__init__
 
     dict_content: object
         Dictionary's content, a bytes-like object.
-    is_raw_content: bool=False
-        When True, it's "raw content", free of any format restriction, except
-        that they must be at least 8 bytes.
 
 Initialize a ZstdDict object, it can used for compress/decompress.
 [clinic start generated code]*/
 
 static int
-_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content,
-                             int is_raw_content)
-/*[clinic end generated code: output=1e379004adace0db input=5f9f4c59daded2d3]*/
+_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
+/*[clinic end generated code: output=49ae79dcbb8ad2df input=951e34a71eaceee0]*/
 {
     /* Only called once */
     if (self->inited) {
@@ -649,29 +645,18 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content,
         return -1;
     }
 
-    if (is_raw_content) {
-        /* Zstandard is compatible with "raw content" dictionaries, free of any
-           format restriction, except that they must be at least 8 bytes. */
-        if (Py_SIZE(self->dict_content) < 8) {
-            Py_CLEAR(self->dict_content);
-            PyErr_SetString(PyExc_ValueError,
-                            "\"raw content\" dictionary should at least 8 bytes.");
-            return -1;
-        }
-
-        /* Set dict_id */
-        self->dict_id = 0;
-    } else {
-        /* Get dict_id */
-        self->dict_id = ZDICT_getDictID(PyBytes_AS_STRING(dict_content),
-                                        Py_SIZE(dict_content));
-        if (self->dict_id == 0) {
-            Py_CLEAR(self->dict_content);
-            PyErr_SetString(PyExc_ValueError,
-                            "dict_content is not a valid zstd dictionary content.");
-            return -1;
-        }
+    /* Both ordinary dictionary and "raw content" dictionary should
+       at least 8 bytes */
+    if (Py_SIZE(self->dict_content) < 8) {
+        Py_CLEAR(self->dict_content);
+        PyErr_SetString(PyExc_ValueError,
+                        "dictionary content should at least 8 bytes.");
+        return -1;
     }
+
+    /* Get dict_id, 0 means "raw content" dictionary. */
+    self->dict_id = ZDICT_getDictID(PyBytes_AS_STRING(dict_content),
+                                    Py_SIZE(dict_content));
 
     return 0;
 }

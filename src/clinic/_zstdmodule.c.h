@@ -3,48 +3,34 @@ preserve
 [clinic start generated code]*/
 
 PyDoc_STRVAR(_zstd_ZstdDict___init____doc__,
-"ZstdDict(dict_content, is_raw_content=False)\n"
+"ZstdDict(dict_content)\n"
 "--\n"
 "\n"
 "Initialize a ZstdDict object, it can used for compress/decompress.\n"
 "\n"
 "  dict_content\n"
-"    Dictionary\'s content, a bytes-like object.\n"
-"  is_raw_content\n"
-"    When True, it\'s \"raw content\", free of any format restriction, except\n"
-"    that they must be at least 8 bytes.");
+"    Dictionary\'s content, a bytes-like object.");
 
 static int
-_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content,
-                             int is_raw_content);
+_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content);
 
 static int
 _zstd_ZstdDict___init__(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     int return_value = -1;
-    static const char * const _keywords[] = {"dict_content", "is_raw_content", NULL};
+    static const char * const _keywords[] = {"dict_content", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "ZstdDict", 0};
-    PyObject *argsbuf[2];
+    PyObject *argsbuf[1];
     PyObject * const *fastargs;
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
-    Py_ssize_t noptargs = nargs + (kwargs ? PyDict_GET_SIZE(kwargs) : 0) - 1;
     PyObject *dict_content;
-    int is_raw_content = 0;
 
-    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 1, 2, 0, argsbuf);
+    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 1, 1, 0, argsbuf);
     if (!fastargs) {
         goto exit;
     }
     dict_content = fastargs[0];
-    if (!noptargs) {
-        goto skip_optional_pos;
-    }
-    is_raw_content = PyObject_IsTrue(fastargs[1]);
-    if (is_raw_content < 0) {
-        goto exit;
-    }
-skip_optional_pos:
-    return_value = _zstd_ZstdDict___init___impl((ZstdDict *)self, dict_content, is_raw_content);
+    return_value = _zstd_ZstdDict___init___impl((ZstdDict *)self, dict_content);
 
 exit:
     return return_value;
@@ -683,4 +669,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=da9801c7b93f6a7b input=a9049054013a1b77]*/
+/*[clinic end generated code: output=8ee4f7d5fa598a92 input=a9049054013a1b77]*/
