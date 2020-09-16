@@ -111,7 +111,7 @@ PyDoc_STRVAR(_zstd__finalize_dict__doc__,
 "               dict_size, compression_level)\n"
 "--\n"
 "\n"
-"Internal function, train a zstd dictionary.");
+"Internal function, finalize a zstd dictionary.");
 
 #define _ZSTD__FINALIZE_DICT_METHODDEF    \
     {"_finalize_dict", (PyCFunction)(void(*)(void))_zstd__finalize_dict, METH_FASTCALL|METH_KEYWORDS, _zstd__finalize_dict__doc__},
@@ -669,4 +669,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=ff1cb6070e836112 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=8ee4f7d5fa598a92 input=a9049054013a1b77]*/

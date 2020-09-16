@@ -819,14 +819,14 @@ _zstd._finalize_dict
     dict_size: Py_ssize_t
     compression_level: int
 
-Internal function, train a zstd dictionary.
+Internal function, finalize a zstd dictionary.
 [clinic start generated code]*/
 
 static PyObject *
 _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
                           PyBytesObject *dst_data, PyObject *dst_data_sizes,
                           Py_ssize_t dict_size, int compression_level)
-/*[clinic end generated code: output=cbe4de35afab79bf input=78d544ce4f1c2be6]*/
+/*[clinic end generated code: output=cbe4de35afab79bf input=01893eac9a0eea82]*/
 {
 #if ZSTD_VERSION_NUMBER < 10405
     PyErr_Format(PyExc_NotImplementedError,
@@ -836,24 +836,10 @@ _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
                  ZSTD_versionString());
     return NULL;
 #else
-    char *custom_dict_buffer = NULL;
-    Py_ssize_t custom_dict_size;
     size_t *chunk_sizes = NULL;
     PyObject *dict_buffer = NULL;
     size_t zstd_ret;
     ZDICT_params_t params;
-
-    /* Get a copy of custom_dict content */
-    custom_dict_size = Py_SIZE(custom_dict);
-    custom_dict_buffer = PyMem_Malloc(custom_dict_size);
-    if (custom_dict_buffer == NULL) {
-        PyErr_NoMemory();
-        goto error;
-    }
-
-    memcpy(custom_dict_buffer,
-           PyBytes_AS_STRING(custom_dict),
-           custom_dict_size);
 
     /* Prepare chunk_sizes */
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
@@ -896,10 +882,9 @@ _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
     /* Train the dictionary. */
     Py_BEGIN_ALLOW_THREADS
     zstd_ret = ZDICT_finalizeDictionary(PyBytes_AS_STRING(dict_buffer), dict_size,
-                                        custom_dict_buffer, custom_dict_size,
-                                        PyBytes_AS_STRING(dst_data),
-                                        chunk_sizes, (uint32_t)chunks_number,
-                                        params);
+                                        PyBytes_AS_STRING(custom_dict), Py_SIZE(custom_dict),
+                                        PyBytes_AS_STRING(dst_data), chunk_sizes,
+                                        (uint32_t)chunks_number, params);
     Py_END_ALLOW_THREADS
 
     /* Check zstd dict error. */
@@ -914,14 +899,10 @@ _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
         goto error;
     }
 
-    PyMem_Free(custom_dict_buffer);
     PyMem_Free(chunk_sizes);
     return dict_buffer;
 
 error:
-    if (custom_dict_buffer != NULL) {
-        PyMem_Free(custom_dict_buffer);
-    }
     if (chunk_sizes != NULL) {
         PyMem_Free(chunk_sizes);
     }

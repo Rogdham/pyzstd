@@ -86,7 +86,7 @@ Stream classes
 
     **Frame**
 
-    zstd data consists of one or more independent "frames". The decompressed content of multiple concatenated frames is the concatenation of each frame decompressed content.
+    Zstd data consists of one or more independent "frames". The decompressed content of multiple concatenated frames is the concatenation of each frame decompressed content.
 
     A frame is completely independent, it has a frame header and epilogue, and a set of parameters which tells the decoder how to decompress it.
 
@@ -314,11 +314,9 @@ Dictionary
 
 .. py:function:: finalize_dict(zstd_dict, iterable_of_samples, dict_size, level)
 
-    Finalize a zstd dictionary.
-
     This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
 
-    Only available when the underlying zstd library's version is greater than or equal to v1.4.5, raise a ``NotImplementedError`` exception otherwise.
+    Only available when the underlying zstd library's version is greater than or equal to v1.4.5, otherwise raise a ``NotImplementedError`` exception.
 
     :param zstd_dict: An existing zstd dictionary.
     :type zstd_dict: ZstdDict
