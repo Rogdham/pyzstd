@@ -5,7 +5,7 @@ import os
 from shutil import copy
 
 CPYTHON_DIR = r'E:\dev\cpython'
-PYZSTD_DIR = os.path.dirname(__file__)
+PYZSTD_DIR = os.path.dirname(os.path.dirname(__file__))
 
 py_list = (
     (r'(from )(_zstd import \*)', r'\1.\2'),

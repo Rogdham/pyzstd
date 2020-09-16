@@ -3,7 +3,7 @@
 import re
 import os
 
-PYZSTD_DIR = os.path.dirname(__file__)
+PYZSTD_DIR = os.path.dirname(os.path.dirname(__file__))
 
 init_list = (
     (r"(?P<a>__version__\s*=\s*')\d+\.\d+\.\d+(?P<b>')", r'\g<1>{}\g<2>'),
