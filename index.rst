@@ -259,12 +259,14 @@ Dictionary
 
     ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
-    .. py:method:: __init__(self, dict_content)
+    .. py:method:: __init__(self, dict_content, is_raw_content=False)
 
         Initialize a ZstdDict object.
 
         :param dict_content: Dictionary's content.
         :type dict_content: bytes-like object
+        :param is_raw_content: **This argument is only for advanced user.** When ``False``, the dictionary was created by zstd functions, follow a specified format. When ``True``, it's "raw content" dictionary, free of any format restriction.
+        :type is_raw_content: bool
         :raises ValueError: If *dict_content* is not a valid zstd dictionary.
 
     .. py:attribute:: dict_content
@@ -273,7 +275,17 @@ Dictionary
 
     .. py:attribute:: dict_id
 
-        ID of zstd dictionary, a 32-bit unsigned integer value.
+        ID of zstd dictionary, a 32-bit unsigned integer value. ``0`` means a "raw content" dictionary.
+
+    .. sourcecode:: python
+
+        # load a zstd dictionary from file
+        with open(dict_path, 'rb') as f:
+            file_content = f.read()
+        zd = ZstdDict(file_content)
+
+        # use the dictionary to compress
+        compressed_dat = compress(raw_dat, zstd_dict=zd)
 
 
 .. py:function:: train_dict(iterable_of_samples, dict_size)
@@ -316,7 +328,7 @@ Dictionary
 
     This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
 
-    Only available when the underlying zstd library's version is greater than or equal to v1.4.5, otherwise raise a ``NotImplementedError`` exception.
+    Only available when the underlying zstd library's version is 1.4.5+, otherwise raise a ``NotImplementedError`` exception.
 
     :param zstd_dict: An existing zstd dictionary.
     :type zstd_dict: ZstdDict
