@@ -125,16 +125,18 @@ def decompress(data, zstd_dict=None, option=None):
     return ret
 
 
-def train_dict(iterable_of_samples, dict_size):
+def train_dict(samples, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
-    iterable_of_samples argument is an iterable of samples.
-    dict_size argument is the dictionary's maximal size, in bytes.
+    Arguments
+    samples:   An iterable of samples, a sample is a bytes-like object
+               represents a file.
+    dict_size: The dictionary's maximum size, in bytes.
     """
     chunks = []
     chunk_sizes = []
 
-    for chunk in iterable_of_samples:
+    for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
@@ -151,17 +153,20 @@ def train_dict(iterable_of_samples, dict_size):
     return ZstdDict(dict_content)
 
 
-def finalize_dict(zstd_dict, iterable_of_samples, dict_size, level):
+def finalize_dict(zstd_dict, samples, dict_size, level):
     """Finalize a zstd dictionary, return a ZstdDict object.
 
     This is an advanced function, see zstd documentation for usage.
+
     Only available when the underlying zstd library's version is
     greater than or equal to v1.4.5
 
-    zstd_dict argument is a ZstdDict object.
-    iterable_of_samples argument is an iterable of samples.
-    dict_size argument is the dictionary's maximal size, in bytes.
-    level argument is the compression level expected to use in production.
+    Arguments
+    zstd_dict: An existing ZstdDict object.
+    samples:   An iterable of samples, a sample is a bytes-like object
+               represents a file.
+    dict_size: The dictionary's maximum size, in bytes.
+    level:     The compression level expected to use in production.
     """
     if zstd_version_info < (1, 4, 5):
         msg = ("This function only available when the underlying zstd "
@@ -169,10 +174,13 @@ def finalize_dict(zstd_dict, iterable_of_samples, dict_size, level):
                "the current underlying zstd library's version is v%s.") % zstd_version
         raise NotImplementedError(msg)
 
+    if not isinstance(zstd_dict, ZstdDict):
+        raise TypeError('zstd_dict argument should be a ZstdDict object.')
+
     chunks = []
     chunk_sizes = []
 
-    for chunk in iterable_of_samples:
+    for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 

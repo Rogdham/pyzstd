@@ -770,13 +770,13 @@ Advanced parameters
 
 .. _mt_compression:
 
-.. note:: zstd multi-threading compression
+.. note:: Zstd multi-threading compression
 
     Zstd library supports multi-threading compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression.
        
-    Note that **the threads are spawned by underlying zstd library**, not by pyzstd module. If you are not careful, your code may spawn 16 compression threads on a 4-core CPU, that is 4 Python threads × 4 zstd threads.
+    Note that **the threads are spawned by underlying zstd library**, not by pyzstd module. If you are not careful, your code may spawn 16 compress threads on a 4-core CPU, that is 4 Python threads × 4 zstd threads.
 
-    The data will be split into portions and be compressed in parallel, the portion size is specified by :py:attr:`CParameter.jobSize` parameter. Since there is some extra overhead, it is not recommended to use this for small size data.
+    The data will be split into portions and be compressed in parallel, the portion size is specified by :py:attr:`CParameter.jobSize` parameter.
 
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output's size is larger a little.
 
