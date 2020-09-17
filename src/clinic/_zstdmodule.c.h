@@ -172,7 +172,7 @@ exit:
 }
 
 PyDoc_STRVAR(_zstd_ZstdCompressor___init____doc__,
-"ZstdCompressor(level_or_option=None, zstd_dict=None)\n"
+"ZstdCompressor(level_or_option=None, zstd_dict=None, rich_mem=False)\n"
 "--\n"
 "\n"
 "Initialize a ZstdCompressor object.\n"
@@ -183,27 +183,34 @@ PyDoc_STRVAR(_zstd_ZstdCompressor___init____doc__,
 "    parameters. The default value None means to use zstd\'s default\n"
 "    compression level/parameters.\n"
 "  zstd_dict\n"
-"    Pre-trained dictionary for compression, a ZstdDict object.");
+"    Pre-trained dictionary for compression, a ZstdDict object.\n"
+"  rich_mem\n"
+"    When False, the output buffer grows gradually. When True, the output\n"
+"    buffer will be initialized with an initial size, the size is larger\n"
+"    than the size of input data a little (maximum compressed size in worst\n"
+"    case single-pass scenario). Zstd has speed optimization for this output\n"
+"    buffer size when using a single FLUSH_FRAME mode to compress data.");
 
 static int
 _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
                                    PyObject *level_or_option,
-                                   PyObject *zstd_dict);
+                                   PyObject *zstd_dict, int rich_mem);
 
 static int
 _zstd_ZstdCompressor___init__(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     int return_value = -1;
-    static const char * const _keywords[] = {"level_or_option", "zstd_dict", NULL};
+    static const char * const _keywords[] = {"level_or_option", "zstd_dict", "rich_mem", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "ZstdCompressor", 0};
-    PyObject *argsbuf[2];
+    PyObject *argsbuf[3];
     PyObject * const *fastargs;
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
     Py_ssize_t noptargs = nargs + (kwargs ? PyDict_GET_SIZE(kwargs) : 0) - 0;
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
+    int rich_mem = 0;
 
-    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 0, 2, 0, argsbuf);
+    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 0, 3, 0, argsbuf);
     if (!fastargs) {
         goto exit;
     }
@@ -216,9 +223,18 @@ _zstd_ZstdCompressor___init__(PyObject *self, PyObject *args, PyObject *kwargs)
             goto skip_optional_pos;
         }
     }
-    zstd_dict = fastargs[1];
+    if (fastargs[1]) {
+        zstd_dict = fastargs[1];
+        if (!--noptargs) {
+            goto skip_optional_pos;
+        }
+    }
+    rich_mem = PyObject_IsTrue(fastargs[2]);
+    if (rich_mem < 0) {
+        goto exit;
+    }
 skip_optional_pos:
-    return_value = _zstd_ZstdCompressor___init___impl((ZstdCompressor *)self, level_or_option, zstd_dict);
+    return_value = _zstd_ZstdCompressor___init___impl((ZstdCompressor *)self, level_or_option, zstd_dict, rich_mem);
 
 exit:
     return return_value;
@@ -669,4 +685,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=8ee4f7d5fa598a92 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=861b8049a38de9ae input=a9049054013a1b77]*/

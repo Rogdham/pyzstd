@@ -23,7 +23,7 @@ Common functions
         If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may remove the small overhead of creating context / setting parameters / loading dictionary.
 
 
-.. py:function:: compress(data, level_or_option=None, zstd_dict=None)
+.. py:function:: compress(data, level_or_option=None, zstd_dict=None, rich_mem=False)
 
     Compress *data*, return the compressed data.
 
@@ -33,6 +33,8 @@ Common functions
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
+    :param rich_mem: Use :ref:`"rich memory mode"<rich_mem>` or not.
+    :type rich_mem: bool
     :return: Compressed data
     :rtype: bytes
 
@@ -105,7 +107,7 @@ Stream classes
 
     A stream compressor. It's thread-safe at method level.
 
-    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
+    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None, rich_mem=False)
 
         Initialize a ZstdCompressor object.
 
@@ -113,6 +115,8 @@ Stream classes
         :type level_or_option: int or dict
         :param zstd_dict: Pre-trained dictionary for compression.
         :type zstd_dict: ZstdDict
+        :param rich_mem: Use :ref:`"rich memory mode"<rich_mem>` or not.
+        :type rich_mem: bool
 
     .. py:method:: compress(self, data, mode=ZstdCompressor.CONTINUE)
 
@@ -327,7 +331,7 @@ Dictionary
 
     This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
 
-    Only available when the underlying zstd library's version is 1.4.5+, otherwise raise a ``NotImplementedError`` exception.
+    .. Only available when the underlying zstd library's version is 1.4.5+, otherwise raise a ``NotImplementedError`` exception.
 
     :param zstd_dict: An existing zstd dictionary.
     :type zstd_dict: ZstdDict
@@ -773,7 +777,7 @@ Advanced parameters
 .. note:: Zstd multi-threading compression
 
     Zstd library supports multi-threading compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression.
-       
+
     Note that **the threads are spawned by underlying zstd library**, not by pyzstd module. If you are not careful, your code may spawn 16 compress threads on a 4-core CPU, that is 4 Python threads × 4 zstd threads.
 
     The data will be split into portions and be compressed in parallel, the portion size is specified by :py:attr:`CParameter.jobSize` parameter.
@@ -788,3 +792,20 @@ Advanced parameters
         option = {CParameter.nbWorkers : 4}
 
         compressed_dat = compress(raw_dat, option)
+
+
+.. _rich_mem:
+
+.. note:: Rich memory mode
+
+    ``pyzstd`` module has a "Rich memory mode", it's only applies to compression. There is a *rich_mem* argument in function :py:func:`compress`, method :py:class:`ZstdCompressor.__init__`.
+
+    By default, this mode is disabled. The output buffer grows gradually, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+
+    When enable this mode, and compress data using a single :py:attr:`ZstdCompressor.FLUSH_FRAME` mode, the effects:
+
+        1. The size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MB input, the output buffer size is (100 MB + 409600 bytes).
+        2. The underlying zstd library has a speed optimization for this output buffer size.
+
+    After enabling this mode, it's about 10% ~ 15% faster, but allocates more memory.
+

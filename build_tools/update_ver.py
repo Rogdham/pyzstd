@@ -6,11 +6,11 @@ import os
 PYZSTD_DIR = os.path.dirname(os.path.dirname(__file__))
 
 init_list = (
-    (r"(?P<a>__version__\s*=\s*')\d+\.\d+\.\d+(?P<b>')", r'\g<1>{}\g<2>'),
+    (r"(?P<a>__version__\s*=\s*').*?(?P<b>')", r'\g<1>{}\g<2>'),
 )
 
 setup_list = (
-    (r"(?P<a>version=')\d+\.\d+\.\d+(?P<b>')", r'\g<1>{}\g<2>'),
+    (r"(?P<a>version=').*?(?P<b>')", r'\g<1>{}\g<2>'),
 )
 
 

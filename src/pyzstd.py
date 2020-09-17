@@ -96,15 +96,15 @@ class Strategy(enum.IntEnum):
     btultra2 = _zstd._ZSTD_btultra2
 
 
-def compress(data, level_or_option=None, zstd_dict=None):
+def compress(data, level_or_option=None, zstd_dict=None, rich_mem=False):
     """Compress a block of data.
 
     Refer to ZstdCompressor's docstring for a description of the
-    optional arguments *level_or_option* and *zstd_dict*.
+    optional arguments *level_or_option*, *zstd_dict* and *rich_mem*.
 
     For incremental compression, use an ZstdCompressor instead.
     """
-    comp = ZstdCompressor(level_or_option, zstd_dict)
+    comp = ZstdCompressor(level_or_option, zstd_dict, rich_mem)
     return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 

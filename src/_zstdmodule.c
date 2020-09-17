@@ -44,6 +44,9 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
+    /* Enabled rich memory mode */
+    char rich_memory;
+
     /* Enabled zstd multi-threading compression */
     char zstd_multi_threading;
 
@@ -192,6 +195,42 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
 
     ob->dst = PyBytes_AS_STRING(b);
     ob->size = block_size;
+    ob->pos = 0;
+    return 0;
+}
+
+
+/* Initialize the buffer, with an initial size. Only used for zstd compression.
+   init_size: the initial size.
+   Return 0 on success
+   Return -1 on failure
+*/
+static inline int
+OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
+                          ZSTD_outBuffer *ob)
+{
+    PyObject *b;
+
+    /* The first block */
+    b = PyBytes_FromStringAndSize(NULL, init_size);
+    if (b == NULL) {
+        buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
+        return -1;
+    }
+
+    /* Create list */
+    buffer->list = PyList_New(1);
+    if (buffer->list == NULL) {
+        Py_DECREF(b);
+        return -1;
+    }
+    PyList_SET_ITEM(buffer->list, 0, b);
+
+    /* Set variables */
+    buffer->allocated = init_size;
+
+    ob->dst = PyBytes_AS_STRING(b);
+    ob->size = (size_t) init_size;
     ob->pos = 0;
     return 0;
 }
@@ -1148,6 +1187,7 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(self->dict == NULL);
+    assert(self->rich_memory == 0);
     assert(self->zstd_multi_threading == 0);
     assert(self->inited == 0);
 
@@ -1205,6 +1245,12 @@ _zstd.ZstdCompressor.__init__
         compression level/parameters.
     zstd_dict: object = None
         Pre-trained dictionary for compression, a ZstdDict object.
+    rich_mem: bool=False
+        When False, the output buffer grows gradually. When True, the output
+        buffer will be initialized with an initial size, the size is larger
+        than the size of input data a little (maximum compressed size in worst
+        case single-pass scenario). Zstd has speed optimization for this output
+        buffer size when using a single FLUSH_FRAME mode to compress data.
 
 Initialize a ZstdCompressor object.
 [clinic start generated code]*/
@@ -1212,8 +1258,8 @@ Initialize a ZstdCompressor object.
 static int
 _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
                                    PyObject *level_or_option,
-                                   PyObject *zstd_dict)
-/*[clinic end generated code: output=65d92fb9ff1519cb input=c1f7dd886ebfed34]*/
+                                   PyObject *zstd_dict, int rich_mem)
+/*[clinic end generated code: output=5352333ca29587cf input=9cbbeb83ce0611d0]*/
 {
     int compress_level = 0; /* 0 means use zstd's default compression level */
 
@@ -1245,12 +1291,15 @@ _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
         self->dict = zstd_dict;
     }
 
+    /* Rich memory mode */
+    self->rich_memory = rich_mem;
+
     return 0;
 }
 
 static inline PyObject *
 compress_impl(ZstdCompressor *self, Py_buffer *data,
-              ZSTD_EndDirective end_directive)
+              ZSTD_EndDirective end_directive, int rich_mem)
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
@@ -1271,10 +1320,32 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         in.pos = 0;
     }
 
-    /* OutputBuffer(OnError)(&buffer) is after `error` label,
-       so initialize the buffer before any `goto error` statement. */
-    if (OutputBuffer_InitAndGrow(&buffer, -1, &out) < 0) {
-        goto error;
+    if (rich_mem) {
+        /* Calculate output buffer's size */
+        size_t output_buffer_size = ZSTD_compressBound(in.size);
+#ifdef _MSC_VER
+        /* When compiled with MSVC, ZSTD_compressBound() is slower that
+           ZSTD_compressBound()-1, need to investigate the reason. */
+        output_buffer_size -= 1;
+#endif
+
+        if (output_buffer_size > (size_t) PY_SSIZE_T_MAX) {
+            PyErr_SetString(PyExc_MemoryError,
+                            "Rich memory mode requests memory greater than "
+                            "2GB, please use a 64-bit system or disable rich "
+                            "memory mode.");
+            return NULL;
+        }
+
+        /* OutputBuffer(OnError)(&buffer) is after `error` label,
+           so initialize the buffer before any `goto error` statement. */
+        if (OutputBuffer_InitWithSize(&buffer, (Py_ssize_t) output_buffer_size, &out) < 0) {
+            goto error;
+        }
+    } else {
+        if (OutputBuffer_InitAndGrow(&buffer, -1, &out) < 0) {
+            goto error;
+        }
     }
 
     /* zstd stream compress */
@@ -1343,11 +1414,10 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 /*[clinic end generated code: output=ed7982d1cf7b4f98 input=757c44946321c057]*/
 {
     PyObject *ret;
+    int rich_mem;
 
     /* Check mode value */
-    if (mode != ZSTD_e_end &&
-        mode != ZSTD_e_flush &&
-        mode != ZSTD_e_continue) {
+    if ((uint32_t) mode > ZSTD_e_end) {
         PyErr_SetString(PyExc_ValueError,
                         "mode argument wrong value, it should be one of "
                         "ZstdCompressor.CONTINUE, ZstdCompressor.FLUSH_BLOCK, "
@@ -1367,9 +1437,20 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
         return NULL;
     }
 
-    /* Compress */
+    /* Thread-safe code */
     ACQUIRE_LOCK(self);
-    ret = compress_impl(self, data, mode);
+
+    /* Use rich memory mode */
+    if (self->rich_memory &&
+        self->last_mode == ZSTD_e_end &&
+        mode == ZSTD_e_end) {
+        rich_mem = 1;
+    } else {
+        rich_mem = 0;
+    }
+
+    /* compress */
+    ret = compress_impl(self, data, mode, rich_mem);
 
     if (ret) {
         self->last_mode = mode;
@@ -1402,8 +1483,9 @@ _zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int end_frame)
     PyObject *ret;
     const int end_directive = end_frame ? ZSTD_e_end : ZSTD_e_flush;
 
+    /* Thread-safe code */
     ACQUIRE_LOCK(self);
-    ret = compress_impl(self, NULL, end_directive);
+    ret = compress_impl(self, NULL, end_directive, 0);
 
     if (ret) {
         self->last_mode = end_directive;
