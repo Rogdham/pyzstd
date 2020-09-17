@@ -287,12 +287,12 @@ Dictionary
         compressed_dat = compress(raw_dat, zstd_dict=zd)
 
 
-.. py:function:: train_dict(iterable_of_samples, dict_size)
+.. py:function:: train_dict(samples, dict_size)
 
     Train a zstd dictionary, see :ref:`tips<train_tips>` for training a zstd dictionary.
 
-    :param iterable_of_samples: An iterable of samples.
-    :type iterable_of_samples: iterable
+    :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
+    :type samples: iterable
     :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
     :return: Trained zstd dictionary.
     :rtype: ZstdDict
@@ -323,7 +323,7 @@ Dictionary
    4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
 
 
-.. py:function:: finalize_dict(zstd_dict, iterable_of_samples, dict_size, level)
+.. py:function:: finalize_dict(zstd_dict, samples, dict_size, level)
 
     This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
 
@@ -331,8 +331,8 @@ Dictionary
 
     :param zstd_dict: An existing zstd dictionary.
     :type zstd_dict: ZstdDict
-    :param iterable_of_samples: An iterable of samples.
-    :type iterable_of_samples: iterable
+    :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
+    :type samples: iterable
     :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
     :param int level: The compression level expected to use in production.
     :return: Finalized zstd dictionary.
@@ -772,11 +772,13 @@ Advanced parameters
 
 .. note:: zstd multi-threading compression
 
-    Zstd library supports multi-threading compression. Note that **the threads are spawned by underlying zstd library**, not by pyzstd module.
+    Zstd library supports multi-threading compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression.
+       
+    Note that **the threads are spawned by underlying zstd library**, not by pyzstd module. If you are not careful, your code may spawn 16 compression threads on a 4-core CPU, that is 4 Python threads × 4 zstd threads.
 
-    Set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression. Since there is some extra overhead, it is not recommended to use this for small size data.
+    The data will be split into portions and be compressed in parallel, the portion size is specified by :py:attr:`CParameter.jobSize` parameter. Since there is some extra overhead, it is not recommended to use this for small size data.
 
-    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
+    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output's size is larger a little.
 
     When zstd multi-threading compression is enabled, using :py:meth:`ZstdCompressor.compress` method with :py:attr:`ZstdCompressor.CONTINUE` mode is not supported, supporting this mode will make the code complicated greatly, it will raise a ``RuntimeError`` in this case.
 

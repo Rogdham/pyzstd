@@ -1301,6 +1301,8 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         }
 
         /* Output buffer exhausted, grow the buffer */
+        assert(out.pos == out.size);
+
         if (out.pos == out.size) {
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
@@ -1616,11 +1618,25 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
+        /* Set at_frame_edge flag */
+        if (out.pos > 0 || zstd_ret == 0) {
+            /* (zstd_ret == 0) means a frame is completely decoded and fully flushed.
+            
+               check (out.pos > 0):   Set the flag when outputted.
+               check (zstd_ret == 0): In rare case, frame epilogue is decoded, but
+                                      no data outputted.
+
+               Check these because after decoding a frame, decompress an empty input
+               will cause zstd_ret becomes non-zero. */
+            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+        }
+
         if (out.pos == out.size) {
             /* Output buffer exhausted.
+
                Need to check `out` before `in`. Maybe zstd's internal buffer still
                have a few bytes can be output, grow the output buffer and continue
-               if max_lengh < 0. */
+               the loop if max_lengh < 0. */
 
             /* Output buffer reached max_length */
             if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
@@ -1636,6 +1652,8 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
             }
+            assert(out.pos == 0);
+
         } else if (in->pos == in->size) {
             /* Finished */
             ret = OutputBuffer_Finish(&buffer, &out);
@@ -1648,18 +1666,6 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     }
 
 success:
-    /* (zstd_ret == 0) means a frame is completely decoded and fully flushed
-    
-       check (out.pos > 0):
-           set at_frame_edge flag when outputted.
-       check (zstd_ret == 0):
-           in rare cases, frame epilogue is decoded, but no output data.
-
-       Check these because after decoding a frame, decompress an empty input
-       will cause zstd_ret becomes non-zero. */
-    if (out.pos > 0 || zstd_ret == 0) {
-        self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
-    }
     return ret;
 error:
     OutputBuffer_OnError(&buffer);
