@@ -1384,7 +1384,12 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 success:
     return ret;
 error:
+    /* Clean up BlocksOutputBuffer */
     OutputBuffer_OnError(&buffer);
+
+    /* Resetting cctx's session never fail */
+    ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
+
     return NULL;
 }
 
@@ -1785,13 +1790,13 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
 {
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
-    char at_frame_edge;   /* Backup at_frame_edge flag */
+    char at_frame_edge_backup;
     char use_input_buffer;
 
     ACQUIRE_LOCK(self);
 
     /* Backup at_frame_edge flag before any goto error statement */
-    at_frame_edge = self->at_frame_edge;
+    at_frame_edge_backup = self->at_frame_edge;
 
     /* Prepare input buffer w/wo unconsumed data */
     if (self->in_begin == self->in_end) {
@@ -1926,7 +1931,7 @@ _zstd_ZstdDecompressor_decompress_impl(ZstdDecompressor *self,
 
 error:
     /* Restore at_frame_edge flag */
-    self->at_frame_edge = at_frame_edge;
+    self->at_frame_edge = at_frame_edge_backup;
 
     /* Reset needs_input */
     self->needs_input = 1;
@@ -1934,6 +1939,9 @@ error:
     /* Discard input buffer */
     self->in_begin = 0;
     self->in_end = 0;
+
+    /* Resetting dctx's session never fail */
+    ZSTD_DCtx_reset(self->dctx, ZSTD_reset_session_only);
 
     Py_CLEAR(ret);
 success:
