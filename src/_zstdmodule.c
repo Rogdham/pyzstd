@@ -179,6 +179,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
         buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
+        PyErr_NoMemory();
         return -1;
     }
 
@@ -186,6 +187,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
+        PyErr_NoMemory();
         return -1;
     }
     PyList_SET_ITEM(buffer->list, 0, b);
@@ -215,6 +217,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
     b = PyBytes_FromStringAndSize(NULL, init_size);
     if (b == NULL) {
         buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
+        PyErr_SetString(PyExc_MemoryError, "Unable to allocate output buffer.");
         return -1;
     }
 
@@ -222,6 +225,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
+        PyErr_NoMemory();
         return -1;
     }
     PyList_SET_ITEM(buffer->list, 0, b);
@@ -278,6 +282,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     }
     if (PyList_Append(buffer->list, b) < 0) {
         Py_DECREF(b);
+        PyErr_NoMemory();
         return -1;
     }
     Py_DECREF(b);
@@ -1712,11 +1717,9 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
         /* Set at_frame_edge flag */
         if (out.pos > 0 || zstd_ret == 0) {
             /* (zstd_ret == 0) means a frame is completely decoded and fully flushed.
-            
                check (out.pos > 0):   Set the flag when outputted.
                check (zstd_ret == 0): In rare case, frame epilogue is decoded, but
                                       no data outputted.
-
                Check these because after decoding a frame, decompress an empty input
                will cause zstd_ret becomes non-zero. */
             self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
@@ -1724,7 +1727,6 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
         if (out.pos == out.size) {
             /* Output buffer exhausted.
-
                Need to check `out` before `in`. Maybe zstd's internal buffer still
                have a few bytes can be output, grow the output buffer and continue
                the loop if max_lengh < 0. */

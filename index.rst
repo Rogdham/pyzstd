@@ -33,7 +33,7 @@ Common functions
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param rich_mem: Use :ref:`"rich memory mode"<rich_mem>` or not.
+    :param rich_mem: Use :ref:`rich memory mode<rich_mem>` or not.
     :type rich_mem: bool
     :return: Compressed data
     :rtype: bytes
@@ -115,7 +115,7 @@ Stream classes
         :type level_or_option: int or dict
         :param zstd_dict: Pre-trained dictionary for compression.
         :type zstd_dict: ZstdDict
-        :param rich_mem: Use :ref:`"rich memory mode"<rich_mem>` or not.
+        :param rich_mem: Use :ref:`rich memory mode<rich_mem>` or not.
         :type rich_mem: bool
 
     .. py:method:: compress(self, data, mode=ZstdCompressor.CONTINUE)
@@ -801,7 +801,7 @@ Advanced parameters
 
     By default, this mode is disabled. The output buffer grows gradually, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    When enable this mode, and compress data using a single :py:attr:`ZstdCompressor.FLUSH_FRAME` mode, the effects:
+    When this mode is enabled, and compress data in a single :py:attr:`ZstdCompressor.FLUSH_FRAME` mode, the effects:
 
         1. The size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MB input, the output buffer size is (100 MB + 409600 bytes).
         2. The underlying zstd library has a speed optimization for this output buffer size.
