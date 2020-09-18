@@ -1324,7 +1324,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         /* Calculate output buffer's size */
         size_t output_buffer_size = ZSTD_compressBound(in.size);
 #ifdef _MSC_VER
-        /* When compiled with MSVC, ZSTD_compressBound() is slower that
+        /* When compiled with MSVC, ZSTD_compressBound() is slower than
            ZSTD_compressBound()-1, need to investigate the reason. */
         output_buffer_size -= 1;
 #endif
@@ -1463,32 +1463,36 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 /*[clinic input]
 _zstd.ZstdCompressor.flush
 
-    end_frame: bool=True
-        True flush data and end the frame.
-        False flush data, don't end the frame, usually used for communication,
-        the receiver can decode the data immediately.
+    mode: int(c_default="ZSTD_e_end") = ZstdCompressor.FLUSH_FRAME
+        Can be ZstdCompressor.FLUSH_FRAME or ZstdCompressor.FLUSH_BLOCK.
 
-Finish the compression process.
-
-Returns the compressed data left in internal buffers.
+Flush any remaining data in internal buffer.
 
 Since zstd data consists of one or more independent frames, the compressor
 object can be used after this method is called.
 [clinic start generated code]*/
 
 static PyObject *
-_zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int end_frame)
-/*[clinic end generated code: output=0206a53c394f4620 input=a7bc773c3a228735]*/
+_zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int mode)
+/*[clinic end generated code: output=b7cf2c8d64dcf2e3 input=bc50737485d09fc5]*/
 {
     PyObject *ret;
-    const int end_directive = end_frame ? ZSTD_e_end : ZSTD_e_flush;
+    
+    /* Check mode value */
+    if (mode != ZSTD_e_end && mode != ZSTD_e_flush) {
+        PyErr_SetString(PyExc_ValueError,
+                        "mode argument wrong value, it should be "
+                        "ZstdCompressor.FLUSH_BLOCK or "
+                        "ZstdCompressor.FLUSH_FRAME.");
+        return NULL;
+    }
 
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
-    ret = compress_impl(self, NULL, end_directive, 0);
+    ret = compress_impl(self, NULL, mode, 0);
 
     if (ret) {
-        self->last_mode = end_directive;
+        self->last_mode = mode;
     }
     RELEASE_LOCK(self);
 

@@ -308,17 +308,13 @@ exit:
 }
 
 PyDoc_STRVAR(_zstd_ZstdCompressor_flush__doc__,
-"flush($self, /, end_frame=True)\n"
+"flush($self, /, mode=ZstdCompressor.FLUSH_FRAME)\n"
 "--\n"
 "\n"
-"Finish the compression process.\n"
+"Flush any remaining data in internal buffer.\n"
 "\n"
-"  end_frame\n"
-"    True flush data and end the frame.\n"
-"    False flush data, don\'t end the frame, usually used for communication,\n"
-"    the receiver can decode the data immediately.\n"
-"\n"
-"Returns the compressed data left in internal buffers.\n"
+"  mode\n"
+"    Can be ZstdCompressor.FLUSH_FRAME or ZstdCompressor.FLUSH_BLOCK.\n"
 "\n"
 "Since zstd data consists of one or more independent frames, the compressor\n"
 "object can be used after this method is called.");
@@ -327,17 +323,17 @@ PyDoc_STRVAR(_zstd_ZstdCompressor_flush__doc__,
     {"flush", (PyCFunction)(void(*)(void))_zstd_ZstdCompressor_flush, METH_FASTCALL|METH_KEYWORDS, _zstd_ZstdCompressor_flush__doc__},
 
 static PyObject *
-_zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int end_frame);
+_zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int mode);
 
 static PyObject *
 _zstd_ZstdCompressor_flush(ZstdCompressor *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
 {
     PyObject *return_value = NULL;
-    static const char * const _keywords[] = {"end_frame", NULL};
+    static const char * const _keywords[] = {"mode", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "flush", 0};
     PyObject *argsbuf[1];
     Py_ssize_t noptargs = nargs + (kwnames ? PyTuple_GET_SIZE(kwnames) : 0) - 0;
-    int end_frame = 1;
+    int mode = ZSTD_e_end;
 
     args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 0, 1, 0, argsbuf);
     if (!args) {
@@ -346,12 +342,12 @@ _zstd_ZstdCompressor_flush(ZstdCompressor *self, PyObject *const *args, Py_ssize
     if (!noptargs) {
         goto skip_optional_pos;
     }
-    end_frame = PyObject_IsTrue(args[0]);
-    if (end_frame < 0) {
+    mode = _PyLong_AsInt(args[0]);
+    if (mode == -1 && PyErr_Occurred()) {
         goto exit;
     }
 skip_optional_pos:
-    return_value = _zstd_ZstdCompressor_flush_impl(self, end_frame);
+    return_value = _zstd_ZstdCompressor_flush_impl(self, mode);
 
 exit:
     return return_value;
@@ -685,4 +681,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=861b8049a38de9ae input=a9049054013a1b77]*/
+/*[clinic end generated code: output=a1d205de71e4cdad input=a9049054013a1b77]*/
