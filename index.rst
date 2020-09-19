@@ -238,7 +238,7 @@ Stream classes
             lst.append(chunk)
 
         decompressed_dat = b''.join(lst)
-        assert d.at_frame_edge, 'data is not integrate.'
+        assert d.at_frame_edge, 'data ends in an incomplete frame.'
 
 
 Dictionary

@@ -120,7 +120,7 @@ def decompress(data, zstd_dict=None, option=None):
     ret = decomp.decompress(data)
 
     if not decomp.at_frame_edge:
-        raise ZstdError("zstd data ends in an incomplete frame.")
+        raise ZstdError("Zstd data ends in an incomplete frame.")
 
     return ret
 
@@ -231,7 +231,7 @@ class EndlessDecompressReader(_compression.DecompressReader):
         # self._fp ends
         if not data:
             if not self._decompressor.at_frame_edge:
-                raise ZstdError("zstd data ends in an incomplete frame.")
+                raise ZstdError("Zstd data ends in an incomplete frame.")
 
             self._eof = True
             self._size = self._pos  # decompressed size

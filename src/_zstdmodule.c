@@ -38,7 +38,7 @@ typedef struct {
     /* ZstdDict object in use */
     PyObject *dict;
 
-    /* Last mode, initialized as ZSTD_e_end */
+    /* Last mode, initialized to ZSTD_e_end */
     int last_mode;
 
     /* Thread lock for compressing */
@@ -1389,12 +1389,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 success:
     return ret;
 error:
-    /* Clean up BlocksOutputBuffer */
     OutputBuffer_OnError(&buffer);
-
-    /* Resetting cctx's session never fail */
-    ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
-
     return NULL;
 }
 
@@ -1464,6 +1459,11 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 
     if (ret) {
         self->last_mode = mode;
+    } else {
+        self->last_mode = ZSTD_e_end;
+
+        /* Resetting cctx's session never fail */
+        ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
     }
     RELEASE_LOCK(self);
 
@@ -1503,6 +1503,11 @@ _zstd_ZstdCompressor_flush_impl(ZstdCompressor *self, int mode)
 
     if (ret) {
         self->last_mode = mode;
+    } else {
+        self->last_mode = ZSTD_e_end;
+
+        /* Resetting cctx's session never fail */
+        ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
     }
     RELEASE_LOCK(self);
 
