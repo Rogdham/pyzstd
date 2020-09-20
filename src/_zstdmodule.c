@@ -1328,9 +1328,10 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
     if (rich_mem) {
         /* Calculate output buffer's size */
         size_t output_buffer_size = ZSTD_compressBound(in.size);
-#ifdef _MSC_VER
+#if defined(_MSC_VER) && ZSTD_VERSION_NUMBER < 10406
         /* When compiled with MSVC, ZSTD_compressBound() is slower than
-           ZSTD_compressBound()-1, need to investigate the reason. */
+           ZSTD_compressBound()-1 a lot. The reason is an inline function
+           is not expanded as expected. */
         output_buffer_size -= 1;
 #endif
 
