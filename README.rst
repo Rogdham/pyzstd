@@ -9,6 +9,14 @@ The interface is similar to Python's bz2/lzma module.
 * Due to the use of `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, only supports Python 3.7+
 
 
+Quick links
+-----------
+
+Documentation: https://pyzstd.readthedocs.io/en/latest/
+
+GitHub: https://github.com/animalize/pyzstd
+
+
 Installtion
 -----------
 
@@ -17,9 +25,8 @@ On Windows/macOS/Linux: ``pip3 install pyzstd``
 On Linux, should install ``python3-dev`` package first.
 
 
-Quick links
------------
+Release note
+------------
+**0.9.2  (Sep 18, 2020)**
 
-Documentation: https://pyzstd.readthedocs.io/en/latest/
-
-GitHub: https://github.com/animalize/pyzstd
+It seems the API is stable.

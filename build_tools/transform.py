@@ -62,3 +62,4 @@ def copy_and_transform(file1, file2, re_list):
 copy_and_transform(r'Lib\zstd.py', r'src\pyzstd.py', py_list)
 copy_and_transform(r'Modules\_zstdmodule.c', r'src', c_list)
 copy_and_transform(r'Modules\clinic\_zstdmodule.c.h', r'src\clinic', [])
+copy_and_transform(r'Lib\test\test_zstd.py', r'build_tools', [])

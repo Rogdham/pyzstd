@@ -53,7 +53,7 @@ setup(
     author='Ma Lin',
     author_email='malincns@163.com',
     url='https://github.com/animalize/pyzstd',
-    license='Python Software Foundation License',
+    license='The 3-Clause BSD License',
 
     classifiers=[
         "Development Status :: 4 - Beta",
