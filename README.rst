@@ -27,12 +27,18 @@ On Linux, should install ``python3-dev`` package first.
 
 Release note
 ------------
-**0.9.2  (Sep 18, 2020)**
+**0.10.0  (Sep 24, 2020)**
 
-Binds zstd v1.4.5 source code.
+Add ``RichMemZstdCompressor`` class.
+
+Remove ``ZstdCompressor.rich_mem_compress`` method.
 
 **0.9.4  (Sep 24, 2020)**
 
 ``ZstdCompressor.__init__()`` method no longer has a *rich_mem* argument.
 
 Add a ``ZstdCompressor.rich_mem_compress()`` method.
+
+**0.9.2  (Sep 18, 2020)**
+
+Binds zstd v1.4.5 source code.

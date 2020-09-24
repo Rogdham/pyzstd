@@ -291,58 +291,6 @@ exit:
     return return_value;
 }
 
-PyDoc_STRVAR(_zstd_ZstdCompressor_rich_mem_compress__doc__,
-"rich_mem_compress($self, /, data)\n"
-"--\n"
-"\n"
-"Compress data use rich memory mode, return a single zstd frame.\n"
-"\n"
-"  data\n"
-"    Data to be compressed, a bytes-like object.\n"
-"\n"
-"The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,\n"
-"otherwise it will issue a PyExc_RuntimeError.\n"
-"\n"
-"Returns a bytes object, it\'s a single zstd frame.");
-
-#define _ZSTD_ZSTDCOMPRESSOR_RICH_MEM_COMPRESS_METHODDEF    \
-    {"rich_mem_compress", (PyCFunction)(void(*)(void))_zstd_ZstdCompressor_rich_mem_compress, METH_FASTCALL|METH_KEYWORDS, _zstd_ZstdCompressor_rich_mem_compress__doc__},
-
-static PyObject *
-_zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
-                                            Py_buffer *data);
-
-static PyObject *
-_zstd_ZstdCompressor_rich_mem_compress(ZstdCompressor *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
-{
-    PyObject *return_value = NULL;
-    static const char * const _keywords[] = {"data", NULL};
-    static _PyArg_Parser _parser = {NULL, _keywords, "rich_mem_compress", 0};
-    PyObject *argsbuf[1];
-    Py_buffer data = {NULL, NULL};
-
-    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 1, 1, 0, argsbuf);
-    if (!args) {
-        goto exit;
-    }
-    if (PyObject_GetBuffer(args[0], &data, PyBUF_SIMPLE) != 0) {
-        goto exit;
-    }
-    if (!PyBuffer_IsContiguous(&data, 'C')) {
-        _PyArg_BadArgument("rich_mem_compress", "argument 'data'", "contiguous buffer", args[0]);
-        goto exit;
-    }
-    return_value = _zstd_ZstdCompressor_rich_mem_compress_impl(self, &data);
-
-exit:
-    /* Cleanup for data */
-    if (data.obj) {
-       PyBuffer_Release(&data);
-    }
-
-    return return_value;
-}
-
 PyDoc_STRVAR(_zstd_ZstdCompressor_flush__doc__,
 "flush($self, /, mode=ZstdCompressor.FLUSH_FRAME)\n"
 "--\n"
@@ -404,6 +352,53 @@ static PyObject *
 _zstd_ZstdCompressor___reduce__(ZstdCompressor *self, PyObject *Py_UNUSED(ignored))
 {
     return _zstd_ZstdCompressor___reduce___impl(self);
+}
+
+PyDoc_STRVAR(_zstd_RichMemZstdCompressor_compress__doc__,
+"compress($self, /, data)\n"
+"--\n"
+"\n"
+"Compress data use rich memory mode, return a single zstd frame.\n"
+"\n"
+"  data\n"
+"    Data to be compressed, a bytes-like object.");
+
+#define _ZSTD_RICHMEMZSTDCOMPRESSOR_COMPRESS_METHODDEF    \
+    {"compress", (PyCFunction)(void(*)(void))_zstd_RichMemZstdCompressor_compress, METH_FASTCALL|METH_KEYWORDS, _zstd_RichMemZstdCompressor_compress__doc__},
+
+static PyObject *
+_zstd_RichMemZstdCompressor_compress_impl(ZstdCompressor *self,
+                                          Py_buffer *data);
+
+static PyObject *
+_zstd_RichMemZstdCompressor_compress(ZstdCompressor *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"data", NULL};
+    static _PyArg_Parser _parser = {NULL, _keywords, "compress", 0};
+    PyObject *argsbuf[1];
+    Py_buffer data = {NULL, NULL};
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 1, 1, 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    if (PyObject_GetBuffer(args[0], &data, PyBUF_SIMPLE) != 0) {
+        goto exit;
+    }
+    if (!PyBuffer_IsContiguous(&data, 'C')) {
+        _PyArg_BadArgument("compress", "argument 'data'", "contiguous buffer", args[0]);
+        goto exit;
+    }
+    return_value = _zstd_RichMemZstdCompressor_compress_impl(self, &data);
+
+exit:
+    /* Cleanup for data */
+    if (data.obj) {
+       PyBuffer_Release(&data);
+    }
+
+    return return_value;
 }
 
 PyDoc_STRVAR(_zstd_ZstdDecompressor___init____doc__,
@@ -717,4 +712,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=51f8507fc7f073b4 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=9311f35d387936b8 input=a9049054013a1b77]*/

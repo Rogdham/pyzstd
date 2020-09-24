@@ -1,7 +1,7 @@
 
 __all__ = ('compress', 'decompress', 'train_dict', 'finalize_dict',
-           'ZstdCompressor', 'ZstdDecompressor', 'ZstdDict', 'ZstdError',
-           'ZstdFile', 'zstd_open',
+           'ZstdCompressor', 'RichMemZstdCompressor', 'ZstdDecompressor',
+           'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
@@ -105,10 +105,11 @@ def compress(data, level_or_option=None, zstd_dict=None, rich_mem=False):
 
     For incremental compression, use an ZstdCompressor instead.
     """
-    comp = ZstdCompressor(level_or_option, zstd_dict)
     if rich_mem:
-        return comp.rich_mem_compress(data)
+        comp = RichMemZstdCompressor(level_or_option, zstd_dict)
+        return comp.compress(data)
     else:
+        comp = ZstdCompressor(level_or_option, zstd_dict)
         return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 

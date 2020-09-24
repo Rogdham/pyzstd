@@ -141,6 +141,18 @@ PyInit__zstd(void)
     }
     Py_DECREF(temp);
 
+    /* RichMemZstdCompressor */
+    temp = PyType_FromSpec(&richmem_zstdcompressor_type_spec);
+    if (temp == NULL) {
+        goto error;
+    }
+
+    if (PyModule_AddObject(module, "RichMemZstdCompressor", temp) < 0) {
+        Py_DECREF(temp);
+        goto error;
+    }
+    static_state.RichMemZstdCompressor_type = (PyTypeObject*) temp;
+
     /* ZstdDecompressor */
     temp = PyType_FromSpec(&zstddecompressor_type_spec);
     if (temp == NULL) {

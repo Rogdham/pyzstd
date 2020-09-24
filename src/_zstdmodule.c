@@ -83,6 +83,7 @@ typedef struct {
 typedef struct {
     PyTypeObject *ZstdDict_type;
     PyTypeObject *ZstdCompressor_type;
+    PyTypeObject *RichMemZstdCompressor_type;
     PyTypeObject *ZstdDecompressor_type;
     PyObject *ZstdError;
 } _zstd_state;
@@ -91,9 +92,10 @@ typedef struct {
 module _zstd
 class _zstd.ZstdDict "ZstdDict *" "&ZstdDict_Type"
 class _zstd.ZstdCompressor "ZstdCompressor *" "&ZstdCompressor_type"
+class _zstd.RichMemZstdCompressor "ZstdCompressor *" "&ZstdCompressor_type"
 class _zstd.ZstdDecompressor "ZstdDecompressor *" "&ZstdDecompressor_type"
 [clinic start generated code]*/
-/*[clinic end generated code: output=da39a3ee5e6b4b0d input=7208e8cc544a5228]*/
+/*[clinic end generated code: output=da39a3ee5e6b4b0d input=fd541bb51b94bfe9]*/
 
 #include "pypi1.h"
 #include "clinic/_zstdmodule.c.h"
@@ -1449,63 +1451,6 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 }
 
 /*[clinic input]
-_zstd.ZstdCompressor.rich_mem_compress
-
-    data: Py_buffer
-        Data to be compressed, a bytes-like object.
-
-Compress data use rich memory mode, return a single zstd frame.
-
-The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,
-otherwise it will issue a PyExc_RuntimeError.
-
-Returns a bytes object, it's a single zstd frame.
-[clinic start generated code]*/
-
-static PyObject *
-_zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
-                                            Py_buffer *data)
-/*[clinic end generated code: output=215920d1d8f64e1d input=c94ef49ad1c94dbe]*/
-{
-    PyObject *ret;
-
-    /* Thread-safe code */
-    ACQUIRE_LOCK(self);
-
-    /* Check last mode */
-    if (self->last_mode != ZSTD_e_end) {
-        char *msg = "When compress data using "
-                    "ZstdCompressor.rich_mem_compress() method, the last mode "
-                    "used to ZstdCompressor object must be "
-                    "ZstdCompressor.FLUSH_FRAME. The current last mode is %s.";
-        char *last_mode_name = (self->last_mode == ZSTD_e_continue) ? 
-                               "ZstdCompressor.CONTINUE" :
-                               "ZstdCompressor.FLUSH_BLOCK";
-        PyErr_Format(PyExc_RuntimeError, msg, last_mode_name);
-
-        ret = NULL;
-        goto error;
-    }
-
-    /* Compress */
-    ret = compress_impl(self, data, ZSTD_e_end, 1);
-
-    if (ret) {
-        self->last_mode = ZSTD_e_end;
-    } else {
-        self->last_mode = ZSTD_e_end;
-
-        /* Resetting cctx's session never fail */
-        ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
-    }
-
-error:
-    RELEASE_LOCK(self);
-
-    return ret;
-}
-
-/*[clinic input]
 _zstd.ZstdCompressor.flush
 
     mode: int(c_default="ZSTD_e_end") = ZstdCompressor.FLUSH_FRAME
@@ -1567,7 +1512,6 @@ _zstd_ZstdCompressor___reduce___impl(ZstdCompressor *self)
 
 static PyMethodDef _ZstdCompressor_methods[] = {
     _ZSTD_ZSTDCOMPRESSOR_COMPRESS_METHODDEF
-    _ZSTD_ZSTDCOMPRESSOR_RICH_MEM_COMPRESS_METHODDEF
     _ZSTD_ZSTDCOMPRESSOR_FLUSH_METHODDEF
     _ZSTD_ZSTDCOMPRESSOR___REDUCE___METHODDEF
     {NULL, NULL}
@@ -1604,6 +1548,68 @@ static PyType_Spec zstdcompressor_type_spec = {
        So calling PyType_GetModuleState() in this file is always safe. */
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstdcompressor_slots,
+};
+
+/* RichMemZstdCompressor */
+
+/*[clinic input]
+_zstd.RichMemZstdCompressor.compress
+
+    data: Py_buffer
+        Data to be compressed, a bytes-like object.
+
+Compress data use rich memory mode, return a single zstd frame.
+[clinic start generated code]*/
+
+static PyObject *
+_zstd_RichMemZstdCompressor_compress_impl(ZstdCompressor *self,
+                                          Py_buffer *data)
+/*[clinic end generated code: output=dcef59dcce6ee3a2 input=ddcd96af137b75f6]*/
+{
+    PyObject *ret;
+
+    /* Thread-safe code */
+    ACQUIRE_LOCK(self);
+
+    ret = compress_impl(self, data, ZSTD_e_end, 1);
+    if (ret == NULL) {
+        /* Resetting cctx's session never fail */
+        ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
+    }
+
+    RELEASE_LOCK(self);
+
+    return ret;
+}
+
+static PyMethodDef _RichMem_ZstdCompressor_methods[] = {
+    _ZSTD_RICHMEMZSTDCOMPRESSOR_COMPRESS_METHODDEF
+    _ZSTD_ZSTDCOMPRESSOR___REDUCE___METHODDEF
+    {NULL, NULL}
+};
+
+PyDoc_STRVAR(RichMemZstdCompressor_doc,
+"A compressor use rich memory mode, in some cases, "
+"it is faster than ZstdCompressor.");
+
+static PyType_Slot richmem_zstdcompressor_slots[] = {
+    {Py_tp_new, _ZstdCompressor_new},
+    {Py_tp_dealloc, _ZstdCompressor_dealloc},
+    {Py_tp_init, _zstd_ZstdCompressor___init__},
+    {Py_tp_methods, _RichMem_ZstdCompressor_methods},
+    {Py_tp_doc, (char*)RichMemZstdCompressor_doc},
+    {0, 0}
+};
+
+static PyType_Spec richmem_zstdcompressor_type_spec = {
+    .name = "_zstd.RichMemZstdCompressor",
+    .basicsize = sizeof(ZstdCompressor),
+    /* Calling PyType_GetModuleState() on a subclass is not safe.
+       zstdcompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
+       which prevents to create a subclass.
+       So calling PyType_GetModuleState() in this file is always safe. */
+    .flags = Py_TPFLAGS_DEFAULT,
+    .slots = richmem_zstdcompressor_slots,
 };
 
 /* ZstdDecompressor */
@@ -2322,6 +2328,16 @@ zstd_exec(PyObject *module)
     }
     Py_DECREF(temp);
 
+    /* RichMemZstdCompressor */
+    state->RichMemZstdCompressor_type = (PyTypeObject*)PyType_FromModuleAndSpec(module,
+                                                &richmem_zstdcompressor_type_spec, NULL);
+    if (state->RichMemZstdCompressor_type == NULL) {
+        return -1;
+    }
+    if (PyModule_AddType(module, (PyTypeObject*)state->RichMemZstdCompressor_type) < 0) {
+        return -1;
+    }
+
     /* ZstdDecompressor */
     state->ZstdDecompressor_type = (PyTypeObject*)PyType_FromModuleAndSpec(module,
                                                   &zstddecompressor_type_spec, NULL);
@@ -2406,6 +2422,7 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
     Py_VISIT(state->ZstdError);
     Py_VISIT(state->ZstdDict_type);
     Py_VISIT(state->ZstdCompressor_type);
+    Py_VISIT(state->RichMemZstdCompressor_type);
     Py_VISIT(state->ZstdDecompressor_type);
     return 0;
 }
@@ -2417,6 +2434,7 @@ _zstd_clear(PyObject *module)
     Py_CLEAR(state->ZstdError);
     Py_CLEAR(state->ZstdDict_type);
     Py_CLEAR(state->ZstdCompressor_type);
+    Py_CLEAR(state->RichMemZstdCompressor_type);
     Py_CLEAR(state->ZstdDecompressor_type);
     return 0;
 }
