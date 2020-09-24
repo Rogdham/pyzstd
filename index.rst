@@ -110,7 +110,7 @@ Stream classes
 
     **Block**
 
-    A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (128KB+3 at most), the maximum size depends on frame parameters.
+    A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (128KB+3bytes at most), the maximum size depends on frame parameters.
 
     Unlike independent frames, each block depends on previous blocks for proper decoding. However, each block can be decompressed without waiting for its successor. So flushing a block may be used in communication scenarios.
 
@@ -155,7 +155,7 @@ Stream classes
 
         ``c.flush(c.FLUSH_BLOCK)`` is equivalent to ``c.compress(b'', c.FLUSH_BLOCK)``
 
-        :param mode: Can be these values: :py:attr:`ZstdCompressor.FLUSH_FRAME`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
+        :param mode: Can be these two values: :py:attr:`ZstdCompressor.FLUSH_FRAME`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
         :return: Flushed data if possible, or ``b''`` otherwise.
         :rtype: bytes
 
@@ -163,7 +163,7 @@ Stream classes
 
         Compress data use :ref:`rich memory mode<rich_mem>`, return a single zstd frame.
 
-        The last mode used to :py:class:`ZstdCompressor` object must be :py:attr:`~ZstdCompressor.FLUSH_FRAME`, otherwise :ref:`rich memory mode<rich_mem>` will not be used, this method will only behaves like a normal :py:attr:`~ZstdCompressor.FLUSH_FRAME` compression, and the returned compressed data may contain previous data. A ``RuntimeWarning`` will be issued in this case.
+        The last mode used to :py:class:`ZstdCompressor` object must be :py:attr:`~ZstdCompressor.FLUSH_FRAME`, otherwise it will raise a ``RuntimeError`` exception.
 
         :param data: Data to be compressed.
         :type data: bytes-like object
@@ -182,7 +182,7 @@ Stream classes
 
         Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for ordinary streaming compression.
 
-        **Note that** when :ref:`underlying zstd library's multi-threading compression<mt_compression>` is enabled, this mode is not supported, it will raise a RuntimeError in this case.
+        **Note that** when :ref:`underlying zstd library's multi-threading compression<mt_compression>` is enabled, this mode is not supported, it will raise a ``RuntimeError`` exception in this case.
 
     .. py:attribute:: FLUSH_BLOCK
 
@@ -822,7 +822,7 @@ Advanced parameters
 
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output is larger a little.
 
-    When zstd multi-threading compression is enabled, using :py:meth:`ZstdCompressor.compress` method with :py:attr:`ZstdCompressor.CONTINUE` mode is not supported, supporting this mode will make the code complicated greatly, it will raise a ``RuntimeError`` in this case.
+    When zstd multi-threading compression is enabled, using :py:meth:`ZstdCompressor.compress` method with :py:attr:`ZstdCompressor.CONTINUE` mode is not supported, supporting this mode will make the code complicated greatly, it will raise a ``RuntimeError`` exception in this case.
 
 
 .. _rich_mem:

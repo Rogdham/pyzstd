@@ -1457,9 +1457,7 @@ _zstd.ZstdCompressor.rich_mem_compress
 Compress data use rich memory mode, return a single zstd frame.
 
 The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,
-otherwise rich memory mode will not be used, it will only behaves like a normal
-ZstdCompressor.FLUSH_FRAME compression, and the returned compressed data
-may contain previous data. It will issue a RuntimeWarning in this case.
+otherwise it will issue a PyExc_RuntimeError.
 
 Returns a bytes object, it's a single zstd frame.
 [clinic start generated code]*/
@@ -1467,39 +1465,30 @@ Returns a bytes object, it's a single zstd frame.
 static PyObject *
 _zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
                                             Py_buffer *data)
-/*[clinic end generated code: output=215920d1d8f64e1d input=0c4e40486b072df1]*/
+/*[clinic end generated code: output=215920d1d8f64e1d input=c94ef49ad1c94dbe]*/
 {
     PyObject *ret;
-    int rich_mem;
 
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
     /* Check last mode */
-    if (self->last_mode == ZSTD_e_end) {
-        rich_mem = 1;
-    } else {
-        rich_mem = 0;
-
-        char *msg = "When compress data using .rich_mem_compress() method, "
-                    "the last mode used to ZstdCompressor object must be "
-                    "ZstdCompressor.FLUSH_FRAME, otherwise the rich memory "
-                    "mode will not be used, it will only behaves like a "
-                    "normal ZstdCompressor.FLUSH_FRAME compression, and the "
-                    "returned compressed data may contain previous data. The "
-                    "last mode is %s.";
+    if (self->last_mode != ZSTD_e_end) {
+        char *msg = "When compress data using "
+                    "ZstdCompressor.rich_mem_compress() method, the last mode "
+                    "used to ZstdCompressor object must be "
+                    "ZstdCompressor.FLUSH_FRAME. The current last mode is %s.";
         char *last_mode_name = (self->last_mode == ZSTD_e_continue) ? 
                                "ZstdCompressor.CONTINUE" :
                                "ZstdCompressor.FLUSH_BLOCK";
+        PyErr_Format(PyExc_RuntimeError, msg, last_mode_name);
 
-        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, msg, last_mode_name) < 0) {
-            ret = NULL;
-            goto error;
-        }
+        ret = NULL;
+        goto error;
     }
 
     /* Compress */
-    ret = compress_impl(self, data, ZSTD_e_end, rich_mem);
+    ret = compress_impl(self, data, ZSTD_e_end, 1);
 
     if (ret) {
         self->last_mode = ZSTD_e_end;
@@ -1509,6 +1498,7 @@ _zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
         /* Resetting cctx's session never fail */
         ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
     }
+
 error:
     RELEASE_LOCK(self);
 

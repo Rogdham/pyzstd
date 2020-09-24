@@ -301,9 +301,7 @@ PyDoc_STRVAR(_zstd_ZstdCompressor_rich_mem_compress__doc__,
 "    Data to be compressed, a bytes-like object.\n"
 "\n"
 "The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,\n"
-"otherwise rich memory mode will not be used, it will only behaves like a normal\n"
-"ZstdCompressor.FLUSH_FRAME compression, and the returned compressed data\n"
-"may contain previous data. It will issue a RuntimeWarning in this case.\n"
+"otherwise it will issue a PyExc_RuntimeError.\n"
 "\n"
 "Returns a bytes object, it\'s a single zstd frame.");
 
@@ -719,4 +717,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=5198ff9db24bf37c input=a9049054013a1b77]*/
+/*[clinic end generated code: output=51f8507fc7f073b4 input=a9049054013a1b77]*/

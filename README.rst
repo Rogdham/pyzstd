@@ -31,7 +31,7 @@ Release note
 
 Binds zstd v1.4.5 source code.
 
-**0.9.3  (Sep 24, 2020)**
+**0.9.4  (Sep 24, 2020)**
 
 ``ZstdCompressor.__init__()`` method no longer has a *rich_mem* argument.
 
