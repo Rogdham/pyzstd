@@ -29,4 +29,10 @@ Release note
 ------------
 **0.9.2  (Sep 18, 2020)**
 
-It seems the API is stable.
+Binds zstd v1.4.5 source code.
+
+**0.9.3  (Sep 24, 2020)**
+
+``ZstdCompressor.__init__()`` method no longer has a *rich_mem* argument.
+
+Add a ``ZstdCompressor.rich_mem_compress()`` method.

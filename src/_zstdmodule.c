@@ -44,9 +44,6 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
-    /* Enabled rich memory mode */
-    char rich_memory;
-
     /* Enabled zstd multi-threading compression */
     char zstd_multi_threading;
 
@@ -1192,7 +1189,6 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(self->dict == NULL);
-    assert(self->rich_memory == 0);
     assert(self->zstd_multi_threading == 0);
     assert(self->inited == 0);
 
@@ -1250,12 +1246,6 @@ _zstd.ZstdCompressor.__init__
         compression level/parameters.
     zstd_dict: object = None
         Pre-trained dictionary for compression, a ZstdDict object.
-    rich_mem: bool=False
-        When False, the output buffer grows gradually. When True, the output
-        buffer will be initialized with an initial size, the size is larger
-        than the size of input data a little (maximum compressed size in worst
-        case single-pass scenario). Zstd has speed optimization for this output
-        buffer size when using a single FLUSH_FRAME mode to compress data.
 
 Initialize a ZstdCompressor object.
 [clinic start generated code]*/
@@ -1263,8 +1253,8 @@ Initialize a ZstdCompressor object.
 static int
 _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
                                    PyObject *level_or_option,
-                                   PyObject *zstd_dict, int rich_mem)
-/*[clinic end generated code: output=5352333ca29587cf input=9cbbeb83ce0611d0]*/
+                                   PyObject *zstd_dict)
+/*[clinic end generated code: output=65d92fb9ff1519cb input=c1f7dd886ebfed34]*/
 {
     int compress_level = 0; /* 0 means use zstd's default compression level */
 
@@ -1295,9 +1285,6 @@ _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
         Py_INCREF(zstd_dict);
         self->dict = zstd_dict;
     }
-
-    /* Rich memory mode */
-    self->rich_memory = rich_mem;
 
     return 0;
 }
@@ -1420,7 +1407,6 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
 /*[clinic end generated code: output=ed7982d1cf7b4f98 input=757c44946321c057]*/
 {
     PyObject *ret;
-    int rich_mem;
 
     /* Check mode value */
     if ((uint32_t) mode > ZSTD_e_end) {
@@ -1446,17 +1432,8 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
-    /* Use rich memory mode */
-    if (self->rich_memory &&
-        self->last_mode == ZSTD_e_end &&
-        mode == ZSTD_e_end) {
-        rich_mem = 1;
-    } else {
-        rich_mem = 0;
-    }
-
-    /* compress */
-    ret = compress_impl(self, data, mode, rich_mem);
+    /* Compress */
+    ret = compress_impl(self, data, mode, 0);
 
     if (ret) {
         self->last_mode = mode;
@@ -1466,6 +1443,73 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
         /* Resetting cctx's session never fail */
         ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
     }
+    RELEASE_LOCK(self);
+
+    return ret;
+}
+
+/*[clinic input]
+_zstd.ZstdCompressor.rich_mem_compress
+
+    data: Py_buffer
+        Data to be compressed, a bytes-like object.
+
+Compress data use rich memory mode, return a single zstd frame.
+
+The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,
+otherwise rich memory mode will not be used, it will only behaves like a normal
+ZstdCompressor.FLUSH_FRAME compression, and the returned compressed data
+may contain previous data. It will issue a RuntimeWarning in this case.
+
+Returns a bytes object, it's a single zstd frame.
+[clinic start generated code]*/
+
+static PyObject *
+_zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
+                                            Py_buffer *data)
+/*[clinic end generated code: output=215920d1d8f64e1d input=0c4e40486b072df1]*/
+{
+    PyObject *ret;
+    int rich_mem;
+
+    /* Thread-safe code */
+    ACQUIRE_LOCK(self);
+
+    /* Check last mode */
+    if (self->last_mode == ZSTD_e_end) {
+        rich_mem = 1;
+    } else {
+        rich_mem = 0;
+
+        char *msg = "When compress data using .rich_mem_compress() method, "
+                    "the last mode used to ZstdCompressor object must be "
+                    "ZstdCompressor.FLUSH_FRAME, otherwise the rich memory "
+                    "mode will not be used, it will only behaves like a "
+                    "normal ZstdCompressor.FLUSH_FRAME compression, and the "
+                    "returned compressed data may contain previous data. The "
+                    "last mode is %s.";
+        char *last_mode_name = (self->last_mode == ZSTD_e_continue) ? 
+                               "ZstdCompressor.CONTINUE" :
+                               "ZstdCompressor.FLUSH_BLOCK";
+
+        if (PyErr_WarnFormat(PyExc_RuntimeWarning, 1, msg, last_mode_name) < 0) {
+            ret = NULL;
+            goto error;
+        }
+    }
+
+    /* Compress */
+    ret = compress_impl(self, data, ZSTD_e_end, rich_mem);
+
+    if (ret) {
+        self->last_mode = ZSTD_e_end;
+    } else {
+        self->last_mode = ZSTD_e_end;
+
+        /* Resetting cctx's session never fail */
+        ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
+    }
+error:
     RELEASE_LOCK(self);
 
     return ret;
@@ -1533,6 +1577,7 @@ _zstd_ZstdCompressor___reduce___impl(ZstdCompressor *self)
 
 static PyMethodDef _ZstdCompressor_methods[] = {
     _ZSTD_ZSTDCOMPRESSOR_COMPRESS_METHODDEF
+    _ZSTD_ZSTDCOMPRESSOR_RICH_MEM_COMPRESS_METHODDEF
     _ZSTD_ZSTDCOMPRESSOR_FLUSH_METHODDEF
     _ZSTD_ZSTDCOMPRESSOR___REDUCE___METHODDEF
     {NULL, NULL}

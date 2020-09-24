@@ -172,7 +172,7 @@ exit:
 }
 
 PyDoc_STRVAR(_zstd_ZstdCompressor___init____doc__,
-"ZstdCompressor(level_or_option=None, zstd_dict=None, rich_mem=False)\n"
+"ZstdCompressor(level_or_option=None, zstd_dict=None)\n"
 "--\n"
 "\n"
 "Initialize a ZstdCompressor object.\n"
@@ -183,34 +183,27 @@ PyDoc_STRVAR(_zstd_ZstdCompressor___init____doc__,
 "    parameters. The default value None means to use zstd\'s default\n"
 "    compression level/parameters.\n"
 "  zstd_dict\n"
-"    Pre-trained dictionary for compression, a ZstdDict object.\n"
-"  rich_mem\n"
-"    When False, the output buffer grows gradually. When True, the output\n"
-"    buffer will be initialized with an initial size, the size is larger\n"
-"    than the size of input data a little (maximum compressed size in worst\n"
-"    case single-pass scenario). Zstd has speed optimization for this output\n"
-"    buffer size when using a single FLUSH_FRAME mode to compress data.");
+"    Pre-trained dictionary for compression, a ZstdDict object.");
 
 static int
 _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
                                    PyObject *level_or_option,
-                                   PyObject *zstd_dict, int rich_mem);
+                                   PyObject *zstd_dict);
 
 static int
 _zstd_ZstdCompressor___init__(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     int return_value = -1;
-    static const char * const _keywords[] = {"level_or_option", "zstd_dict", "rich_mem", NULL};
+    static const char * const _keywords[] = {"level_or_option", "zstd_dict", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "ZstdCompressor", 0};
-    PyObject *argsbuf[3];
+    PyObject *argsbuf[2];
     PyObject * const *fastargs;
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
     Py_ssize_t noptargs = nargs + (kwargs ? PyDict_GET_SIZE(kwargs) : 0) - 0;
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
-    int rich_mem = 0;
 
-    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 0, 3, 0, argsbuf);
+    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 0, 2, 0, argsbuf);
     if (!fastargs) {
         goto exit;
     }
@@ -223,18 +216,9 @@ _zstd_ZstdCompressor___init__(PyObject *self, PyObject *args, PyObject *kwargs)
             goto skip_optional_pos;
         }
     }
-    if (fastargs[1]) {
-        zstd_dict = fastargs[1];
-        if (!--noptargs) {
-            goto skip_optional_pos;
-        }
-    }
-    rich_mem = PyObject_IsTrue(fastargs[2]);
-    if (rich_mem < 0) {
-        goto exit;
-    }
+    zstd_dict = fastargs[1];
 skip_optional_pos:
-    return_value = _zstd_ZstdCompressor___init___impl((ZstdCompressor *)self, level_or_option, zstd_dict, rich_mem);
+    return_value = _zstd_ZstdCompressor___init___impl((ZstdCompressor *)self, level_or_option, zstd_dict);
 
 exit:
     return return_value;
@@ -297,6 +281,60 @@ _zstd_ZstdCompressor_compress(ZstdCompressor *self, PyObject *const *args, Py_ss
     }
 skip_optional_pos:
     return_value = _zstd_ZstdCompressor_compress_impl(self, &data, mode);
+
+exit:
+    /* Cleanup for data */
+    if (data.obj) {
+       PyBuffer_Release(&data);
+    }
+
+    return return_value;
+}
+
+PyDoc_STRVAR(_zstd_ZstdCompressor_rich_mem_compress__doc__,
+"rich_mem_compress($self, /, data)\n"
+"--\n"
+"\n"
+"Compress data use rich memory mode, return a single zstd frame.\n"
+"\n"
+"  data\n"
+"    Data to be compressed, a bytes-like object.\n"
+"\n"
+"The last mode used to ZstdCompressor object must be ZstdCompressor.FLUSH_FRAME,\n"
+"otherwise rich memory mode will not be used, it will only behaves like a normal\n"
+"ZstdCompressor.FLUSH_FRAME compression, and the returned compressed data\n"
+"may contain previous data. It will issue a RuntimeWarning in this case.\n"
+"\n"
+"Returns a bytes object, it\'s a single zstd frame.");
+
+#define _ZSTD_ZSTDCOMPRESSOR_RICH_MEM_COMPRESS_METHODDEF    \
+    {"rich_mem_compress", (PyCFunction)(void(*)(void))_zstd_ZstdCompressor_rich_mem_compress, METH_FASTCALL|METH_KEYWORDS, _zstd_ZstdCompressor_rich_mem_compress__doc__},
+
+static PyObject *
+_zstd_ZstdCompressor_rich_mem_compress_impl(ZstdCompressor *self,
+                                            Py_buffer *data);
+
+static PyObject *
+_zstd_ZstdCompressor_rich_mem_compress(ZstdCompressor *self, PyObject *const *args, Py_ssize_t nargs, PyObject *kwnames)
+{
+    PyObject *return_value = NULL;
+    static const char * const _keywords[] = {"data", NULL};
+    static _PyArg_Parser _parser = {NULL, _keywords, "rich_mem_compress", 0};
+    PyObject *argsbuf[1];
+    Py_buffer data = {NULL, NULL};
+
+    args = _PyArg_UnpackKeywords(args, nargs, NULL, kwnames, &_parser, 1, 1, 0, argsbuf);
+    if (!args) {
+        goto exit;
+    }
+    if (PyObject_GetBuffer(args[0], &data, PyBUF_SIMPLE) != 0) {
+        goto exit;
+    }
+    if (!PyBuffer_IsContiguous(&data, 'C')) {
+        _PyArg_BadArgument("rich_mem_compress", "argument 'data'", "contiguous buffer", args[0]);
+        goto exit;
+    }
+    return_value = _zstd_ZstdCompressor_rich_mem_compress_impl(self, &data);
 
 exit:
     /* Cleanup for data */
@@ -681,4 +719,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=a1d205de71e4cdad input=a9049054013a1b77]*/
+/*[clinic end generated code: output=5198ff9db24bf37c input=a9049054013a1b77]*/

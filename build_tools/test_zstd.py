@@ -20,7 +20,7 @@ zstd = import_module("zstd")
 from zstd import ZstdCompressor, ZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, decompress
 
-COMPRESSED_DAT1 = compress(b'abcdefg123456' * 1000)
+COMPRESSED_DAT = compress(b'abcdefg123456' * 1000)
 DAT_100_PLUS_32KB = compress(b'a' * (100 + 32*1024))
 SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
                   (100).to_bytes(4, byteorder='little') + \
@@ -143,7 +143,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         d = ZstdDecompressor()
 
         # decompress a frame
-        d.decompress(COMPRESSED_DAT1)
+        d.decompress(COMPRESSED_DAT)
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
@@ -162,11 +162,6 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
         # decompress the rest
         d.decompress(b'', -1)
-        self.assertTrue(d.at_frame_edge)
-        self.assertTrue(d.needs_input)
-
-        # empty input
-        d.decompress(b'')
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
@@ -213,6 +208,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
         d = ZstdDecompressor()
 
+        # first frame, two steps
         d.decompress(data, 21)
         self.assertFalse(d.at_frame_edge)
         self.assertFalse(d.needs_input)
@@ -221,6 +217,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertTrue(d.at_frame_edge)
         self.assertFalse(d.needs_input)
 
+        # second frame
         d.decompress(b'', 60)
         self.assertTrue(d.at_frame_edge)
         self.assertFalse(d.needs_input)
@@ -254,6 +251,24 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertEqual(len(output), 0)
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
+
+        # skippable frame, two steps
+        output = d.decompress(SKIPPABLE_FRAME, len(SKIPPABLE_FRAME)//2)
+        self.assertEqual(len(output), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        output = d.decompress(b'')
+        self.assertEqual(len(output), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        # skippable frame + normal frame
+        output = d.decompress(SKIPPABLE_FRAME + COMPRESSED_DAT)
+        self.assertGreater(len(output), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
 
 # # Test data:
 

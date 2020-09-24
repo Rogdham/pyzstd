@@ -99,13 +99,17 @@ class Strategy(enum.IntEnum):
 def compress(data, level_or_option=None, zstd_dict=None, rich_mem=False):
     """Compress a block of data.
 
-    Refer to ZstdCompressor's docstring for a description of the
-    optional arguments *level_or_option*, *zstd_dict* and *rich_mem*.
+    Refer to ZstdCompressor's docstring for a description of the optional
+    arguments *level_or_option*, *zstd_dict*. Set *rich_mem* to True to enable
+    rich memory mode.
 
     For incremental compression, use an ZstdCompressor instead.
     """
-    comp = ZstdCompressor(level_or_option, zstd_dict, rich_mem)
-    return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
+    comp = ZstdCompressor(level_or_option, zstd_dict)
+    if rich_mem:
+        return comp.rich_mem_compress(data)
+    else:
+        return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 
 def decompress(data, zstd_dict=None, option=None):
