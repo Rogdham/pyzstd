@@ -46,7 +46,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.10.0',
+    version='0.10.1',
     description="A Zstandard (zstd) module, the interface is similar to Python's bz2/lzma modules.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -54,6 +54,7 @@ setup(
     author_email='malincns@163.com',
     url='https://github.com/animalize/pyzstd',
     license='The 3-Clause BSD License',
+    python_requires=">=3.7",
 
     classifiers=[
         "Development Status :: 4 - Beta",

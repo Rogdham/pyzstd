@@ -1383,6 +1383,70 @@ error:
     return NULL;
 }
 
+
+static PyObject *
+compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
+{
+    ZSTD_inBuffer in;
+    ZSTD_outBuffer out;
+    BlocksOutputBuffer buffer;
+    size_t zstd_ret;
+    PyObject *ret;
+
+    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+
+    /* Prepare input & output buffers */
+    in.src = data->buf;
+    in.size = data->len;
+    in.pos = 0;
+
+    if (OutputBuffer_InitAndGrow(&buffer, -1, &out) < 0) {
+        goto error;
+    }
+
+    /* zstd stream compress */
+    while (1) {
+        Py_BEGIN_ALLOW_THREADS
+        do {
+            zstd_ret = ZSTD_compressStream2(self->cctx, &out, &in, ZSTD_e_continue);
+        } while (out.pos != out.size && in.pos != in.size && !ZSTD_isError(zstd_ret));
+        Py_END_ALLOW_THREADS
+
+        /* Check error */
+        if (ZSTD_isError(zstd_ret)) {
+            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            PyErr_SetString(state->ZstdError, ZSTD_getErrorName(zstd_ret));
+            goto error;
+        }
+
+        /* Finished */
+        if (in.pos == in.size) {
+            ret = OutputBuffer_Finish(&buffer, &out);
+            if (ret != NULL) {
+                goto success;
+            } else {
+                goto error;
+            }
+        }
+
+        /* Output buffer exhausted, grow the buffer */
+        assert(out.pos == out.size);
+
+        if (out.pos == out.size) {
+            if (OutputBuffer_Grow(&buffer, &out) < 0) {
+                goto error;
+            }
+        }
+    }
+
+success:
+    return ret;
+error:
+    OutputBuffer_OnError(&buffer);
+    return NULL;
+}
+
+
 /*[clinic input]
 _zstd.ZstdCompressor.compress
 
@@ -1419,23 +1483,15 @@ _zstd_ZstdCompressor_compress_impl(ZstdCompressor *self, Py_buffer *data,
         return NULL;
     }
 
-    /* Check zstd multi-threading with ZSTD_e_continue mode */
-    if (self->zstd_multi_threading && mode == ZSTD_e_continue) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "ZstdCompressor.CONTINUE mode is not supported when "
-                        "using zstd multi-threading compression (set compress "
-                        "parameter \"nbWorkers\" > 1), supporting this mode "
-                        "will make the code greatly complicated. Please use "
-                        "ZstdCompressor.FLUSH_BLOCK mode or "
-                        "ZstdCompressor.FLUSH_FRAME mode.");
-        return NULL;
-    }
-
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
     /* Compress */
-    ret = compress_impl(self, data, mode, 0);
+    if (self->zstd_multi_threading && mode == ZSTD_e_continue) {
+        ret = compress_mt_continue_impl(self, data);
+    } else {
+        ret = compress_impl(self, data, mode, 0);
+    }
 
     if (ret) {
         self->last_mode = mode;
