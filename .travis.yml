@@ -1,0 +1,69 @@
+# In this configuration, the package is tested against multiple versions of python
+# on Linux and on one version of Python on Windows. If and only if all tests pass
+# will the wheels be built and deployed. Further, deployment is only initiated if
+# the current branch is "master", the current commit is tagged, and the current
+# repo is yours (e.g. it won't run on a Pull Request). For convenience, a source
+# distribution is also created.
+
+branches:
+  only:
+    - master
+    - dev
+
+jobs:
+  include:
+    # source code
+    - name: Deploy source distribution
+      language: python
+      python: 3.8
+      install: skip
+      script:
+        - python3 setup.py sdist --formats=gztar
+        - python3 setup.py install
+        - python3 build_tools/test_zstd.py
+      after_success:
+        - |
+          if [[ $TRAVIS_TAG ]]; then
+            python3 -m pip install twine
+            python3 -m twine upload --skip-existing dist/*.tar.gz
+          fi
+
+    # Linux builds
+    - name: "Linux py37:py38"
+      services: docker
+      language: python
+
+    # macOS builds
+    - name: "MacOS py37:py38"
+      os: osx
+      language: shell
+
+    # Windows builds
+    - name: "Windows py37:py38"
+      os: windows
+      language: shell
+      before_install:
+        - choco install python --version 3.8.0
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+        # make sure it's on PATH as 'python3'
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
+
+env:
+  global:
+    - TWINE_USERNAME=__token__
+    # Note: TWINE_PASSWORD is set to a PyPI API token in Travis settings
+      - CIBW_BUILD='cp37-* cp38-*'
+      - CIBW_SKIP='*_i686'
+
+install:
+  - python3 -m pip install twine cibuildwheel
+
+script:
+  - python3 -m cibuildwheel --output-dir wheelhouse
+
+after_success:
+  # if the release was tagged, upload them to PyPI
+  - |
+    if [[ $TRAVIS_TAG ]]; then
+      python3 -m twine upload --verbose --skip-existing wheelhouse/*.whl
+    fi
