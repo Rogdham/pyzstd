@@ -19,7 +19,7 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.10.2  (Sep 29, 2020)**
+**0.11.0  (Sep 29, 2020)**
 
 Use Travis CI to compile builds.
 
