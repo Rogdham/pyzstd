@@ -17,16 +17,12 @@ Documentation: https://pyzstd.readthedocs.io/en/latest/
 GitHub: https://github.com/animalize/pyzstd
 
 
-Installtion
------------
-
-On Windows/macOS/Linux: ``pip3 install pyzstd``
-
-On Linux, should install ``python3-dev`` package first.
-
-
 Release note
 ------------
+**0.11.0  (Sep 29, 2020)**
+
+Use Travis CI to compile builds.
+
 **0.10.1  (Sep 25, 2020)**
 
 It seems the API is stable.

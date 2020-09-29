@@ -1,8 +1,10 @@
 ﻿#!/usr/bin/env python
 from setuptools import setup, Extension, find_packages
+import io
 import os
 
-with open(os.path.join(os.path.dirname(__file__), 'README.rst'), encoding='utf-8') as file:
+path = os.path.join(os.path.dirname(__file__), 'README.rst')
+with io.open(path, 'r', encoding='utf-8') as file:
     long_description = file.read()
 
 zstd_files = [
@@ -46,7 +48,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.10.1',
+    version='0.11.0',
     description="A Zstandard (zstd) module, the interface is similar to Python's bz2/lzma modules.",
     long_description=long_description,
     long_description_content_type='text/x-rst',

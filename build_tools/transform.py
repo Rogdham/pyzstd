@@ -34,6 +34,13 @@ PyInit__zstd\(void\)
 // }"""),
 )
 
+test_list = (
+    (r'(from test.support.import_helper[^\n]+)', r'# \1'),
+    (r'from test.support.os_helper[^\)]+\)[^\n]*\n', ''),
+    (r'zstd\s*=\s*import_module\("zstd"\)', 'import pyzstd as zstd'),
+    (r'from zstd import ', 'from pyzstd import ')
+)
+
 def copy_and_transform(file1, file2, re_list):
     path1 = os.path.join(CPYTHON_DIR, file1)
     path2 = os.path.join(PYZSTD_DIR, file2)
@@ -62,4 +69,4 @@ def copy_and_transform(file1, file2, re_list):
 copy_and_transform(r'Lib\zstd.py', r'src\pyzstd.py', py_list)
 copy_and_transform(r'Modules\_zstdmodule.c', r'src', c_list)
 copy_and_transform(r'Modules\clinic\_zstdmodule.c.h', r'src\clinic', [])
-copy_and_transform(r'Lib\test\test_zstd.py', r'build_tools', [])
+copy_and_transform(r'Lib\test\test_zstd.py', r'build_tools', test_list)

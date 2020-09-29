@@ -11,13 +11,10 @@ import unittest
 from test.support import (
     _4G, bigmemtest, run_unittest
 )
-from test.support.import_helper import import_module
-from test.support.os_helper import (
-    TESTFN, unlink
-)
+# from test.support.import_helper import import_module
 
-zstd = import_module("zstd")
-from zstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
+import pyzstd as zstd
+from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, decompress, ZstdDict
 
 COMPRESSED_DAT = compress(b'abcdefg123456' * 1000)
