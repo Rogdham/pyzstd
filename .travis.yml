@@ -5,11 +5,6 @@
 # repo is yours (e.g. it won't run on a Pull Request). For convenience, a source
 # distribution is also created.
 
-os: linux
-language: python
-python:
-  - 3.7
-  - 3.8
 
 branches:
   only:
@@ -17,14 +12,12 @@ branches:
     - dev
 
 stages:
-  - name: build
   - name: deploy
 
 env:
   global:
     - TWINE_USERNAME=__token__
     # Note: TWINE_PASSWORD is set to a PyPI API token in Travis settings
-    #- CIBW_TEST_COMMAND: "'python {project}/test/polyscope_test.py backend=openGL_mock'"
     - CIBW_BUILD="cp37-* cp38-*"
 
 script:
@@ -42,58 +35,15 @@ before_install:
 jobs:
   include:
 
-    # Build source distribution
-    - stage: build  
-      name: Build source distribution
-      os: linux
-      language: python
-      python: 3.7
-      install: skip
-      # if the build has a tag, it must match setup.py
-      before_script: |
-        [[ "$TRAVIS_TAG" ==  "" ]] || [[ "$TRAVIS_TAG" == "v$(python setup.py --version)" ]]
-      script:
-        - python3 -m pip install setuptools
-        - python3 setup.py sdist --formats=gztar
-        
-    # Build on linux
-    - stage: build 
-      name: Build Linux wheels
-      os: linux
-      language: python
-      python: 3.7
-      services: docker
-      install: python3 -m pip install cibuildwheel==1.6.1
-      script: python3 -m cibuildwheel --output-dir wheelhouse
-        
-    # Build on mac
-    - stage: build 
-      name: Build macOS wheels
-      os: osx
-      osx_image: xcode11.2  
-      language: shell       
-      install: python3 -m pip install cibuildwheel==1.6.1
-      script: python3 -m cibuildwheel --output-dir wheelhouse
-
-    # Build on windows
-    - stage: build 
-      name: Build Windows wheels
-      os: windows
-      language: shell
-      install: python3 -m pip install cibuildwheel==1.6.1
-      script: python3 -m cibuildwheel --output-dir wheelhouse
-   
     # Deploy on linux
-    # Also deploy source here. Otherwise source gets uploaded much earlier 
-    # than the first binary, which is annoying.
     - stage: deploy
       name: Build and deploy Linux wheels & source
       os: linux
       language: python
-      python: 3.7
+      python: 3.8
       services: docker
       install: 
-        - python3 -m pip install cibuildwheel==1.6.1
+        - python3 -m pip install cibuildwheel
         - python3 -m pip install setuptools
       script: 
         - python3 setup.py sdist --formats=gztar
@@ -107,9 +57,8 @@ jobs:
     - stage: deploy
       name: Build and deploy macOS wheels
       os: osx
-      osx_image: xcode11.2  
       language: shell       
-      install: python3 -m pip install cibuildwheel==1.6.1
+      install: python3 -m pip install cibuildwheel
       script: python3 -m cibuildwheel --output-dir wheelhouse
       after_success:
         - python3 -m pip install twine
@@ -120,7 +69,7 @@ jobs:
       name: Build and deploy Windows wheels
       os: windows
       language: shell
-      install: python3 -m pip install cibuildwheel==1.6.1
+      install: python3 -m pip install cibuildwheel
       script: python3 -m cibuildwheel --output-dir wheelhouse
       after_success:
         - python3 -m pip install twine
