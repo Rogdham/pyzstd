@@ -20,10 +20,6 @@ env:
     # Note: TWINE_PASSWORD is set to a PyPI API token in Travis settings
     - CIBW_BUILD="cp37-* cp38-*"
 
-script:
-  - python3 setup.py install
-  - python3 build_tools/test_zstd.py
-
 before_install:
   - |
     if [[ "$TRAVIS_OS_NAME" = windows ]]; then
@@ -48,30 +44,51 @@ jobs:
       script: 
         - python3 setup.py sdist --formats=gztar
         - python3 -m cibuildwheel --output-dir wheelhouse
+        - python3 setup.py install
+        - python3 build_tools/test_zstd.py
       after_success:
-        - python3 -m pip install twine
-        - python3 -m twine upload --skip-existing dist/*.tar.gz 
-        - python3 -m twine upload --skip-existing wheelhouse/*.whl
+        - |
+          if [[ $TRAVIS_TAG ]]; then
+              - python3 -m pip install twine
+              - python3 -m twine upload --skip-existing dist/*.tar.gz 
+              - python3 -m twine upload --skip-existing wheelhouse/*.whl
+          fi
     
     # Deploy on mac
     - stage: deploy
       name: Build and deploy macOS wheels
       os: osx
       language: shell       
-      install: python3 -m pip install cibuildwheel
-      script: python3 -m cibuildwheel --output-dir wheelhouse
+      install:
+        - python3 -m pip install cibuildwheel
+        - python3 -m pip install setuptools
+      script:
+        - python3 -m cibuildwheel --output-dir wheelhouse
+        - python3 setup.py install
+        - python3 build_tools/test_zstd.py
       after_success:
-        - python3 -m pip install twine
-        - python3 -m twine upload --skip-existing wheelhouse/*.whl
+        - |
+          if [[ $TRAVIS_TAG ]]; then
+            - python3 -m pip install twine
+            - python3 -m twine upload --skip-existing wheelhouse/*.whl
+          fi
         
     # Deploy on windows
     - stage: deploy
       name: Build and deploy Windows wheels
       os: windows
       language: shell
-      install: python3 -m pip install cibuildwheel
-      script: python3 -m cibuildwheel --output-dir wheelhouse
+      install:
+        - python3 -m pip install cibuildwheel
+        - python3 -m pip install setuptools
+      script:
+        - python3 -m cibuildwheel --output-dir wheelhouse
+        - python3 setup.py install
+        - python3 build_tools/test_zstd.py
       after_success:
-        - python3 -m pip install twine
-        - python3 -m twine upload --skip-existing wheelhouse/*.whl
+        - |
+          if [[ $TRAVIS_TAG ]]; then
+            - python3 -m pip install twine
+            - python3 -m twine upload --skip-existing wheelhouse/*.whl
+          fi
    
