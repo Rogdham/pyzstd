@@ -17,6 +17,7 @@ stages:
 env:
   global:
     - TWINE_USERNAME=__token__
+    - TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
     # Note: TWINE_PASSWORD is set to a PyPI API token in Travis settings
     - CIBW_BUILD="cp37-* cp38-*"
 
