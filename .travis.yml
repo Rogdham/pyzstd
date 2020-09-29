@@ -20,14 +20,6 @@ env:
     # Note: TWINE_PASSWORD is set to a PyPI API token in Travis settings
     - CIBW_BUILD="cp37-* cp38-*"
 
-before_install:
-  - |
-    if [[ "$TRAVIS_OS_NAME" = windows ]]; then
-        choco install python --version 3.8.0
-        export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
-        # make sure it's on PATH as 'python'
-        ln -s /c/Python38/python.exe /c/Python38/python3.exe
-    fi
 jobs:
   include:
 
@@ -78,6 +70,11 @@ jobs:
       name: Build and deploy Windows wheels
       os: windows
       language: shell
+      before_install:
+        - choco install python --version 3.8.0
+        - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
+        # make sure it's on PATH as 'python'
+        - ln -s /c/Python38/python.exe /c/Python38/python3.exe
       install:
         - python3 -m pip install cibuildwheel
         - python3 -m pip install setuptools
@@ -86,9 +83,6 @@ jobs:
         - python3 setup.py install
         - python3 build_tools/test_zstd.py
       after_success:
-        - |
-          if [[ $TRAVIS_TAG ]]; then
-            python3 -m pip install -U twine
-            python3 -m twine upload --verbose --skip-existing wheelhouse/*.whl
-          fi
+        - python3 -m pip install -U twine
+        - python3 -m twine upload --verbose --skip-existing wheelhouse/*.whl
    
