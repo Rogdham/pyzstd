@@ -21,7 +21,7 @@ Release note
 ------------
 **0.11.0  (Sep 29, 2020)**
 
-Use Travis CI to compile builds.
+Use `Travis CI <https://www.travis-ci.org/>`_ to compile & upload builds.
 
 **0.10.1  (Sep 25, 2020)**
 
