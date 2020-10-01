@@ -296,14 +296,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(ZstdError, ZstdDecompressor, None, d2)
 
     def test_zstd_multithread_compress(self):
-        b = b'test_zstd_multithread_compress123456' * 5_000_000
+        b = b'test_multithread_123456' * 1_000_000
 
         dat1 = compress(b, {CParameter.nbWorkers : 2})
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
     def test_rich_mem_compress(self):
-        b = b'test_zstd_multithread_compress123456' * 5_000
+        b = b'test_rich_mem_123456' * 5_000
 
         dat1 = compress(b, rich_mem=True)
         dat2 = decompress(dat1)
