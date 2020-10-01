@@ -5,11 +5,11 @@ Introduction
 
 The interface is similar to Python's bz2/lzma module.
 
-* Binds zstd v1.4.5 source code
+* Zstd v1.4.5 source code
 * Due to the use of `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, only supports Python 3.7+
 
 
-Quick links
+Links
 -----------
 
 Documentation: https://pyzstd.readthedocs.io/en/latest/
@@ -31,4 +31,4 @@ It seems the API is stable.
 
 The first version upload to PyPI.
 
-Bind zstd v1.4.5 source code.
+Zstd v1.4.5 source code.
