@@ -13,8 +13,8 @@ env:
     - CIBW_BUILD="cp37-* cp38-*"
 
 install:
-  - python3 -m pip install cibuildwheel
-  - python3 -m pip install setuptools
+  - python3 -m pip install -U cibuildwheel
+  - python3 -m pip install -U setuptools
 
 jobs:
   include:
