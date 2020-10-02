@@ -421,7 +421,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     char *type;
     ZSTD_bounds bounds;
 
-    assert(buf_size >= 160);
+    assert(buf_size >= 200);
 
     if (is_compress) {
         list = cp_list;
@@ -438,6 +438,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     for (int i = 0; i < list_size; i++) {
         if (key_v == (list+i)->parameter) {
             name = (list+i)->parameter_name;
+            break;
         }
     }
 
@@ -965,7 +966,7 @@ set_c_parameters(ZstdCompressor *self,
                  int *compress_level)
 {
     size_t zstd_ret;
-    char msg_buf[160];
+    char msg_buf[200];
 
     assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
 
@@ -1039,7 +1040,7 @@ set_c_parameters(ZstdCompressor *self,
                 _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
                 get_parameter_error_msg(msg_buf, sizeof(msg_buf),
                                         pos, key_v, value_v, 1);
-                PyErr_Format(state->ZstdError, msg_buf);
+                PyErr_SetString(state->ZstdError, msg_buf);
                 return -1;
             }
         }
@@ -1098,7 +1099,7 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
     size_t zstd_ret;
     PyObject *key, *value;
     Py_ssize_t pos;
-    char msg_buf[160];
+    char msg_buf[200];
 
     assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
 
@@ -1133,7 +1134,7 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
             _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
             get_parameter_error_msg(msg_buf, sizeof(msg_buf),
                                     pos, key_v, value_v, 0);
-            PyErr_Format(state->ZstdError, msg_buf);
+            PyErr_SetString(state->ZstdError, msg_buf);
             return -1;
         }
     }
