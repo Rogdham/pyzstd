@@ -19,6 +19,7 @@ c_list = (
     (r'(\n#include "clinic/_zstdmodule.c.h")', r'\n#include "pypi1.h"\1'),
     (r'get_zstd_state\(PyObject \*module\)',
      r'get_zstd_state_NOUSE(PyObject *module)'),
+    (r'PyType_GetModuleState\(', r'PyType_GetModuleState_pypi('),
 
     (r"""PyMODINIT_FUNC
 PyInit__zstd\(void\)

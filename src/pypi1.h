@@ -19,14 +19,13 @@ _PyNumber_Index(PyObject *item)
     return PyNumber_Index(item);
 }
 
-#if PY_VERSION_HEX < 0x03090000
-
 static inline _zstd_state *
-PyType_GetModuleState(void *arg)
+PyType_GetModuleState_pypi(void *arg)
 {
     return &static_state;
 }
 
+#if PY_VERSION_HEX < 0x03090000
 static inline int
 PyModule_AddType(PyObject *module, PyTypeObject *type)
 {
