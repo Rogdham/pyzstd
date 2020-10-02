@@ -1318,7 +1318,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
     if (rich_mem) {
         /* Calculate output buffer's size */
         size_t output_buffer_size = ZSTD_compressBound(in.size);
-#if defined(_MSC_VER) && ZSTD_VERSION_NUMBER < 10406
+#if defined(_MSC_VER) && (ZSTD_VERSION_NUMBER < 10406)
         /* When compiled with MSVC, ZSTD_compressBound() is slower than
            ZSTD_compressBound()-1 a lot. The reason is an inline function
            is not expanded as expected. */
@@ -1326,10 +1326,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 #endif
 
         if (output_buffer_size > (size_t) PY_SSIZE_T_MAX) {
-            PyErr_SetString(PyExc_MemoryError,
-                            "Rich memory mode requests memory greater than "
-                            "2GB, please use a 64-bit system or disable rich "
-                            "memory mode.");
+            PyErr_NoMemory();
             return NULL;
         }
 
