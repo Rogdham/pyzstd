@@ -54,7 +54,7 @@ jobs:
       language: python
       python: 3.8
       env:
-        CIBW_SKIP: *manylinux1*
+        CIBW_SKIP = "*manylinux1*"
 
     # ARMv8
     - stage: deploy
