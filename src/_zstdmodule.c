@@ -421,7 +421,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     char *type;
     ZSTD_bounds bounds;
 
-    assert(buf_size >= 160);
+    assert(buf_size >= 200);
 
     if (is_compress) {
         list = cp_list;
@@ -438,6 +438,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     for (int i = 0; i < list_size; i++) {
         if (key_v == (list+i)->parameter) {
             name = (list+i)->parameter_name;
+            break;
         }
     }
 
@@ -965,9 +966,9 @@ set_c_parameters(ZstdCompressor *self,
                  int *compress_level)
 {
     size_t zstd_ret;
-    char msg_buf[160];
+    char msg_buf[200];
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
@@ -985,7 +986,7 @@ set_c_parameters(ZstdCompressor *self,
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
             PyErr_Format(state->ZstdError,
                          "Error when setting compression level: %s",
                          ZSTD_getErrorName(zstd_ret));
@@ -1036,10 +1037,10 @@ set_c_parameters(ZstdCompressor *self,
             /* Set parameter to compress context */
             zstd_ret = ZSTD_CCtx_setParameter(self->cctx, key_v, value_v);
             if (ZSTD_isError(zstd_ret)) {
-                _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+                _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
                 get_parameter_error_msg(msg_buf, sizeof(msg_buf),
                                         pos, key_v, value_v, 1);
-                PyErr_Format(state->ZstdError, msg_buf);
+                PyErr_SetString(state->ZstdError, msg_buf);
                 return -1;
             }
         }
@@ -1058,7 +1059,7 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     size_t zstd_ret;
     ZSTD_CDict *c_dict;
     int ret;
-    _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+    _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
     assert(state != NULL);
 
     /* Check dict type */
@@ -1098,9 +1099,9 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
     size_t zstd_ret;
     PyObject *key, *value;
     Py_ssize_t pos;
-    char msg_buf[160];
+    char msg_buf[200];
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     if (!PyDict_Check(option)) {
         PyErr_SetString(PyExc_TypeError,
@@ -1130,10 +1131,10 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
             get_parameter_error_msg(msg_buf, sizeof(msg_buf),
                                     pos, key_v, value_v, 0);
-            PyErr_Format(state->ZstdError, msg_buf);
+            PyErr_SetString(state->ZstdError, msg_buf);
             return -1;
         }
     }
@@ -1147,7 +1148,7 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
     size_t zstd_ret;
     ZSTD_DDict *d_dict;
     int ret;
-    _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+    _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
     assert(state != NULL);
 
     /* Check dict type */
@@ -1260,7 +1261,7 @@ _zstd_ZstdCompressor___init___impl(ZstdCompressor *self,
 {
     int compress_level = 0; /* 0 means use zstd's default compression level */
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* Only called once */
     if (self->inited) {
@@ -1301,7 +1302,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
     size_t zstd_ret;
     PyObject *ret;
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* Prepare input & output buffers */
     if (data != NULL) {
@@ -1351,7 +1352,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
             PyErr_SetString(state->ZstdError, ZSTD_getErrorName(zstd_ret));
             goto error;
         }
@@ -1393,7 +1394,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
     size_t zstd_ret;
     PyObject *ret;
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* Prepare input & output buffers */
     in.src = data->buf;
@@ -1414,7 +1415,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
             PyErr_SetString(state->ZstdError, ZSTD_getErrorName(zstd_ret));
             goto error;
         }
@@ -1598,10 +1599,10 @@ static PyType_Slot zstdcompressor_slots[] = {
 static PyType_Spec zstdcompressor_type_spec = {
     .name = "_zstd.ZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
+    /* Calling PyType_GetModuleState_pypi() on a subclass is not safe.
        zstdcompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
        which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
+       So calling PyType_GetModuleState_pypi() in this file is always safe. */
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstdcompressor_slots,
 };
@@ -1660,10 +1661,10 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
 static PyType_Spec richmem_zstdcompressor_type_spec = {
     .name = "_zstd.RichMemZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
+    /* Calling PyType_GetModuleState_pypi() on a subclass is not safe.
        zstdcompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
        which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
+       So calling PyType_GetModuleState_pypi() in this file is always safe. */
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = richmem_zstdcompressor_slots,
 };
@@ -1756,7 +1757,7 @@ _zstd_ZstdDecompressor___init___impl(ZstdDecompressor *self,
                                      PyObject *zstd_dict, PyObject *option)
 /*[clinic end generated code: output=182ba99f2278542e input=be83f6924b0baaf7]*/
 {
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* Only called once */
     if (self->inited) {
@@ -1796,7 +1797,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     BlocksOutputBuffer buffer;
     PyObject *ret;
 
-    assert(PyType_GetModuleState(Py_TYPE(self)) != NULL);
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
@@ -1812,7 +1813,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            _zstd_state *state = PyType_GetModuleState(Py_TYPE(self));
+            _zstd_state *state = PyType_GetModuleState_pypi(Py_TYPE(self));
             PyErr_SetString(state->ZstdError, ZSTD_getErrorName(zstd_ret));
             goto error;
         }
@@ -2108,10 +2109,10 @@ static PyType_Slot zstddecompressor_slots[] = {
 static PyType_Spec zstddecompressor_type_spec = {
     .name = "_zstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
+    /* Calling PyType_GetModuleState_pypi() on a subclass is not safe.
        zstddecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
        which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
+       So calling PyType_GetModuleState_pypi() in this file is always safe. */
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstddecompressor_slots,
 };
