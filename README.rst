@@ -19,6 +19,10 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.11.1  (Oct 2, 2020)**
+
+Fix segmentfault when (maxOS + Python 3.9)
+
 **0.11.0  (Sep 29, 2020)**
 
 Use `Travis CI <https://www.travis-ci.org/>`_ to compile & upload builds.
