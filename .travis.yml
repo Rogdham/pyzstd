@@ -26,13 +26,16 @@ after_success:
 jobs:
   include:
 
-    # Deploy on linux
+    # manylinux1, manylinux2014
     - stage: deploy
-      name: Build and deploy Linux wheels & source
+      name: manylinux1/manylinux2014 wheels & source
       os: linux
       services: docker
       language: python
       python: 3.8
+      env:
+        CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+        CIBW_MANYLINUX_I686_IMAGE: manylinux2014
       script:
         - python3 setup.py sdist --formats=gztar
         - python3 -m cibuildwheel --output-dir wheelhouse
@@ -43,20 +46,19 @@ jobs:
         - python3 -m twine upload --verbose --skip-existing dist/*.tar.gz
         - python3 -m twine upload --verbose --skip-existing wheelhouse/*.whl
 
-    # Deploy on linux, manylinux2014
+    # manylinux2010
     - stage: deploy
-      name: Build and deploy Linux manylinux2014 wheels
+      name: manylinux2010 wheels
       os: linux
       services: docker
       language: python
       python: 3.8
       env:
-        CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-        CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+        CIBW_SKIP = "*manylinux1*"
 
-    # Deploy on linux, ARMv8
+    # ARMv8
     - stage: deploy
-      name: Build and deploy Linux ARMv8 wheels
+      name: ARMv8 wheels
       os: linux
       arch: arm64
       services: docker
@@ -67,17 +69,17 @@ jobs:
 
     # Deploy on mac
     - stage: deploy
-      name: Build and deploy macOS wheels
+      name: macOS wheels
       os: osx
       language: shell
 
     # Deploy on windows
     - stage: deploy
-      name: Build and deploy Windows wheels
+      name: Windows wheels
       os: windows
       language: shell
       before_install:
-        - choco install python --version 3.8.0
+        - choco install python3 --version 3.8.5 --params "/InstallDir:C:\Python38"
         - export PATH="/c/Python38:/c/Python38/Scripts:$PATH"
         # make sure it's on PATH as 'python'
         - ln -s /c/Python38/python.exe /c/Python38/python3.exe
