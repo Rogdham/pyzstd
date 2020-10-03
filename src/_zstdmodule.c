@@ -17,7 +17,6 @@ typedef struct {
     /* Reuseable compress/decompress dictionary, they are created once and
        can be shared by multiple threads concurrently, since its usage is
        read-only.
-
        c_dicts is a dict, int(compressionLevel):PyCapsule(ZSTD_CDict*) */
     PyObject *c_dicts;
     ZSTD_DDict *d_dict;
@@ -25,7 +24,7 @@ typedef struct {
     /* Thread lock for generating ZSTD_CDict/ZSTD_DDict */
     PyThread_type_lock lock;
 
-    /* __init__ has been called */
+    /* __init__ has been called, 0 or 1. */
     char inited;
 } ZstdDict;
 
@@ -44,10 +43,10 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
-    /* Enabled zstd multi-threading compression */
+    /* Enabled zstd multi-threading compression, 0 or 1. */
     char zstd_multi_threading;
 
-    /* __init__ has been called */
+    /* __init__ has been called, 0 or 1. */
     char inited;
 } ZstdCompressor;
 
@@ -62,10 +61,10 @@ typedef struct {
 
     /* True when the output is at a frame edge, means a frame is completely
        decoded and fully flushed, or the decompressor just be initialized.
-       Note that the input stream is not necessarily at a frame edge. */
+       The input stream is not necessarily at a frame edge. 0 or 1. */
     char at_frame_edge;
 
-    /* False if input_buffer has unconsumed data */
+    /* False if input_buffer has unconsumed data, 0 or 1. */
     char needs_input;
 
     /* Unconsumed input data */
@@ -76,7 +75,7 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
-    /* __init__ has been called */
+    /* __init__ has been called, 0 or 1. */
     char inited;
 } ZstdDecompressor;
 
@@ -100,9 +99,27 @@ class _zstd.ZstdDecompressor "ZstdDecompressor *" "&ZstdDecompressor_type"
 #include "pypi1.h"
 #include "clinic/_zstdmodule.c.h"
 
+static inline _zstd_state *
+get_zstd_state_NOUSE(PyObject *module)
+{
+    void *state = PyModule_GetState(module);
+    assert(state != NULL);
+    return (_zstd_state *)state;
+}
+
+#define ACQUIRE_LOCK(obj) do {                    \
+    if (!PyThread_acquire_lock((obj)->lock, 0)) { \
+        Py_BEGIN_ALLOW_THREADS                    \
+        PyThread_acquire_lock((obj)->lock, 1);    \
+        Py_END_ALLOW_THREADS                      \
+    } } while (0)
+#define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
+
+
 /* -----------------------------------
      BlocksOutputBuffer code
    ----------------------------------- */
+
 typedef struct {
     /* List of blocks */
     PyObject *list;
@@ -350,23 +367,6 @@ OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 {
     Py_XDECREF(buffer->list);
 }
-
-
-static inline _zstd_state *
-get_zstd_state_NOUSE(PyObject *module)
-{
-    void *state = PyModule_GetState(module);
-    assert(state != NULL);
-    return (_zstd_state *)state;
-}
-
-#define ACQUIRE_LOCK(obj) do {                    \
-    if (!PyThread_acquire_lock((obj)->lock, 0)) { \
-        Py_BEGIN_ALLOW_THREADS                    \
-        PyThread_acquire_lock((obj)->lock, 1);    \
-        Py_END_ALLOW_THREADS                      \
-    } } while (0)
-#define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
 
 
 /* -----------------------------------
@@ -776,7 +776,11 @@ static PyType_Spec zstddict_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstddict_slots,
 };
-/* ZstdDict code end */
+
+
+/* --------------------------
+     Train dictionary code
+   -------------------------- */
 
 /*[clinic input]
 _zstd._train_dict
@@ -958,6 +962,10 @@ error:
 #endif
 }
 
+
+/* -----------------------------------
+     Set parameters / load dictionary
+   ----------------------------------- */
 
 /* Set compressLevel or compress parameters to compress context. */
 static int
@@ -1180,6 +1188,10 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
     return 0;
 }
 
+
+/* -----------------------
+     ZstdCompressor code
+   ----------------------- */
 
 static PyObject *
 _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1604,7 +1616,10 @@ static PyType_Spec zstdcompressor_type_spec = {
     .slots = zstdcompressor_slots,
 };
 
-/* RichMemZstdCompressor */
+
+/* ------------------------------
+     RichMemZstdCompressor code
+   ------------------------------ */
 
 /*[clinic input]
 _zstd.RichMemZstdCompressor.compress
@@ -1666,7 +1681,10 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
     .slots = richmem_zstdcompressor_slots,
 };
 
-/* ZstdDecompressor */
+
+/* -------------------------
+     ZstdDecompressor code
+   ------------------------- */
 
 static PyObject *
 _ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
