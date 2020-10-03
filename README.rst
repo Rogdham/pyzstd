@@ -19,6 +19,10 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.11.2  (xxxx, 2020)**
+
+"Rich memory mode" no longer takes effect when using zstd multi-threading compression.
+
 **0.11.1  (Oct 2, 2020)**
 
 Fix segmentfault when (macOS + Python 3.9)
