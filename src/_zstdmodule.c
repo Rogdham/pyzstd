@@ -1636,11 +1636,12 @@ _zstd_RichMemZstdCompressor_compress_impl(ZstdCompressor *self,
 /*[clinic end generated code: output=dcef59dcce6ee3a2 input=ddcd96af137b75f6]*/
 {
     PyObject *ret;
+    int rich_mem = (self->zstd_multi_threading == 0);
 
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
-    ret = compress_impl(self, data, ZSTD_e_end, 1);
+    ret = compress_impl(self, data, ZSTD_e_end, rich_mem);
     if (ret == NULL) {
         /* Resetting cctx's session never fail */
         ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
