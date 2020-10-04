@@ -27,13 +27,13 @@ Exception
 Common functions
 ----------------
 
-    This section contains function :py:func:`compress`, :py:func:`decompress`.
+    This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
 
     .. hint::
         If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may remove the small overhead of creating context / setting parameters / loading dictionary.
 
 
-.. py:function:: compress(data, level_or_option=None, zstd_dict=None, rich_mem=False)
+.. py:function:: compress(data, level_or_option=None, zstd_dict=None)
 
     Compress *data*, return the compressed data.
 
@@ -43,8 +43,6 @@ Common functions
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param rich_mem: Use :ref:`rich memory mode<rich_mem>` if possible.
-    :type rich_mem: bool
     :return: Compressed data
     :rtype: bytes
 
@@ -69,6 +67,11 @@ Common functions
     ``0`` means use default compression level, which is currently ``3`` defined by underlying zstd library. zstd library also offers negative compression levels, which extend the range of speed vs ratio preferences. The lower the level, the faster the speed (at the cost of compression).
 
     :py:data:`compressionLevel_values` is some values defined by underlying zstd library.
+
+
+.. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
+
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. The parameters are the same as :py:func:`compress` function.
 
 
 .. py:function:: decompress(data, zstd_dict=None, option=None)

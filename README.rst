@@ -19,19 +19,7 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.11.2  (xxxx, 2020)**
-
-"Rich memory mode" no longer takes effect when using zstd multi-threading compression.
-
-**0.11.1  (Oct 2, 2020)**
-
-Fix segmentfault when (macOS + Python 3.9)
-
-**0.11.0  (Sep 29, 2020)**
-
-Use `Travis CI <https://www.travis-ci.org/>`_ to compile & upload builds.
-
-**0.10.1  (Sep 25, 2020)**
+**0.12.0  (Oct 5, 2020)**
 
 It seems the API is stable.
 

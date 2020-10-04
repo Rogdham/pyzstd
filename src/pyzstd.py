@@ -1,5 +1,6 @@
 
-__all__ = ('compress', 'decompress', 'train_dict', 'finalize_dict',
+__all__ = ('compress', 'richmem_compress', 'decompress',
+           'train_dict', 'finalize_dict',
            'ZstdCompressor', 'RichMemZstdCompressor', 'ZstdDecompressor',
            'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
            'CParameter', 'DParameter', 'Strategy',
@@ -96,21 +97,25 @@ class Strategy(enum.IntEnum):
     btultra2 = _zstd._ZSTD_btultra2
 
 
-def compress(data, level_or_option=None, zstd_dict=None, rich_mem=False):
+def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data.
 
     Refer to ZstdCompressor's docstring for a description of the optional
-    arguments *level_or_option*, *zstd_dict*. Set *rich_mem* to True to enable
-    rich memory mode.
+    arguments *level_or_option*, *zstd_dict*.
 
     For incremental compression, use an ZstdCompressor instead.
     """
-    if rich_mem:
-        comp = RichMemZstdCompressor(level_or_option, zstd_dict)
-        return comp.compress(data)
-    else:
-        comp = ZstdCompressor(level_or_option, zstd_dict)
-        return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
+    comp = ZstdCompressor(level_or_option, zstd_dict)
+    return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
+
+
+def richmem_compress(data, level_or_option=None, zstd_dict=None):
+    """Compress a block of data, use rich memory mode.
+
+    The parameters are the same as compress function.
+    """
+    comp = RichMemZstdCompressor(level_or_option, zstd_dict)
+    return comp.compress(data)
 
 
 def decompress(data, zstd_dict=None, option=None):

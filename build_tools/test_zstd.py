@@ -15,8 +15,8 @@ from test.support import (
 
 import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
-                 CParameter, DParameter, Strategy, compress, decompress, ZstdDict, \
-                 train_dict, finalize_dict, zstd_version, zstd_version_info, \
+                 CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
+                 ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
                  compressionLevel_values, get_frame_info, get_frame_size
 
 COMPRESSED_DAT = compress(b'abcdefg123456' * 1000)
@@ -305,7 +305,17 @@ class CompressorDecompressorTestCase(unittest.TestCase):
     def test_rich_mem_compress(self):
         b = b'test_rich_mem_123456' * 5_000
 
-        dat1 = compress(b, rich_mem=True)
+        dat1 = richmem_compress(b)
+        dat2 = decompress(dat1)
+        self.assertEqual(dat2, b)
+
+    def test_rich_mem_compress_warn(self):
+        b = b'test_rich_mem_123456' * 5_000
+
+        # warning when multi-threading compression
+        with self.assertWarns(ResourceWarning):
+            dat1 = richmem_compress(b, {CParameter.nbWorkers:2})
+
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 

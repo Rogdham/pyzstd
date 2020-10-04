@@ -1615,6 +1615,71 @@ static PyType_Spec zstdcompressor_type_spec = {
    ------------------------------ */
 
 /*[clinic input]
+_zstd.RichMemZstdCompressor.__init__
+
+    level_or_option: object = None
+        It can be an int object, in this case represents the compression
+        level. It can also be a dictionary for setting various advanced
+        parameters. The default value None means to use zstd's default
+        compression level/parameters.
+    zstd_dict: object = None
+        Pre-trained dictionary for compression, a ZstdDict object.
+
+Initialize a RichMemZstdCompressor object.
+[clinic start generated code]*/
+
+static int
+_zstd_RichMemZstdCompressor___init___impl(ZstdCompressor *self,
+                                          PyObject *level_or_option,
+                                          PyObject *zstd_dict)
+/*[clinic end generated code: output=4bf6220198421b7e input=406964d7de48c832]*/
+{
+    int compress_level = 0; /* 0 means use zstd's default compression level */
+
+    assert(PyType_GetModuleState_pypi(Py_TYPE(self)) != NULL);
+
+    /* Only called once */
+    if (self->inited) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "ZstdCompressor.__init__ function was called twice.");
+        return -1;
+    }
+    self->inited = 1;
+
+    /* Set compressLevel/option to compress context */
+    if (level_or_option != Py_None) {
+        if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
+            return -1;
+        }
+    }
+
+    /* Check effective condition */
+    if (self->zstd_multi_threading) {
+        char *msg = "Currently \"rich memory mode\" has no effect on "
+                    "zstd multi-threading compression (set "
+                    "\"CParameter.nbWorkers\" > 1), it will allocate "
+                    "unnecessary memory.";
+        if (PyErr_WarnEx(PyExc_ResourceWarning, msg, 1) < 0) {
+            return -1;
+        }
+    }
+
+    /* Load dictionary to compress context */
+    if (zstd_dict != Py_None) {
+        if (load_c_dict(self, zstd_dict, compress_level) < 0) {
+            return -1;
+        }
+
+        /* Py_INCREF the dict */
+        Py_INCREF(zstd_dict);
+        self->dict = zstd_dict;
+    }
+
+    return 0;
+}
+
+
+/*[clinic input]
 _zstd.RichMemZstdCompressor.compress
 
     data: Py_buffer
@@ -1629,12 +1694,11 @@ _zstd_RichMemZstdCompressor_compress_impl(ZstdCompressor *self,
 /*[clinic end generated code: output=dcef59dcce6ee3a2 input=ddcd96af137b75f6]*/
 {
     PyObject *ret;
-    int rich_mem = (self->zstd_multi_threading == 0);
 
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
-    ret = compress_impl(self, data, ZSTD_e_end, rich_mem);
+    ret = compress_impl(self, data, ZSTD_e_end, 1);
     if (ret == NULL) {
         /* Resetting cctx's session never fail */
         ZSTD_CCtx_reset(self->cctx, ZSTD_reset_session_only);
@@ -1658,7 +1722,7 @@ PyDoc_STRVAR(RichMemZstdCompressor_doc,
 static PyType_Slot richmem_zstdcompressor_slots[] = {
     {Py_tp_new, _ZstdCompressor_new},
     {Py_tp_dealloc, _ZstdCompressor_dealloc},
-    {Py_tp_init, _zstd_ZstdCompressor___init__},
+    {Py_tp_init, _zstd_RichMemZstdCompressor___init__},
     {Py_tp_methods, _RichMem_ZstdCompressor_methods},
     {Py_tp_doc, (char*)RichMemZstdCompressor_doc},
     {0, 0}
