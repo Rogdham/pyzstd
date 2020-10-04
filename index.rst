@@ -27,13 +27,13 @@ Exception
 Common functions
 ----------------
 
-    This section contains function :py:func:`compress`, :py:func:`decompress`.
+    This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
 
     .. hint::
         If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may remove the small overhead of creating context / setting parameters / loading dictionary.
 
 
-.. py:function:: compress(data, level_or_option=None, zstd_dict=None, rich_mem=False)
+.. py:function:: compress(data, level_or_option=None, zstd_dict=None)
 
     Compress *data*, return the compressed data.
 
@@ -43,8 +43,6 @@ Common functions
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param rich_mem: Use :ref:`rich memory mode<rich_mem>` or not.
-    :type rich_mem: bool
     :return: Compressed data
     :rtype: bytes
 
@@ -69,6 +67,11 @@ Common functions
     ``0`` means use default compression level, which is currently ``3`` defined by underlying zstd library. zstd library also offers negative compression levels, which extend the range of speed vs ratio preferences. The lower the level, the faster the speed (at the cost of compression).
 
     :py:data:`compressionLevel_values` is some values defined by underlying zstd library.
+
+
+.. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
+
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. The parameters are the same as :py:func:`compress` function.
 
 
 .. py:function:: decompress(data, zstd_dict=None, option=None)
@@ -198,7 +201,7 @@ Stream classes
 
 .. py:class:: RichMemZstdCompressor
 
-    A compressor use :ref:`rich memory mode<rich_mem>`. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
+    A compressor use :ref:`rich memory mode<rich_mem>` if possible. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
 
     Thread-safe at method level.
 
@@ -208,7 +211,7 @@ Stream classes
 
     .. py:method:: compress(self, data)
 
-        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+        Compress *data* use :ref:`rich memory mode<rich_mem>` if possible, return a single zstd :ref:`frame<frame_block>`.
 
         :param data: Data to be compressed.
         :type data: bytes-like object
@@ -826,22 +829,25 @@ Advanced parameters
 
     The data will be split into portions and be compressed in parallel. The portion size can  be specified by :py:attr:`CParameter.jobSize` parameter, usually don't need to set this.
 
-    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output is larger a little.
+    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output is larger a little, and it's not multiple :ref:`frames<frame_block>`.
 
 
 .. _rich_mem:
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. There is a *rich_mem* argument in :py:func:`compress` function, a :py:class:`RichMemZstdCompressor` class.
+    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster. There is a *rich_mem* argument in :py:func:`compress` function, a :py:class:`RichMemZstdCompressor` class.
+
+    Current effective condition:
+
+    * Use single :ref:`zstd thread <mt_compression>` to compress.
 
     Effects:
 
-    * Allocate more memory, the output buffer is larger than input data a little.
-    * When :ref:`zstd threads number<mt_compression>` is ``1``, 10% ~ 15% faster.
-    * When :ref:`zstd threads number<mt_compression>` > ``1``, maybe the size of output data can be reduced a bit.
+    * The output buffer is larger than input data a little.
+    * 10% ~ 15% faster.
 
-    When this mode is disabled, the output buffer grows gradually, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When this mode is disabled, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/dbf717d48cf0cdb218665b5ee276c8d8c2138ae2/src/_zstdmodule.c#L146-L171>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
     After enabling this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MB input data, the allocated output buffer is (100 MB + 400 KB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
 
@@ -855,22 +861,4 @@ Advanced parameters
         compressed_dat1 = c.compress(raw_dat1)
         compressed_dat2 = c.compress(raw_dat2)
 
-    Compress a 520 MB data:
-
-    +-------------+------------------+------------------+
-    | zstd threads|     use rich_mem | not use rich_mem |
-    +=============+==================+==================+
-    |           1 | **4.62 sec** [1] |     5.40 sec [2] |
-    +-------------+------------------+------------------+
-    |           2 |     2.54 sec [3] |     2.55 sec [4] |
-    +-------------+------------------+------------------+
-    |           3 |     2.07 sec [3] |     2.08 sec [4] |
-    +-------------+------------------+------------------+
-    |           4 |     1.99 sec [3] |     2.02 sec [4] |
-    +-------------+------------------+------------------+
-
-    | Compressed data size:
-    | [1] 286,842,126 bytes
-    | [2] 286,842,149 bytes
-    | [3] 286,913,958 bytes
-    | [4] 287,650,683 bytes
+    Compressing a 520 MB data, when disabled, takes 5.40 seconds; when enabled, takes 4.62 seconds.

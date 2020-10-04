@@ -48,8 +48,8 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.11.1',
-    description="Python bindings for Zstandard(zstd) compression algorithm, the interface is similar to Python's bz2/lzma module.",
+    version='0.12.0',
+    description="Python bindings for Zstandard (zstd) compression algorithm, the interface is similar to Python's bz2/lzma module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',

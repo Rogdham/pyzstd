@@ -354,6 +354,59 @@ _zstd_ZstdCompressor___reduce__(ZstdCompressor *self, PyObject *Py_UNUSED(ignore
     return _zstd_ZstdCompressor___reduce___impl(self);
 }
 
+PyDoc_STRVAR(_zstd_RichMemZstdCompressor___init____doc__,
+"RichMemZstdCompressor(level_or_option=None, zstd_dict=None)\n"
+"--\n"
+"\n"
+"Initialize a RichMemZstdCompressor object.\n"
+"\n"
+"  level_or_option\n"
+"    It can be an int object, in this case represents the compression\n"
+"    level. It can also be a dictionary for setting various advanced\n"
+"    parameters. The default value None means to use zstd\'s default\n"
+"    compression level/parameters.\n"
+"  zstd_dict\n"
+"    Pre-trained dictionary for compression, a ZstdDict object.");
+
+static int
+_zstd_RichMemZstdCompressor___init___impl(ZstdCompressor *self,
+                                          PyObject *level_or_option,
+                                          PyObject *zstd_dict);
+
+static int
+_zstd_RichMemZstdCompressor___init__(PyObject *self, PyObject *args, PyObject *kwargs)
+{
+    int return_value = -1;
+    static const char * const _keywords[] = {"level_or_option", "zstd_dict", NULL};
+    static _PyArg_Parser _parser = {NULL, _keywords, "RichMemZstdCompressor", 0};
+    PyObject *argsbuf[2];
+    PyObject * const *fastargs;
+    Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+    Py_ssize_t noptargs = nargs + (kwargs ? PyDict_GET_SIZE(kwargs) : 0) - 0;
+    PyObject *level_or_option = Py_None;
+    PyObject *zstd_dict = Py_None;
+
+    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 0, 2, 0, argsbuf);
+    if (!fastargs) {
+        goto exit;
+    }
+    if (!noptargs) {
+        goto skip_optional_pos;
+    }
+    if (fastargs[0]) {
+        level_or_option = fastargs[0];
+        if (!--noptargs) {
+            goto skip_optional_pos;
+        }
+    }
+    zstd_dict = fastargs[1];
+skip_optional_pos:
+    return_value = _zstd_RichMemZstdCompressor___init___impl((ZstdCompressor *)self, level_or_option, zstd_dict);
+
+exit:
+    return return_value;
+}
+
 PyDoc_STRVAR(_zstd_RichMemZstdCompressor_compress__doc__,
 "compress($self, /, data)\n"
 "--\n"
@@ -712,4 +765,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=9311f35d387936b8 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=e7343f411763f022 input=a9049054013a1b77]*/
