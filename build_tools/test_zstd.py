@@ -5,6 +5,7 @@ import pathlib
 import pickle
 import random
 import sys
+import tempfile
 from test import support
 import unittest
 
@@ -17,10 +18,11 @@ import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
                  ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
-                 compressionLevel_values, get_frame_info, get_frame_size
+                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile
 
 COMPRESSED_DAT = compress(b'abcdefg123456' * 1000)
 DAT_100_PLUS_32KB = compress(b'a' * (100 + 32*1024))
+DECOMPRESSED_DAT_100_PLUS_32KB = b'a' * (100 + 32*1024)
 SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
                   (100).to_bytes(4, byteorder='little') + \
                   b'a' * 100
@@ -520,6 +522,191 @@ class ZstdDictTestCase(unittest.TestCase):
             self.assertEqual(sample, dat2)
 
 
+class FileTestCase(unittest.TestCase):
+
+    def test_init(self):
+        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+            pass
+        with ZstdFile(BytesIO(), "w") as f:
+            pass
+        with ZstdFile(BytesIO(), "x") as f:
+            pass
+        with ZstdFile(BytesIO(), "a") as f:
+            pass
+
+    def test_init_with_PathLike_filename(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = pathlib.Path(tmp_f.name)
+
+        with ZstdFile(filename, "a") as f:
+            f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+        with ZstdFile(filename) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+
+        with ZstdFile(filename, "a") as f:
+            f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+        with ZstdFile(filename) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB * 2)
+
+        os.remove(filename)
+
+    def test_init_with_filename(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = pathlib.Path(tmp_f.name)
+            
+        with ZstdFile(filename) as f:
+            pass
+        with ZstdFile(filename, "w") as f:
+            pass
+        with ZstdFile(filename, "a") as f:
+            pass
+
+        os.remove(filename)
+
+    def test_init_mode(self):
+        bi = BytesIO()
+
+        with ZstdFile(bi, "r"):
+            pass
+        with ZstdFile(bi, "rb"):
+            pass
+        with ZstdFile(bi, "w"):
+            pass
+        with ZstdFile(bi, "wb"):
+            pass
+        with ZstdFile(bi, "a"):
+            pass
+        with ZstdFile(bi, "ab"):
+            pass
+
+    def test_init_with_x_mode(self):
+        with tempfile.NamedTemporaryFile() as tmp_f:
+            filename = pathlib.Path(tmp_f.name)
+            
+        for mode in ("x", "xb"):
+            with ZstdFile(filename, mode):
+                pass
+            with self.assertRaises(FileExistsError):
+                with ZstdFile(filename, mode):
+                    pass
+            os.remove(filename)
+
+    def test_init_bad_mode(self):
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), (3, "x"))
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "xt")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "x+")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rx")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "wx")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rt")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r+")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "wt")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "w+")
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rw")
+
+    def test_init_bad_check(self):
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(), "w", level_or_option='asd')
+        # CHECK_UNKNOWN and anything above CHECK_ID_MAX should be invalid.
+        with self.assertRaises(ZstdError):
+            ZstdFile(BytesIO(), "w", level_or_option={999:9999})
+        with self.assertRaises(ZstdError):
+            ZstdFile(BytesIO(), "w", level_or_option={CParameter.windowLog:99})
+
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r", level_or_option=33)
+
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB),
+                             level_or_option={DParameter.windowLogMax:2**31})
+
+        with self.assertRaises(ZstdError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), 
+                             level_or_option={444:333})
+
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), zstd_dict={1:2})
+
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(DAT_100_PLUS_32KB), zstd_dict=b'dict123456')
+
+
+    def test_close(self):
+        with BytesIO(DAT_100_PLUS_32KB) as src:
+            f = ZstdFile(src)
+            f.close()
+            # ZstdFile.close() should not close the underlying file object.
+            self.assertFalse(src.closed)
+            # Try closing an already-closed ZstdFile.
+            f.close()
+            self.assertFalse(src.closed)
+
+        # Test with a real file on disk, opened directly by LZMAFile.
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = pathlib.Path(tmp_f.name)
+
+        f = ZstdFile(filename)
+        fp = f._fp
+        f.close()
+        # Here, ZstdFile.close() *should* close the underlying file object.
+        self.assertTrue(fp.closed)
+        # Try closing an already-closed ZstdFile.
+        f.close()
+
+        os.remove(filename)
+
+    def test_closed(self):
+        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        try:
+            self.assertFalse(f.closed)
+            f.read()
+            self.assertFalse(f.closed)
+        finally:
+            f.close()
+        self.assertTrue(f.closed)
+
+        f = ZstdFile(BytesIO(), "w")
+        try:
+            self.assertFalse(f.closed)
+        finally:
+            f.close()
+        self.assertTrue(f.closed)
+
+    def test_fileno(self):
+        # 1
+        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        try:
+            self.assertRaises(UnsupportedOperation, f.fileno)
+        finally:
+            f.close()
+        self.assertRaises(ValueError, f.fileno)
+
+        # 2
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = pathlib.Path(tmp_f.name)
+
+        f = ZstdFile(filename)
+        try:
+            self.assertEqual(f.fileno(), f._fp.fileno())
+            self.assertIsInstance(f.fileno(), int)
+        finally:
+            f.close()
+        self.assertRaises(ValueError, f.fileno)
+
+        os.remove(filename)
+
+
 def test_main():
     run_unittest(
         FunctionsTestCase,
@@ -527,6 +714,7 @@ def test_main():
         CompressorDecompressorTestCase,
         DecompressorFlagsTestCase,
         ZstdDictTestCase,
+        FileTestCase,
     )
 
 if __name__ == "__main__":

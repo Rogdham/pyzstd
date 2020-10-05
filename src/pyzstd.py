@@ -7,6 +7,7 @@ __all__ = ('compress', 'richmem_compress', 'decompress',
            'get_frame_info', 'get_frame_size',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
 
+import builtins
 import enum
 import io
 import os
@@ -145,15 +146,13 @@ def train_dict(samples, dict_size):
     """
     chunks = []
     chunk_sizes = []
-
     for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
+    chunks = b''.join(chunks)
     if not chunks:
         raise ValueError("The chunks is empty content, can't train dictionary.")
-
-    chunks = b''.join(chunks)
 
     # chunks: samples be stored concatenated in a single flat buffer.
     # chunk_sizes: a list of each sample's size.
@@ -189,15 +188,13 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
 
     chunks = []
     chunk_sizes = []
-
     for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
+    chunks = b''.join(chunks)
     if not chunks:
         raise ValueError("The chunks is empty content, can't train dictionary.")
-
-    chunks = b''.join(chunks)
 
     # zstd_dict: existing dictionary.
     # chunks: samples be stored concatenated in a single flat buffer.
@@ -265,15 +262,15 @@ class ZstdFile(_compression.BaseStream):
         self._mode = _MODE_CLOSED
 
         if not isinstance(zstd_dict, (type(None), ZstdDict)):
-            raise ValueError("zstd_dict should be ZstdDict object.")
+            raise TypeError("zstd_dict should be ZstdDict object.")
 
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
-                raise ValueError("level_or_option should be dict object.")
+                raise TypeError("level_or_option should be dict object.")
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
-                raise ValueError("level_or_option should be int or dict object.")
+                raise TypeError("level_or_option should be int or dict object.")
             mode_code = _MODE_WRITE
             self._compressor = ZstdCompressor(level_or_option, zstd_dict)
             self._pos = 0
@@ -306,7 +303,7 @@ class ZstdFile(_compression.BaseStream):
         if self._mode == _MODE_CLOSED:
             return
         try:
-            if self._mode == _MODE_READ:
+            if self._mode == _MODE_READ and hasattr(self, '_buffer'):
                 self._buffer.close()
                 self._buffer = None
             elif self._mode == _MODE_WRITE:
