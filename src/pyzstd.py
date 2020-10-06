@@ -2,7 +2,7 @@
 __all__ = ('compress', 'richmem_compress', 'decompress',
            'train_dict', 'finalize_dict',
            'ZstdCompressor', 'RichMemZstdCompressor', 'ZstdDecompressor',
-           'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
+           'ZstdDict', 'ZstdError', 'ZstdFile', 'open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
@@ -10,6 +10,7 @@ __all__ = ('compress', 'richmem_compress', 'decompress',
 import builtins
 import enum
 import io
+import sys
 import os
 import _compression
 from collections import namedtuple
@@ -248,6 +249,18 @@ class EndlessDecompressReader(_compression.DecompressReader):
         self._pos += len(data)
         return data
 
+    def readall(self):
+        chunks = []
+        while True:
+            # sys.maxsize means that the max length of output buffer is
+            # unlimited, so that the whole input buffer can be decompressed
+            # within one .decompress() call.
+            data = self.read(sys.maxsize)
+            if not data:
+                break
+            chunks.append(data)
+        return b''.join(chunks)
+        
 
 _MODE_CLOSED   = 0
 _MODE_READ     = 1
@@ -428,10 +441,18 @@ class ZstdFile(_compression.BaseStream):
         return self._pos
 
 
-def zstd_open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
+def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
          encoding=None, errors=None, newline=None):
-    if "t" in mode and "b" in mode:
-        raise ValueError("Invalid mode: %r" % (mode,))
+    if "t" in mode:
+        if "b" in mode:
+            raise ValueError("Invalid mode: %r" % (mode,))
+    else:
+        if encoding is not None:
+            raise ValueError("Argument 'encoding' not supported in binary mode")
+        if errors is not None:
+            raise ValueError("Argument 'errors' not supported in binary mode")
+        if newline is not None:
+            raise ValueError("Argument 'newline' not supported in binary mode")
 
     zstd_mode = mode.replace("t", "")
     binary_file = ZstdFile(filename, zstd_mode,

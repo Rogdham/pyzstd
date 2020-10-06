@@ -1,5 +1,6 @@
 import _compression
-from io import BytesIO, UnsupportedOperation, DEFAULT_BUFFER_SIZE
+import builtins
+from io import BytesIO, StringIO, UnsupportedOperation, DEFAULT_BUFFER_SIZE
 import os
 import pathlib
 import pickle
@@ -18,7 +19,7 @@ import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
                  ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
-                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile
+                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile, open
 
 DECOMPRESSED_DAT = b'abcdefg123456' * 1000
 COMPRESSED_DAT = compress(DECOMPRESSED_DAT)
@@ -30,9 +31,10 @@ SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
                   (100).to_bytes(4, byteorder='little') + \
                   b'a' * 100
 
-with open(os.path.abspath(__file__), 'rb') as f:
+with builtins.open(os.path.abspath(__file__), 'rb') as f:
     THIS_FILE_BYTES = f.read()
     THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
+COMPRESSED_THIS_FILE = compress(THIS_FILE_BYTES)
 
 COMPRESSED_BOGUS = DECOMPRESSED_DAT
 
@@ -400,6 +402,28 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         self.assertEqual(size, 100+32*1024)
         self.assertTrue(d.at_frame_edge)
+
+    def test_compress_flushblock(self):
+        c = ZstdCompressor()
+        dat1 = c.compress(DECOMPRESSED_DAT_100_PLUS_32KB, c.FLUSH_BLOCK)
+
+        d = ZstdDecompressor()
+        dat2 = d.decompress(dat1)
+
+        self.assertEqual(dat2, DECOMPRESSED_DAT_100_PLUS_32KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+    def test_compress_flushframe(self):
+        c = ZstdCompressor()
+        dat1 = c.compress(DECOMPRESSED_DAT_100_PLUS_32KB, c.FLUSH_FRAME)
+
+        d = ZstdDecompressor()
+        dat2 = d.decompress(dat1)
+
+        self.assertEqual(dat2, DECOMPRESSED_DAT_100_PLUS_32KB)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
 
 class DecompressorFlagsTestCase(unittest.TestCase):
@@ -1196,6 +1220,110 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.tell)
 
 
+class OpenTestCase(unittest.TestCase):
+
+    def test_binary_modes(self):
+        with open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
+            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with BytesIO() as bio:
+            with open(bio, "wb") as f:
+                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+            file_data = decompress(bio.getvalue())
+            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
+            with open(bio, "ab") as f:
+                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+            file_data = decompress(bio.getvalue())
+            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB * 2)
+
+    def test_text_modes(self):
+        uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
+
+        with open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
+            self.assertEqual(f.read(), uncompressed)
+
+        with BytesIO() as bio:
+            with open(bio, "wt") as f:
+                f.write(uncompressed)
+            file_data = decompress(bio.getvalue()).decode("utf-8")
+            self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
+
+            with open(bio, "at") as f:
+                f.write(uncompressed)
+            file_data = decompress(bio.getvalue()).decode("utf-8")
+            self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed * 2)
+
+    def test_bad_params(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            TESTFN = pathlib.Path(tmp_f.name)
+
+        with self.assertRaises(ValueError):
+            open(TESTFN, "")
+        with self.assertRaises(ValueError):
+            open(TESTFN, "rbt")
+        with self.assertRaises(ValueError):
+            open(TESTFN, "rb", encoding="utf-8")
+        with self.assertRaises(ValueError):
+            open(TESTFN, "rb", errors="ignore")
+        with self.assertRaises(ValueError):
+            open(TESTFN, "rb", newline="\n")
+
+        os.remove(TESTFN)
+
+    def test_format_and_filters(self):
+        option = {DParameter.windowLogMax:25}
+        with open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+
+        option = {CParameter.compressionLevel:12}
+        with BytesIO() as bio:
+            with open(bio, "wb", level_or_option=option) as f:
+                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+            file_data = decompress(bio.getvalue())
+            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
+
+    def test_encoding(self):
+        uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
+
+        with BytesIO() as bio:
+            with open(bio, "wt", encoding="utf-16-le") as f:
+                f.write(uncompressed)
+            file_data = decompress(bio.getvalue()).decode("utf-16-le")
+            self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
+            bio.seek(0)
+            with open(bio, "rt", encoding="utf-16-le") as f:
+                self.assertEqual(f.read().replace(os.linesep, "\n"), uncompressed)
+
+    def test_encoding_error_handler(self):
+        with BytesIO(compress(b"foo\xffbar")) as bio:
+            with open(bio, "rt", encoding="ascii", errors="ignore") as f:
+                self.assertEqual(f.read(), "foobar")
+
+    def test_newline(self):
+        # Test with explicit newline (universal newline mode disabled).
+        text = THIS_FILE_STR.replace(os.linesep, "\n")
+        with BytesIO() as bio:
+            with open(bio, "wt", newline="\n") as f:
+                f.write(text)
+            bio.seek(0)
+            with open(bio, "rt", newline="\r") as f:
+                self.assertEqual(f.readlines(), [text])
+
+    def test_x_mode(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            TESTFN = pathlib.Path(tmp_f.name)
+        
+        for mode in ("x", "xb", "xt"):
+            os.remove(TESTFN)
+
+            with open(TESTFN, mode):
+                pass
+            with self.assertRaises(FileExistsError):
+                with open(TESTFN, mode):
+                    pass
+
+        os.remove(TESTFN)
+
+
 def test_main():
     run_unittest(
         FunctionsTestCase,
@@ -1204,6 +1332,7 @@ def test_main():
         DecompressorFlagsTestCase,
         ZstdDictTestCase,
         FileTestCase,
+        OpenTestCase,
     )
 
 TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae\x06b\x02'
