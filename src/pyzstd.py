@@ -262,15 +262,20 @@ class ZstdFile(_compression.BaseStream):
         self._mode = _MODE_CLOSED
 
         if not isinstance(zstd_dict, (type(None), ZstdDict)):
-            raise TypeError("zstd_dict should be ZstdDict object.")
+            raise TypeError("zstd_dict argument should be a ZstdDict object.")
 
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
-                raise TypeError("level_or_option should be dict object.")
+                msg = ("In read mode (decompression), level_or_option argument "
+                       "should be a dict object, that represents decompression "
+                       "option. It doesn't support int type compression level "
+                       "in this case.")
+                raise TypeError(msg)
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
-                raise TypeError("level_or_option should be int or dict object.")
+                msg = "level_or_option argument should be int or dict object."
+                raise TypeError(msg)
             mode_code = _MODE_WRITE
             self._compressor = ZstdCompressor(level_or_option, zstd_dict)
             self._pos = 0
