@@ -2,13 +2,15 @@
 __all__ = ('compress', 'richmem_compress', 'decompress',
            'train_dict', 'finalize_dict',
            'ZstdCompressor', 'RichMemZstdCompressor', 'ZstdDecompressor',
-           'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
+           'ZstdDict', 'ZstdError', 'ZstdFile', 'open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
 
+import builtins
 import enum
 import io
+import sys
 import os
 import _compression
 from collections import namedtuple
@@ -145,15 +147,13 @@ def train_dict(samples, dict_size):
     """
     chunks = []
     chunk_sizes = []
-
     for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
+    chunks = b''.join(chunks)
     if not chunks:
         raise ValueError("The chunks is empty content, can't train dictionary.")
-
-    chunks = b''.join(chunks)
 
     # chunks: samples be stored concatenated in a single flat buffer.
     # chunk_sizes: a list of each sample's size.
@@ -189,15 +189,13 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
 
     chunks = []
     chunk_sizes = []
-
     for chunk in samples:
         chunks.append(chunk)
         chunk_sizes.append(len(chunk))
 
+    chunks = b''.join(chunks)
     if not chunks:
         raise ValueError("The chunks is empty content, can't train dictionary.")
-
-    chunks = b''.join(chunks)
 
     # zstd_dict: existing dictionary.
     # chunks: samples be stored concatenated in a single flat buffer.
@@ -251,6 +249,18 @@ class EndlessDecompressReader(_compression.DecompressReader):
         self._pos += len(data)
         return data
 
+    def readall(self):
+        chunks = []
+        while True:
+            # sys.maxsize means that the max length of output buffer is
+            # unlimited, so that the whole input buffer can be decompressed
+            # within one .decompress() call.
+            data = self.read(sys.maxsize)
+            if not data:
+                break
+            chunks.append(data)
+        return b''.join(chunks)
+        
 
 _MODE_CLOSED   = 0
 _MODE_READ     = 1
@@ -265,15 +275,20 @@ class ZstdFile(_compression.BaseStream):
         self._mode = _MODE_CLOSED
 
         if not isinstance(zstd_dict, (type(None), ZstdDict)):
-            raise ValueError("zstd_dict should be ZstdDict object.")
+            raise TypeError("zstd_dict argument should be a ZstdDict object.")
 
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
-                raise ValueError("level_or_option should be dict object.")
+                msg = ("In read mode (decompression), level_or_option argument "
+                       "should be a dict object, that represents decompression "
+                       "option. It doesn't support int type compression level "
+                       "in this case.")
+                raise TypeError(msg)
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
-                raise ValueError("level_or_option should be int or dict object.")
+                msg = "level_or_option argument should be int or dict object."
+                raise TypeError(msg)
             mode_code = _MODE_WRITE
             self._compressor = ZstdCompressor(level_or_option, zstd_dict)
             self._pos = 0
@@ -306,7 +321,7 @@ class ZstdFile(_compression.BaseStream):
         if self._mode == _MODE_CLOSED:
             return
         try:
-            if self._mode == _MODE_READ:
+            if self._mode == _MODE_READ and hasattr(self, '_buffer'):
                 self._buffer.close()
                 self._buffer = None
             elif self._mode == _MODE_WRITE:
@@ -426,10 +441,18 @@ class ZstdFile(_compression.BaseStream):
         return self._pos
 
 
-def zstd_open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
+def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
          encoding=None, errors=None, newline=None):
-    if "t" in mode and "b" in mode:
-        raise ValueError("Invalid mode: %r" % (mode,))
+    if "t" in mode:
+        if "b" in mode:
+            raise ValueError("Invalid mode: %r" % (mode,))
+    else:
+        if encoding is not None:
+            raise ValueError("Argument 'encoding' not supported in binary mode")
+        if errors is not None:
+            raise ValueError("Argument 'errors' not supported in binary mode")
+        if newline is not None:
+            raise ValueError("Argument 'newline' not supported in binary mode")
 
     zstd_mode = mode.replace("t", "")
     binary_file = ZstdFile(filename, zstd_mode,

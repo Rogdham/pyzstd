@@ -71,7 +71,9 @@ Common functions
 
 .. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
 
-    Use :ref:`rich memory mode<rich_mem>` to compress *data*. The parameters are the same as :py:func:`compress` function.
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. In some cases, it is faster than :py:func:`compress`, but allocate more memory.
+
+    The parameters are the same as :py:func:`compress` function.
 
 
 .. py:function:: decompress(data, zstd_dict=None, option=None)
@@ -201,7 +203,7 @@ Stream classes
 
 .. py:class:: RichMemZstdCompressor
 
-    A compressor use :ref:`rich memory mode<rich_mem>` if possible. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
+    A compressor use :ref:`rich memory mode<rich_mem>`. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
 
     Thread-safe at method level.
 
@@ -211,7 +213,7 @@ Stream classes
 
     .. py:method:: compress(self, data)
 
-        Compress *data* use :ref:`rich memory mode<rich_mem>` if possible, return a single zstd :ref:`frame<frame_block>`.
+        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
 
         :param data: Data to be compressed.
         :type data: bytes-like object
@@ -836,12 +838,10 @@ Advanced parameters
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster. There is a *rich_mem* argument in :py:func:`compress` function, a :py:class:`RichMemZstdCompressor` class.
+    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster. There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
 
-    Current effective condition:
-
-    * Use single :ref:`zstd thread <mt_compression>` to compress.
-
+    Note that currently it has no effect on :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
+ 
     Effects:
 
     * The output buffer is larger than input data a little.
