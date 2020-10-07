@@ -1,6 +1,5 @@
 import _compression
-import builtins
-from io import BytesIO, StringIO, UnsupportedOperation, DEFAULT_BUFFER_SIZE
+from io import BytesIO, UnsupportedOperation
 import os
 import pathlib
 import pickle
@@ -19,24 +18,25 @@ import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
                  ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
-                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile, open
+                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile, zstd_open
 
-DECOMPRESSED_DAT = b'abcdefg123456' * 1000
-COMPRESSED_DAT = compress(DECOMPRESSED_DAT)
+DECOMPRESSED_DAT = None
+COMPRESSED_DAT = None
 
-DECOMPRESSED_DAT_100_PLUS_32KB = b'a' * (100 + 32*1024)
-DAT_100_PLUS_32KB = compress(DECOMPRESSED_DAT_100_PLUS_32KB)
+DECOMPRESSED_DAT_100_PLUS_32KB = None
+DAT_100_PLUS_32KB = None
 
-SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
-                  (100).to_bytes(4, byteorder='little') + \
-                  b'a' * 100
+SKIPPABLE_FRAME = None
 
-with builtins.open(os.path.abspath(__file__), 'rb') as f:
-    THIS_FILE_BYTES = f.read()
-    THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
-COMPRESSED_THIS_FILE = compress(THIS_FILE_BYTES)
+THIS_FILE_BYTES = None
+THIS_FILE_STR = None
+COMPRESSED_THIS_FILE = None
 
-COMPRESSED_BOGUS = DECOMPRESSED_DAT
+COMPRESSED_BOGUS = None
+
+SAMPLES = None
+
+TRAINED_DICT = None
 
 class FunctionsTestCase(unittest.TestCase):
 
@@ -278,7 +278,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
              CParameter.checksumFlag : 1,
              CParameter.dictIDFlag : 0,
 
-             CParameter.nbWorkers : 0,
+             CParameter.nbWorkers : 2,
              CParameter.jobSize : 50_000,
              CParameter.overlapLog : 9,
              }
@@ -392,6 +392,31 @@ class CompressorDecompressorTestCase(unittest.TestCase):
                 in_dat = b''
 
             dat = d.decompress(in_dat, 1)
+
+            size += len(dat)
+
+            if 0 < size < 100+32*1024:
+                self.assertFalse(d.at_frame_edge)
+            else:
+                self.assertTrue(d.at_frame_edge)
+
+        self.assertEqual(size, 100+32*1024)
+        self.assertTrue(d.at_frame_edge)
+
+    def test_decompress_1_3bytes(self):
+        d = ZstdDecompressor()
+        bi = BytesIO(DAT_100_PLUS_32KB)
+        size = 0
+
+        while True: 
+            if d.needs_input:
+                in_dat = bi.read(1)
+                if not in_dat:
+                    break
+            else:
+                in_dat = b''
+
+            dat = d.decompress(in_dat, 3)
 
             size += len(dat)
 
@@ -583,44 +608,36 @@ class ZstdDictTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
             zd.dict_id = 10000
-    
+
     def test_train_dict(self):
-        # prepare data -----------------------------
-        colors = [b'red', b'green', b'yellow', b'black', b'withe', b'blue',
-                  b'lilac', b'purple', b'navy', b'glod', b'silver', b'olive']
-        lst = []
-        for i in range(1200):
-            sample  = b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-            sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-            sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-            sample += b'%s = %d' % (random.choice(colors), random.randrange(100))
-            lst.append(sample)
-
-        # train zstd dict -----------------------------
         DICT_SIZE1 = 100*1024
-        dic1 = zstd.train_dict(lst, DICT_SIZE1)
 
-        self.assertGreater(len(dic1.dict_content), 0)
-        self.assertLessEqual(len(dic1.dict_content), DICT_SIZE1)
+        global TRAINED_DICT
+        TRAINED_DICT = zstd.train_dict(SAMPLES, DICT_SIZE1)
+
+        self.assertNotEqual(TRAINED_DICT.dict_id, 0)
+        self.assertGreater(len(TRAINED_DICT.dict_content), 0)
+        self.assertLessEqual(len(TRAINED_DICT.dict_content), DICT_SIZE1)
 
         # compress/decompress
-        for sample in lst:
-            dat1 = compress(sample, zstd_dict=dic1)
-            dat2 = decompress(dat1, dic1)
+        for sample in SAMPLES:
+            dat1 = compress(sample, zstd_dict=TRAINED_DICT)
+            dat2 = decompress(dat1, TRAINED_DICT)
             self.assertEqual(sample, dat2)
 
-        # finalize_dict -----------------------------
+        # finalize_dict
         if zstd_version_info < (1, 4, 5):
             return
 
         DICT_SIZE2 = 80*1024
-        dic2 = finalize_dict(dic1, lst, DICT_SIZE2, 10)
+        dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, 10)
 
+        self.assertNotEqual(dic2.dict_id, 0)
         self.assertGreater(len(dic2.dict_content), 0)
         self.assertLessEqual(len(dic2.dict_content), DICT_SIZE2)
 
         # compress/decompress
-        for sample in lst:
+        for sample in SAMPLES:
             dat1 = compress(sample, zstd_dict=dic2)
             dat2 = decompress(dat1, dic2)
             self.assertEqual(sample, dat2)
@@ -936,7 +953,7 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(len(f.read(130*1024)), 130*1024)
             self.assertRaises(ZstdError, f.read, 1)
 
-        # Incomplete header.
+        # Incomplete header
         for i in range(20):
             with ZstdFile(BytesIO(truncated[:i])) as f:
                 self.assertEqual(f.read(1), b'')
@@ -1219,18 +1236,29 @@ class FileTestCase(unittest.TestCase):
         f.close()
         self.assertRaises(ValueError, f.tell)
 
+    def test_file_dict(self):
+        bi = BytesIO()
+        with ZstdFile(bi, 'w', zstd_dict=TRAINED_DICT) as f:
+            f.write(SAMPLES[0])
+
+        bi.seek(0)
+        with ZstdFile(bi, zstd_dict=TRAINED_DICT) as f:
+            dat = f.read()
+
+        self.assertEqual(dat, SAMPLES[0])
+
 
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
-        with open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
+        with zstd_open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
             self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
         with BytesIO() as bio:
-            with open(bio, "wb") as f:
+            with zstd_open(bio, "wb") as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
-            with open(bio, "ab") as f:
+            with zstd_open(bio, "ab") as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB * 2)
@@ -1238,16 +1266,16 @@ class OpenTestCase(unittest.TestCase):
     def test_text_modes(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
-        with open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
+        with zstd_open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
             self.assertEqual(f.read(), uncompressed)
 
         with BytesIO() as bio:
-            with open(bio, "wt") as f:
+            with zstd_open(bio, "wt") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
 
-            with open(bio, "at") as f:
+            with zstd_open(bio, "at") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed * 2)
@@ -1257,26 +1285,26 @@ class OpenTestCase(unittest.TestCase):
             TESTFN = pathlib.Path(tmp_f.name)
 
         with self.assertRaises(ValueError):
-            open(TESTFN, "")
+            zstd_open(TESTFN, "")
         with self.assertRaises(ValueError):
-            open(TESTFN, "rbt")
+            zstd_open(TESTFN, "rbt")
         with self.assertRaises(ValueError):
-            open(TESTFN, "rb", encoding="utf-8")
+            zstd_open(TESTFN, "rb", encoding="utf-8")
         with self.assertRaises(ValueError):
-            open(TESTFN, "rb", errors="ignore")
+            zstd_open(TESTFN, "rb", errors="ignore")
         with self.assertRaises(ValueError):
-            open(TESTFN, "rb", newline="\n")
+            zstd_open(TESTFN, "rb", newline="\n")
 
         os.remove(TESTFN)
 
-    def test_format_and_filters(self):
+    def test_option(self):
         option = {DParameter.windowLogMax:25}
-        with open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
+        with zstd_open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
             self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
 
         option = {CParameter.compressionLevel:12}
         with BytesIO() as bio:
-            with open(bio, "wb", level_or_option=option) as f:
+            with zstd_open(bio, "wb", level_or_option=option) as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
@@ -1285,27 +1313,27 @@ class OpenTestCase(unittest.TestCase):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
         with BytesIO() as bio:
-            with open(bio, "wt", encoding="utf-16-le") as f:
+            with zstd_open(bio, "wt", encoding="utf-16-le") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-16-le")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
             bio.seek(0)
-            with open(bio, "rt", encoding="utf-16-le") as f:
+            with zstd_open(bio, "rt", encoding="utf-16-le") as f:
                 self.assertEqual(f.read().replace(os.linesep, "\n"), uncompressed)
 
     def test_encoding_error_handler(self):
         with BytesIO(compress(b"foo\xffbar")) as bio:
-            with open(bio, "rt", encoding="ascii", errors="ignore") as f:
+            with zstd_open(bio, "rt", encoding="ascii", errors="ignore") as f:
                 self.assertEqual(f.read(), "foobar")
 
     def test_newline(self):
         # Test with explicit newline (universal newline mode disabled).
         text = THIS_FILE_STR.replace(os.linesep, "\n")
         with BytesIO() as bio:
-            with open(bio, "wt", newline="\n") as f:
+            with zstd_open(bio, "wt", newline="\n") as f:
                 f.write(text)
             bio.seek(0)
-            with open(bio, "rt", newline="\r") as f:
+            with zstd_open(bio, "rt", newline="\r") as f:
                 self.assertEqual(f.readlines(), [text])
 
     def test_x_mode(self):
@@ -1315,13 +1343,24 @@ class OpenTestCase(unittest.TestCase):
         for mode in ("x", "xb", "xt"):
             os.remove(TESTFN)
 
-            with open(TESTFN, mode):
+            with zstd_open(TESTFN, mode):
                 pass
             with self.assertRaises(FileExistsError):
-                with open(TESTFN, mode):
+                with zstd_open(TESTFN, mode):
                     pass
 
         os.remove(TESTFN)
+
+    def test_open_dict(self):
+        bi = BytesIO()
+        with zstd_open(bi, 'w', zstd_dict=TRAINED_DICT) as f:
+            f.write(SAMPLES[0])
+
+        bi.seek(0)
+        with zstd_open(bi, zstd_dict=TRAINED_DICT) as f:
+            dat = f.read()
+
+        self.assertEqual(dat, SAMPLES[0])
 
 
 def test_main():
@@ -1335,6 +1374,50 @@ def test_main():
         OpenTestCase,
     )
 
+def prepare_test_data():
+    global DECOMPRESSED_DAT
+    DECOMPRESSED_DAT = b'abcdefg123456' * 1000
+
+    global COMPRESSED_DAT
+    COMPRESSED_DAT = compress(DECOMPRESSED_DAT)
+
+    global DECOMPRESSED_DAT_100_PLUS_32KB
+    DECOMPRESSED_DAT_100_PLUS_32KB = b'a' * (100 + 32*1024)
+
+    global DAT_100_PLUS_32KB
+    DAT_100_PLUS_32KB = compress(DECOMPRESSED_DAT_100_PLUS_32KB)
+
+    global SKIPPABLE_FRAME
+    SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
+                      (100).to_bytes(4, byteorder='little') + \
+                      b'a' * 100
+
+    global THIS_FILE_BYTES, THIS_FILE_STR
+    with open(os.path.abspath(__file__), 'rb') as f:
+        THIS_FILE_BYTES = f.read()
+        THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
+
+    global COMPRESSED_THIS_FILE
+    COMPRESSED_THIS_FILE = compress(THIS_FILE_BYTES)
+
+    global COMPRESSED_BOGUS
+    COMPRESSED_BOGUS = DECOMPRESSED_DAT
+
+    # dict data
+    colors = [b'red', b'green', b'yellow', b'black', b'withe', b'blue',
+              b'lilac', b'purple', b'navy', b'glod', b'silver', b'olive']
+    lst = []
+    for i in range(1800):
+        sample  = b'%s = %d\n' % (random.choice(colors), random.randrange(100))
+        sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
+        sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
+        sample += b'%s = %d' % (random.choice(colors), random.randrange(100))
+        lst.append(sample)
+    global SAMPLES
+    SAMPLES = lst
+
+# uncompressed size 130KB, more than a zstd block.
+# with a frame epilogue, 4 bytes checksum.
 TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae\x06b\x02'
  b"\x8b\xee\xc6\xd0\x16o\xd6\xfd\xc5\x0bIi\x15}+&\x83'\xc7\xe9\xcd-\x869"
  b'\x05\xbexe\xa5E\xb8\xb0 \x9c\xb5\x81\x92\xb5\x81 {\x92c`\x02\xb9\x04\xd7'
@@ -2519,4 +2602,5 @@ TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae
 
 
 if __name__ == "__main__":
+    prepare_test_data()
     test_main()
