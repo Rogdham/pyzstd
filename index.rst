@@ -466,6 +466,28 @@ Module-level variables
     values(default=3, min=-131072, max=22)
 
 
+ZstdFile class and zstd_open() function
+---------------------------------------
+
+.. py:class:: ZstdFile
+
+    Open a zstd-compressed file in binary mode.
+
+    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. You may read their documentation.
+
+    .. py:method:: __init__(self, filename=None, mode="r", *, level_or_option=None, zstd_dict=None)
+    
+        When using read mode (decompression), the *level_or_option* parameter can only be a dict object, that represents decompression option. It doesn't support int type compression level in this case.
+
+.. py:function:: zstd_open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
+
+    Open a zstd-compressed file in binary or text mode, returning a file object (:py:class:`ZstdFile`).
+
+    This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library. You may read their documentation.
+
+    When using read mode (decompression), the *level_or_option* parameter can only be a dict object, that represents decompression option. It doesn't support int type compression level in this case.
+
+
 Advanced parameters
 -------------------
 
@@ -853,8 +875,8 @@ Advanced parameters
 
     .. sourcecode:: python
 
-        # used with compress() function
-        compressed_dat = compress(raw_dat, rich_mem=True)
+        # used with richmem_compress() function
+        compressed_dat = richmem_compress(raw_dat)
 
         # reuse RichMemZstdCompressor object
         c = RichMemZstdCompressor()
