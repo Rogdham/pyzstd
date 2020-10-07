@@ -875,7 +875,7 @@ Advanced parameters
 
     .. sourcecode:: python
 
-        # used with richmem_compress() function
+        # use richmem_compress() function
         compressed_dat = richmem_compress(raw_dat)
 
         # reuse RichMemZstdCompressor object

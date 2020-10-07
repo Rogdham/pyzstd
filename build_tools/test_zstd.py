@@ -52,7 +52,7 @@ class FunctionsTestCase(unittest.TestCase):
         self.assertLess(compressionLevel_values.min, compressionLevel_values.max)
 
     def test_compress_decompress(self):
-        raw_dat = b'12345678abcd'
+        raw_dat = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//6]
         default, minv, maxv = compressionLevel_values
 
         for level in range(max(-20, minv), maxv+1):
@@ -207,12 +207,11 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, ZstdCompressor, level_or_option=b'abc')
 
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict=123)
-        self.assertRaises(TypeError, ZstdCompressor, zstd_dict=b'abc')
+        self.assertRaises(TypeError, ZstdCompressor, zstd_dict=b'abcd1234')
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict={1:2, 3:4})
 
-        self.assertRaises(TypeError, ZstdCompressor, rich_mem='8GB')
         self.assertRaises(TypeError, ZstdCompressor, rich_mem=None)
-        self.assertRaises(TypeError, ZstdCompressor, rich_mem={1:2})
+        self.assertRaises(TypeError, ZstdCompressor, rich_mem=True)
 
         with self.assertRaises(ValueError):
             ZstdCompressor(2**31)
@@ -309,21 +308,21 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(ZstdError, ZstdDecompressor, None, d2)
 
     def test_zstd_multithread_compress(self):
-        b = b'test_multithread_123456' * 1_000_000
+        b = THIS_FILE_BYTES * 30
 
         dat1 = compress(b, {CParameter.nbWorkers : 2})
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
     def test_rich_mem_compress(self):
-        b = b'test_rich_mem_123456' * 5_000
+        b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
         dat1 = richmem_compress(b)
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
     def test_rich_mem_compress_warn(self):
-        b = b'test_rich_mem_123456' * 5_000
+        b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
         # warning when multi-threading compression
         with self.assertWarns(ResourceWarning):
@@ -392,7 +391,30 @@ class CompressorDecompressorTestCase(unittest.TestCase):
                 in_dat = b''
 
             dat = d.decompress(in_dat, 1)
+            size += len(dat)
 
+            if 0 < size < 100+32*1024:
+                self.assertFalse(d.at_frame_edge)
+            else:
+                self.assertTrue(d.at_frame_edge)
+
+        self.assertEqual(size, 100+32*1024)
+        self.assertTrue(d.at_frame_edge)
+
+    def test_decompress_3_2bytes(self):
+        d = ZstdDecompressor()
+        bi = BytesIO(DAT_100_PLUS_32KB)
+        size = 0
+
+        while True: 
+            if d.needs_input:
+                in_dat = bi.read(3)
+                if not in_dat:
+                    break
+            else:
+                in_dat = b''
+
+            dat = d.decompress(in_dat, 2)
             size += len(dat)
 
             if 0 < size < 100+32*1024:
@@ -417,7 +439,6 @@ class CompressorDecompressorTestCase(unittest.TestCase):
                 in_dat = b''
 
             dat = d.decompress(in_dat, 3)
-
             size += len(dat)
 
             if 0 < size < 100+32*1024:
