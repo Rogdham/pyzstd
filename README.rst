@@ -19,7 +19,7 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.12.0  (Oct 5, 2020)**
+**0.12.4  (Oct 7, 2020)**
 
 It seems the API is stable.
 
