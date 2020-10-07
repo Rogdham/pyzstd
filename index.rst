@@ -304,12 +304,14 @@ Dictionary
 
     ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
-    .. py:method:: __init__(self, dict_content)
+    .. py:method:: __init__(self, dict_content, is_raw=False)
 
         Initialize a ZstdDict object.
 
         :param dict_content: Dictionary's content.
         :type dict_content: bytes-like object
+        :param is_raw: This parameter is for advanced user. ``True`` means *dict_content* argument is a "raw content" dictionary, free of any format restriction. ``False`` means *dict_content* argument is an ordinary zstd dictionary, was created by zstd functions, follow a specified format.
+        :type is_raw: bool
 
     .. py:attribute:: dict_content
 
@@ -319,7 +321,9 @@ Dictionary
 
         ID of zstd dictionary, a 32-bit unsigned integer value.
 
-        Non-zero means ordinary dictionary, was created by zstd functions, follow a specified format. ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user.
+        Non-zero means ordinary dictionary, was created by zstd functions, follow a specified format.
+
+        ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user.
 
     .. sourcecode:: python
 
@@ -476,7 +480,7 @@ ZstdFile class and zstd_open() function
     This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. You may read their documentation.
 
     .. py:method:: __init__(self, filename=None, mode="r", *, level_or_option=None, zstd_dict=None)
-    
+
         When using read mode (decompression), the *level_or_option* parameter can only be a dict object, that represents decompression option. It doesn't support int type compression level in this case.
 
 .. py:function:: zstd_open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
@@ -863,7 +867,7 @@ Advanced parameters
     pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster. There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
 
     Note that currently it has no effect on :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
- 
+
     Effects:
 
     * The output buffer is larger than input data a little.

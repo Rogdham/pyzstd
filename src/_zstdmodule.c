@@ -666,13 +666,16 @@ _zstd.ZstdDict.__init__
 
     dict_content: object
         Dictionary's content, a bytes-like object.
+    is_raw: bool = False
+        True means dict_content is "raw content", used for advanced user.
 
 Initialize a ZstdDict object, it can used for compress/decompress.
 [clinic start generated code]*/
 
 static int
-_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
-/*[clinic end generated code: output=49ae79dcbb8ad2df input=951e34a71eaceee0]*/
+_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content,
+                             int is_raw)
+/*[clinic end generated code: output=c5f5a0d8377d037c input=7ea2757e7bc7e15c]*/
 {
     /* Only called once */
     if (self->inited) {
@@ -692,7 +695,6 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
     /* Both ordinary dictionary and "raw content" dictionary should
        at least 8 bytes */
     if (Py_SIZE(self->dict_content) < 8) {
-        Py_CLEAR(self->dict_content);
         PyErr_SetString(PyExc_ValueError,
                         "dictionary content should at least 8 bytes.");
         return -1;
@@ -701,6 +703,18 @@ _zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content)
     /* Get dict_id, 0 means "raw content" dictionary. */
     self->dict_id = ZDICT_getDictID(PyBytes_AS_STRING(dict_content),
                                     Py_SIZE(dict_content));
+
+    /* Check validity for ordinary dictionary */
+    if (!is_raw && self->dict_id == 0) {
+        char *msg = "The \"dict_content\" argument is not a valid zstd "
+                    "dictionary. The first 4 bytes of a valid zstd dictionary "
+                    "should be a magic number: b'\\x37\\xA4\\x30\\xEC'.\n"
+                    "If you are an advanced user, and can be sure that "
+                    "\"dict_content\" is a \"raw content\" zstd dictionary, "
+                    "set \"is_raw\" argument to True.";
+        PyErr_SetString(PyExc_ValueError, msg);
+        return -1;
+    }
 
     return 0;
 }
@@ -1369,7 +1383,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
             }
         }
 
-        /* Output buffer exhausted, grow the buffer */
+        /* Output buffer should be exhausted, grow the buffer. */
         assert(out.pos == out.size);
 
         if (out.pos == out.size) {
@@ -1432,7 +1446,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
             }
         }
 
-        /* Output buffer exhausted, grow the buffer */
+        /* Output buffer should be exhausted, grow the buffer. */
         assert(out.pos == out.size);
 
         if (out.pos == out.size) {

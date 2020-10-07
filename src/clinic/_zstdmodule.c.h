@@ -3,34 +3,47 @@ preserve
 [clinic start generated code]*/
 
 PyDoc_STRVAR(_zstd_ZstdDict___init____doc__,
-"ZstdDict(dict_content)\n"
+"ZstdDict(dict_content, is_raw=False)\n"
 "--\n"
 "\n"
 "Initialize a ZstdDict object, it can used for compress/decompress.\n"
 "\n"
 "  dict_content\n"
-"    Dictionary\'s content, a bytes-like object.");
+"    Dictionary\'s content, a bytes-like object.\n"
+"  is_raw\n"
+"    True means dict_content is \"raw content\", used for advanced user.");
 
 static int
-_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content);
+_zstd_ZstdDict___init___impl(ZstdDict *self, PyObject *dict_content,
+                             int is_raw);
 
 static int
 _zstd_ZstdDict___init__(PyObject *self, PyObject *args, PyObject *kwargs)
 {
     int return_value = -1;
-    static const char * const _keywords[] = {"dict_content", NULL};
+    static const char * const _keywords[] = {"dict_content", "is_raw", NULL};
     static _PyArg_Parser _parser = {NULL, _keywords, "ZstdDict", 0};
-    PyObject *argsbuf[1];
+    PyObject *argsbuf[2];
     PyObject * const *fastargs;
     Py_ssize_t nargs = PyTuple_GET_SIZE(args);
+    Py_ssize_t noptargs = nargs + (kwargs ? PyDict_GET_SIZE(kwargs) : 0) - 1;
     PyObject *dict_content;
+    int is_raw = 0;
 
-    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 1, 1, 0, argsbuf);
+    fastargs = _PyArg_UnpackKeywords(_PyTuple_CAST(args)->ob_item, nargs, kwargs, NULL, &_parser, 1, 2, 0, argsbuf);
     if (!fastargs) {
         goto exit;
     }
     dict_content = fastargs[0];
-    return_value = _zstd_ZstdDict___init___impl((ZstdDict *)self, dict_content);
+    if (!noptargs) {
+        goto skip_optional_pos;
+    }
+    is_raw = PyObject_IsTrue(fastargs[1]);
+    if (is_raw < 0) {
+        goto exit;
+    }
+skip_optional_pos:
+    return_value = _zstd_ZstdDict___init___impl((ZstdDict *)self, dict_content, is_raw);
 
 exit:
     return return_value;
@@ -765,4 +778,4 @@ exit:
 
     return return_value;
 }
-/*[clinic end generated code: output=e7343f411763f022 input=a9049054013a1b77]*/
+/*[clinic end generated code: output=e84e7fe2bde310ba input=a9049054013a1b77]*/
