@@ -479,7 +479,7 @@ ZstdFile class and zstd_open() function
 
     This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. You may read their documentation.
 
-    .. py:method:: __init__(self, filename=None, mode="r", *, level_or_option=None, zstd_dict=None)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
         When using read mode (decompression), the *level_or_option* parameter can only be a dict object, that represents decompression option. It doesn't support int type compression level in this case.
 

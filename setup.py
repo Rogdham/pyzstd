@@ -34,7 +34,7 @@ zstd_files = [
     'decompress/zstd_decompress_block.c',
     'decompress/zstd_ddict.c',
     'decompress/huf_decompress.c',
-    
+
     'dictBuilder/zdict.c',
     'dictBuilder/divsufsort.c',
     'dictBuilder/fastcover.c',
@@ -71,6 +71,10 @@ setup(
 
     package_dir={'pyzstd': 'src'},
     py_modules=['pyzstd.__init__', 'pyzstd.pyzstd'],
+
+    packages=["pyzstd"],
+    package_data={"pyzstd": ['__init__.pyi', 'py.typed']},
+
     ext_modules=[Extension('pyzstd._zstd',
                             zstdFiles,
                             extra_compile_args=["-DZSTD_MULTITHREAD"])
