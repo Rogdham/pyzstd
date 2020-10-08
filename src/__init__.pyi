@@ -104,7 +104,7 @@ class ZstdDecompressor:
                    max_length: int = -1) -> bytes: ...
 
 class ZstdError(Exception):
-    pass
+    ...
 
 def compress(data: ByteString,
              level_or_option: Union[None, int, Dict[CParameter, int]] = None,

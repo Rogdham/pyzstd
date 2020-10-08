@@ -53,12 +53,10 @@ jobs:
       services: docker
       language: python
       python: 3.8
-      env:
-        CIBW_SKIP = "*manylinux1*"
 
-    # ARMv8
+    # ARMv8 linux
     - stage: deploy
-      name: ARMv8 wheels
+      name: ARMv8 linux wheels
       os: linux
       arch: arm64
       services: docker
@@ -67,13 +65,13 @@ jobs:
       env:
         CIBW_MANYLINUX_AARCH64_IMAGE: quay.io/pypa/manylinux2014_aarch64:latest 
 
-    # Deploy on mac
+    # macOS
     - stage: deploy
       name: macOS wheels
       os: osx
       language: shell
 
-    # Deploy on windows
+    # Windows
     - stage: deploy
       name: Windows wheels
       os: windows

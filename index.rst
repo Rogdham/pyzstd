@@ -251,9 +251,9 @@ Stream classes
 
     .. py:attribute:: at_frame_edge
 
-        ``True`` when the output is at a frame edge, means a frame is completely decoded and fully flushed, or the decompressor just be initialized.
+        ``True`` when the output is at a frame edge, means a :ref:`frame<frame_block>` is completely decoded and fully flushed, or the decompressor just be initialized.
 
-        Since zstd data consists of one or more independent :ref:`frames<frame_block>`, and doesn't have an end marker, this flag could be used to check data integrity.
+        Since zstd data consists of one or more independent frames, and doesn't have an end marker, this flag could be used to check data integrity.
 
         Note that the input stream is not necessarily at a frame edge.
 
@@ -485,7 +485,7 @@ ZstdFile class and zstd_open() function
 
 .. py:function:: zstd_open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
 
-    Open a zstd-compressed file in binary or text mode, returning a file object (:py:class:`ZstdFile`).
+    Open a zstd-compressed file in binary or text mode, returning a file object (:py:class:`ZstdFile` or `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_).
 
     This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library. You may read their documentation.
 
@@ -847,7 +847,7 @@ Advanced parameters
 
     Zstd library supports multi-threading compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression.
 
-    **The threads are spawned by underlying zstd library**, not by pyzstd module.
+    The threads are spawned by underlying zstd library, not by pyzstd module.
 
     .. sourcecode:: python
 
@@ -864,18 +864,18 @@ Advanced parameters
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster. There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
+    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster.
 
-    Note that currently it has no effect on :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
+    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
 
     Effects:
 
     * The output buffer is larger than input data a little.
-    * 10% ~ 15% faster.
+    * 4 ~ 15% faster.
 
-    When this mode is disabled, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/dbf717d48cf0cdb218665b5ee276c8d8c2138ae2/src/_zstdmodule.c#L146-L171>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/dbf717d48cf0cdb218665b5ee276c8d8c2138ae2/src/_zstdmodule.c#L146-L171>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    After enabling this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MB input data, the allocated output buffer is (100 MB + 400 KB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
+    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MB input data, the allocated output buffer is (100 MB + 400 KB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
 
     .. sourcecode:: python
 
@@ -887,4 +887,4 @@ Advanced parameters
         compressed_dat1 = c.compress(raw_dat1)
         compressed_dat2 = c.compress(raw_dat2)
 
-    Compressing a 520 MB data, when disabled, takes 5.40 seconds; when enabled, takes 4.62 seconds.
+    Compressing a 520 MB data, it accelerates from 5.40 seconds to 4.62 seconds.
