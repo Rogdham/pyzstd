@@ -864,7 +864,7 @@ Advanced parameters
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory in some cases, but faster.
+    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory, but faster in some cases.
 
     There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
 

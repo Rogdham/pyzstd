@@ -411,7 +411,7 @@ static const ParameterInfo dp_list[] =
 
 
 /* Format an user friendly error message. */
-static inline void
+static void
 get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
                         int key_v, int value_v, char is_compress)
 {
@@ -981,6 +981,25 @@ error:
      Set parameters / load dictionary
    ----------------------------------- */
 
+static int
+check_level_bounds(int compressionLevel, char* buf, int buf_size)
+{
+    assert(buf_size >= 120);
+
+    if (compressionLevel > ZSTD_maxCLevel() || compressionLevel < ZSTD_minCLevel()) {
+        PyOS_snprintf(buf, buf_size,
+                      "In zstd v%s, the compression level parameter should %d "
+                      "<= value <= %d, provided value is %d, it will be clamped.",
+                      ZSTD_versionString(), ZSTD_minCLevel(),
+                      ZSTD_maxCLevel(), compressionLevel);
+
+        if (PyErr_WarnEx(PyExc_RuntimeWarning, buf, 1) < 0) {
+            return -1;
+        }
+    }
+    return 0;
+}
+
 /* Set compressLevel or compress parameters to compress context. */
 static int
 set_c_parameters(ZstdCompressor *self,
@@ -994,17 +1013,25 @@ set_c_parameters(ZstdCompressor *self,
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
-        *compress_level = _PyLong_AsInt(level_or_option);
-        if (*compress_level == -1 && PyErr_Occurred()) {
+        const int level = _PyLong_AsInt(level_or_option);
+        if (level == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Compress level should be 32-bit signed int value.");
+            return -1;
+        }
+
+        /* Save to *compress_level for generating ZSTD_CDICT */
+        *compress_level = level;
+
+        /* Check compressionLevel bounds */
+        if (check_level_bounds(level, msg_buf, sizeof(msg_buf)) < 0) {
             return -1;
         }
 
         /* Set compressionLevel to compress context */
         zstd_ret = ZSTD_CCtx_setParameter(self->cctx,
                                           ZSTD_c_compressionLevel,
-                                          *compress_level);
+                                          level);
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
@@ -1039,8 +1066,13 @@ set_c_parameters(ZstdCompressor *self,
             }
 
             if (key_v == ZSTD_c_compressionLevel) {
-                /* Get compressionLevel for generating ZSTD_CDICT */
+                /* Save to *compress_level for generating ZSTD_CDICT */
                 *compress_level = value_v;
+
+                /* Check compressionLevel bounds */
+                if (check_level_bounds(value_v, msg_buf, sizeof(msg_buf)) < 0) {
+                    return -1;
+                }
             } else if (key_v == ZSTD_c_nbWorkers) {
                 /* From zstd library doc:
                    1. When nbWorkers >= 1, triggers asynchronous mode when
