@@ -30,7 +30,7 @@ Common functions
     This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
 
     .. hint::
-        If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may remove the small overhead of creating context / setting parameters / loading dictionary.
+        If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -871,7 +871,7 @@ Advanced parameters
     Effects:
 
     * The output buffer is larger than input data a little.
-    * 4 ~ 15% faster.
+    * If input data is larger than ~31.8KB, 4 ~ 15% faster.
 
     When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/dbf717d48cf0cdb218665b5ee276c8d8c2138ae2/src/_zstdmodule.c#L146-L171>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 

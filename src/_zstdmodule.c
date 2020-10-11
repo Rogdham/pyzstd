@@ -131,9 +131,7 @@ typedef struct {
 } BlocksOutputBuffer;
 
 
-/* Block size sequence. Some compressor/decompressor can't process large
-   buffer (>4GB), so the type is int. Below functions assume the type is int.
-*/
+/* Block size sequence. Below functions assume the type is int. */
 #define KB (1024)
 #define MB (1024*1024)
 static const int BUFFER_BLOCK_SIZE[] =
@@ -466,8 +464,11 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     /* Error message */
     PyOS_snprintf(buf, buf_size,
                   "Error when setting zstd %s parameter \"%s\", it "
-                  "should %d <= value <= %d, provided value is %d.",
-                  type, name, bounds.lowerBound, bounds.upperBound, value_v);
+                  "should %d <= value <= %d, provided value is %d. "
+                  "(zstd v%s, %d-bit build)",
+                  type, name,
+                  bounds.lowerBound, bounds.upperBound, value_v,
+                  ZSTD_versionString(), sizeof(Py_ssize_t)*8);
 }
 
 
@@ -816,6 +817,12 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
     size_t zstd_ret;
 
     /* Prepare chunk_sizes */
+    if (!PyList_Check(dst_data_sizes)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "dst_data_sizes argument should be a list.");
+        goto error;
+    }
+
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
@@ -833,6 +840,9 @@ _zstd__train_dict_impl(PyObject *module, PyBytesObject *dst_data,
         PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                            "Items in dst_data_sizes list should be int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
@@ -907,6 +917,12 @@ _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
     ZDICT_params_t params;
 
     /* Prepare chunk_sizes */
+    if (!PyList_Check(dst_data_sizes)) {
+        PyErr_SetString(PyExc_TypeError,
+                        "dst_data_sizes argument should be a list.");
+        goto error;
+    }
+
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
@@ -924,6 +940,9 @@ _zstd__finalize_dict_impl(PyObject *module, PyBytesObject *custom_dict,
         PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                            "Items in dst_data_sizes list should be int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
