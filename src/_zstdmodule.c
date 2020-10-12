@@ -1,5 +1,6 @@
 
 #include "Python.h"
+#include "pythread.h"
 #include "structmember.h"      // PyMemberDef
 
 #include "../lib/zstd.h"
