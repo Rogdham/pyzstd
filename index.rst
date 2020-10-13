@@ -466,7 +466,7 @@ Module-level variables
 
 .. sourcecode:: python
 
-    >>> pyzstd.compressionLevel_values
+    >>> pyzstd.compressionLevel_values  # 131072 = 128*1024
     values(default=3, min=-131072, max=22)
 
 
