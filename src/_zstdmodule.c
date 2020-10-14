@@ -2200,6 +2200,7 @@ _get_cparam_bounds(PyObject *module, PyObject *args)
     int cParam;
 
     PyObject *ret;
+    PyObject *temp;
 
     if (!PyArg_ParseTuple(args, "i:_get_cparam_bounds", &cParam)) {
         return NULL;
@@ -2217,8 +2218,19 @@ _get_cparam_bounds(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    PyTuple_SET_ITEM(ret, 0, PyLong_FromLong(bound.lowerBound));
-    PyTuple_SET_ITEM(ret, 1, PyLong_FromLong(bound.upperBound));
+    temp = PyLong_FromLong(bound.lowerBound);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 0, temp);
+
+    temp = PyLong_FromLong(bound.upperBound);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 1, temp);
 
     return ret;
 }
@@ -2235,6 +2247,7 @@ _get_dparam_bounds(PyObject *module, PyObject *args)
     int dParam;
 
     PyObject *ret;
+    PyObject *temp;
 
     if (!PyArg_ParseTuple(args, "i:_get_dparam_bounds", &dParam)) {
         return NULL;
@@ -2252,8 +2265,19 @@ _get_dparam_bounds(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    PyTuple_SET_ITEM(ret, 0, PyLong_FromLong(bound.lowerBound));
-    PyTuple_SET_ITEM(ret, 1, PyLong_FromLong(bound.upperBound));
+    temp = PyLong_FromLong(bound.lowerBound);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 0, temp);
+
+    temp = PyLong_FromLong(bound.upperBound);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 1, temp);
 
     return ret;
 }
