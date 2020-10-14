@@ -857,7 +857,9 @@ Advanced parameters
 
     The data will be split into portions and be compressed in parallel. The portion size can  be specified by :py:attr:`CParameter.jobSize` parameter, usually don't need to set this.
 
-    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used. In addition, the multi-threaded output is larger a little, and it's not multiple :ref:`frames<frame_block>`.
+    The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
+
+    The multi-threaded output is not multiple :ref:`frames<frame_block>`, it's larger a little. Compressing a 520.58 MB data, single-threaded output is 273.55 MB, multi-threaded output is 274.33 MB.
 
 
 .. _rich_mem:
@@ -887,4 +889,4 @@ Advanced parameters
         compressed_dat1 = c.compress(raw_dat1)
         compressed_dat2 = c.compress(raw_dat2)
 
-    Compressing a 520 MB data, it accelerates from 5.40 seconds to 4.62 seconds.
+    Compressing a 520.58 MB data, it accelerates from 5.40 seconds to 4.62 seconds.
