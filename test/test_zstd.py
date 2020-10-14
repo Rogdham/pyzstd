@@ -427,52 +427,56 @@ class CompressorDecompressorTestCase(unittest.TestCase):
     def test_decompress_1byte(self):
         d = ZstdDecompressor()
 
-        dat = d.decompress(DAT_100_PLUS_32KB, 1)
+        dat = d.decompress(COMPRESSED_THIS_FILE, 1)
         size = len(dat)
 
         while True:
-            if not d.needs_input:
+            if d.needs_input:
+                break
+            else:
                 dat = d.decompress(b'', 1)
 
             if not dat:
                 break
-
             size += len(dat)
 
-            if 0 < size < 100+32*1024:
+            if 0 < size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
 
-        self.assertEqual(size, 100+32*1024)
+        self.assertEqual(size, len(THIS_FILE_BYTES))
         self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
     def test_decompress_2bytes(self):
         d = ZstdDecompressor()
 
-        dat = d.decompress(DAT_100_PLUS_32KB, 2)
+        dat = d.decompress(COMPRESSED_THIS_FILE, 2)
         size = len(dat)
 
         while True:
-            if not d.needs_input:
+            if d.needs_input:
+                break
+            else:
                 dat = d.decompress(b'', 2)
 
             if not dat:
                 break
-
             size += len(dat)
 
-            if 0 < size < 100+32*1024:
+            if 0 < size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
 
-        self.assertEqual(size, 100+32*1024)
+        self.assertEqual(size, len(THIS_FILE_BYTES))
         self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
     def test_decompress_3_1bytes(self):
         d = ZstdDecompressor()
-        bi = BytesIO(DAT_100_PLUS_32KB)
+        bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
         while True:
@@ -486,17 +490,18 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             dat = d.decompress(in_dat, 1)
             size += len(dat)
 
-            if 0 < size < 100+32*1024:
+            if 0 < size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
 
-        self.assertEqual(size, 100+32*1024)
+        self.assertEqual(size, len(THIS_FILE_BYTES))
         self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
     def test_decompress_3_2bytes(self):
         d = ZstdDecompressor()
-        bi = BytesIO(DAT_100_PLUS_32KB)
+        bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
         while True:
@@ -510,17 +515,18 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             dat = d.decompress(in_dat, 2)
             size += len(dat)
 
-            if 0 < size < 100+32*1024:
+            if 0 < size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
 
-        self.assertEqual(size, 100+32*1024)
+        self.assertEqual(size, len(THIS_FILE_BYTES))
         self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
     def test_decompress_1_3bytes(self):
         d = ZstdDecompressor()
-        bi = BytesIO(DAT_100_PLUS_32KB)
+        bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
         while True:
@@ -534,13 +540,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             dat = d.decompress(in_dat, 3)
             size += len(dat)
 
-            if 0 < size < 100+32*1024:
+            if 0 < size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
 
-        self.assertEqual(size, 100+32*1024)
+        self.assertEqual(size, len(THIS_FILE_BYTES))
         self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
 
     def test_compress_flushblock(self):
         c = ZstdCompressor()
