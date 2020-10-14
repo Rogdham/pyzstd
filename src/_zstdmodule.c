@@ -2411,11 +2411,42 @@ static PyMethodDef _zstd_methods[] = {
     {NULL}
 };
 
+static int
+_zstd_traverse(PyObject *module, visitproc visit, void *arg)
+{
+    Py_VISIT(static_state.ZstdError);
+    Py_VISIT(static_state.ZstdDict_type);
+    Py_VISIT(static_state.ZstdCompressor_type);
+    Py_VISIT(static_state.RichMemZstdCompressor_type);
+    Py_VISIT(static_state.ZstdDecompressor_type);
+    return 0;
+}
+
+static int
+_zstd_clear(PyObject *module)
+{
+    Py_CLEAR(static_state.ZstdError);
+    Py_CLEAR(static_state.ZstdDict_type);
+    Py_CLEAR(static_state.ZstdCompressor_type);
+    Py_CLEAR(static_state.RichMemZstdCompressor_type);
+    Py_CLEAR(static_state.ZstdDecompressor_type);
+    return 0;
+}
+
+static void
+_zstd_free(void *module)
+{
+    _zstd_clear((PyObject *)module);
+}
+
 static PyModuleDef _zstdmodule = {
     PyModuleDef_HEAD_INIT,
     .m_name = "_zstd",
     .m_size = -1,
     .m_methods = _zstd_methods,
+    .m_traverse = _zstd_traverse,
+    .m_clear = _zstd_clear,
+    .m_free = _zstd_free
 };
 
 static inline int
@@ -2601,10 +2632,11 @@ PyInit__zstd(void)
     return module;
 
 error:
-    Py_XDECREF(static_state.ZstdError);
-    Py_XDECREF(static_state.ZstdDict_type);
-    Py_XDECREF(static_state.ZstdCompressor_type);
-    Py_XDECREF(static_state.RichMemZstdCompressor_type);
-    Py_XDECREF(static_state.ZstdDecompressor_type);
+    _zstd_clear(NULL);
+    Py_XDECREF(module);
+
+    if(!PyErr_Occurred()) {
+        PyErr_SetString(PyExc_SystemError, "Failed to initialize pyzstd module.");
+    }
     return NULL;
 }
