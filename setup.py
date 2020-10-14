@@ -48,7 +48,7 @@ zstdFiles.append('src/_zstdmodule.c')
 
 setup(
     name='pyzstd',
-    version='0.12.4',
+    version='0.12.5',
     description="Python bindings for Zstandard (zstd) compression algorithm, the interface is similar to Python's bz2/lzma module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
@@ -56,13 +56,15 @@ setup(
     author_email='malincns@163.com',
     url='https://github.com/animalize/pyzstd',
     license='The 3-Clause BSD License',
-    python_requires=">=3.7",
+    python_requires=">=3.3",
 
     classifiers=[
         "Development Status :: 4 - Beta",
         "Intended Audience :: Developers",
         "License :: OSI Approved :: BSD License",
         "Topic :: System :: Archiving :: Compression",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
