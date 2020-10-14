@@ -8,7 +8,7 @@ Introduction
 Features of zstd:
 
 * Fast compression and decompression speed.
-* Using :ref:`multi-threading compression<mt_compression>`, the compression speed improves significantly.
+* Using :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
 * Using :ref:`zstd dictionary<zstd_dict>`, the compression ratio on small data (a few KB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
 
@@ -503,7 +503,7 @@ Advanced parameters
         - Compress algorithm parameters (:py:attr:`~CParameter.windowLog`, :py:attr:`~CParameter.hashLog`, :py:attr:`~CParameter.chainLog`, :py:attr:`~CParameter.searchLog`, :py:attr:`~CParameter.minMatch`, :py:attr:`~CParameter.targetLength`, :py:attr:`~CParameter.strategy`)
         - Long distance matching (:py:attr:`~CParameter.enableLongDistanceMatching`, :py:attr:`~CParameter.ldmHashLog`, :py:attr:`~CParameter.ldmMinMatch`, :py:attr:`~CParameter.ldmBucketSizeLog`, :py:attr:`~CParameter.ldmHashRateLog`)
         - Misc (:py:attr:`~CParameter.contentSizeFlag`, :py:attr:`~CParameter.checksumFlag`, :py:attr:`~CParameter.dictIDFlag`)
-        - Multi-threading compression (:py:attr:`~CParameter.nbWorkers`, :py:attr:`~CParameter.jobSize`, :py:attr:`~CParameter.overlapLog`)
+        - Multi-threaded compression (:py:attr:`~CParameter.nbWorkers`, :py:attr:`~CParameter.jobSize`, :py:attr:`~CParameter.overlapLog`)
 
     :py:class:`DParameter` class' attribute:
 
@@ -727,7 +727,7 @@ Advanced parameters
 
         Select how many threads will be spawned to compress in parallel.
 
-        When nbWorkers > ``1``, enables multi-threading compression, see :ref:`zstd multi-threading compression<mt_compression>` for details.
+        When nbWorkers > ``1``, enables multi-threaded compression, see :ref:`zstd multi-threaded compression<mt_compression>` for details.
 
         More workers improve speed, but also increase memory usage.
 
@@ -843,9 +843,9 @@ Advanced parameters
 
 .. _mt_compression:
 
-.. note:: Zstd multi-threading compression
+.. note:: Zstd multi-threaded compression
 
-    Zstd library supports multi-threading compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threading compression.
+    Zstd library supports multi-threaded compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable zstd multi-threaded compression.
 
     The threads are spawned by underlying zstd library, not by pyzstd module.
 
@@ -868,7 +868,7 @@ Advanced parameters
 
     pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory, but faster in some cases.
 
-    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threading compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
+    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
 
     Effects:
 
