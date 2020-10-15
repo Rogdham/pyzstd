@@ -20,7 +20,7 @@ Release note
 ------------
 **0.12.5  (Oct 12, 2020)**
 
-No longer use `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, now supports Python 3.3+.
+No longer use `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, now supports Python 3.5+.
 
 **0.12.4  (Oct 7, 2020)**
 

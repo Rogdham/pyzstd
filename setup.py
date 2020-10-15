@@ -1,10 +1,11 @@
-﻿#!/usr/bin/env python
+﻿#!/usr/bin/env python3
 from setuptools import setup, Extension, find_packages
+from setuptools.command.build_ext import build_ext
 import io
 import os
 
-path = os.path.join(os.path.dirname(__file__), 'README.rst')
-with io.open(path, 'r', encoding='utf-8') as file:
+README_PATH = os.path.join(os.path.dirname(__file__), 'README.rst')
+with io.open(README_PATH, 'r', encoding='utf-8') as file:
     long_description = file.read()
 
 zstd_files = [
@@ -41,10 +42,24 @@ zstd_files = [
     'dictBuilder/cover.c',
     ]
 
-zstdFiles = []
+c_files = []
 for f in zstd_files:
-    zstdFiles.append('lib/'+f)
-zstdFiles.append('src/_zstdmodule.c')
+    c_files.append('lib/'+f)
+c_files.append('src/_zstdmodule.c')
+
+_zstd_extension = Extension('pyzstd._zstd',
+                            c_files,
+                            extra_compile_args=["-DZSTD_MULTITHREAD"])
+
+class build_ext_compiler_check(build_ext):
+    def build_extensions(self):
+        if 'msvc' in self.compiler.compiler_type:
+            for extension in self.extensions:
+                if extension == _zstd_extension:
+                    # more aggressive inlining than /Ob2
+                    # https://github.com/facebook/zstd/issues/2314
+                    extension.extra_compile_args.append("/Ob3")
+        super().build_extensions()
 
 setup(
     name='pyzstd',
@@ -56,7 +71,7 @@ setup(
     author_email='malincns@163.com',
     url='https://github.com/animalize/pyzstd',
     license='The 3-Clause BSD License',
-    python_requires=">=3.3",
+    python_requires=">=3.5",
 
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -77,8 +92,6 @@ setup(
     packages=["pyzstd"],
     package_data={"pyzstd": ['__init__.pyi', 'py.typed']},
 
-    ext_modules=[Extension('pyzstd._zstd',
-                            zstdFiles,
-                            extra_compile_args=["-DZSTD_MULTITHREAD"])
-                ],
+    ext_modules=[_zstd_extension],
+    cmdclass={'build_ext': build_ext_compiler_check}
 )

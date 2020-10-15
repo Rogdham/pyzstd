@@ -176,7 +176,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     /* The first block */
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
-        buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
+        buffer->list = NULL; /* For OutputBuffer_OnError() */
         PyErr_NoMemory();
         return -1;
     }
@@ -214,7 +214,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
     /* The first block */
     b = PyBytes_FromStringAndSize(NULL, init_size);
     if (b == NULL) {
-        buffer->list = NULL; /* For _BlocksOutputBuffer_OnError() */
+        buffer->list = NULL; /* For OutputBuffer_OnError() */
         PyErr_SetString(PyExc_MemoryError, "Unable to allocate output buffer.");
         return -1;
     }
@@ -805,7 +805,7 @@ _train_dict(PyObject *module, PyObject *args)
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "Number of data chunks is too big, should <= 4294967295.");
+                        "The number of samples is too large.");
         goto error;
     }
 
@@ -907,7 +907,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "Number of data chunks is too big, should <= 4294967295.");
+                        "The number of samples is too large.");
         goto error;
     }
 
@@ -944,7 +944,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     /* Force dictID value, 0 means auto mode (32-bits random value). */
     params.dictID = 0;
 
-    /* Train the dictionary. */
+    /* Finalize the dictionary. */
     Py_BEGIN_ALLOW_THREADS
     zstd_ret = ZDICT_finalizeDictionary(PyBytes_AS_STRING(dict_buffer), dict_size,
                                         PyBytes_AS_STRING(custom_dict), Py_SIZE(custom_dict),
@@ -1539,7 +1539,7 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     int mode = ZSTD_e_end;
 
     PyObject *ret;
-    
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|i:ZstdCompressor.flush", kwlist,
                                      &mode)) {
         return NULL;
