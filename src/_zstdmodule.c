@@ -177,7 +177,6 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
         buffer->list = NULL; /* For OutputBuffer_OnError() */
-        PyErr_NoMemory();
         return -1;
     }
 
@@ -185,7 +184,6 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
-        PyErr_NoMemory();
         return -1;
     }
     PyList_SET_ITEM(buffer->list, 0, b);
@@ -223,13 +221,13 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
-        PyErr_NoMemory();
         return -1;
     }
     PyList_SET_ITEM(buffer->list, 0, b);
 
     /* Set variables */
     buffer->allocated = init_size;
+    buffer->max_length = -1;
 
     ob->dst = PyBytes_AS_STRING(b);
     ob->size = (size_t) init_size;
@@ -280,7 +278,6 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     }
     if (PyList_Append(buffer->list, b) < 0) {
         Py_DECREF(b);
-        PyErr_NoMemory();
         return -1;
     }
     Py_DECREF(b);
