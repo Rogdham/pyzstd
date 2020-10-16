@@ -592,7 +592,6 @@ ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     ZstdDict *self;
     self = (ZstdDict*)type->tp_alloc(type, 0);
     if (self == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -604,7 +603,6 @@ ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* ZSTD_CDict dict */
     self->c_dicts = PyDict_New();
     if (self->c_dicts == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -832,7 +830,6 @@ _train_dict(PyObject *module, PyObject *args)
     /* Allocate dict buffer */
     dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
     if (dict_buffer == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -940,7 +937,6 @@ _finalize_dict(PyObject *module, PyObject *args)
     /* Allocate dict buffer */
     dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
     if (dict_buffer == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -1242,7 +1238,6 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     ZstdCompressor *self;
     self = (ZstdCompressor*)type->tp_alloc(type, 0);
     if (self == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -1770,7 +1765,6 @@ _ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     ZstdDecompressor *self;
     self = (ZstdDecompressor*)type->tp_alloc(type, 0);
     if (self == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
@@ -2224,7 +2218,6 @@ _get_cparam_bounds(PyObject *module, PyObject *args)
 
     ret = PyTuple_New(2);
     if (ret == NULL) {
-        PyErr_NoMemory();
         return NULL;
     }
 
@@ -2271,7 +2264,6 @@ _get_dparam_bounds(PyObject *module, PyObject *args)
 
     ret = PyTuple_New(2);
     if (ret == NULL) {
-        PyErr_NoMemory();
         return NULL;
     }
 
@@ -2321,7 +2313,6 @@ get_frame_size(PyObject *module, PyObject *args)
 
     ret = PyLong_FromSize_t(frame_size);
     if (ret == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
     goto success;
@@ -2380,7 +2371,6 @@ _get_frame_info(PyObject *module, PyObject *args)
     /* Build tuple */
     ret = PyTuple_New(2);
     if (ret == NULL) {
-        PyErr_NoMemory();
         goto error;
     }
 
