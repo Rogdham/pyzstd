@@ -770,6 +770,32 @@ class ZstdDictTestCase(unittest.TestCase):
             dat2 = decompress(dat1, dic2)
             self.assertEqual(sample, dat2)
 
+    def test_train_dict_arguments(self):
+        with self.assertRaises(ValueError):
+            train_dict([], 100_000)
+
+        with self.assertRaises(ValueError):
+            train_dict(SAMPLES, -100)
+
+        with self.assertRaises(ValueError):
+            train_dict(SAMPLES, 0)
+
+    def test_finalize_dict_arguments(self):
+        global TRAINED_DICT
+        TRAINED_DICT = zstd.train_dict(SAMPLES, 100*1024)
+
+        with self.assertRaises(TypeError):
+            finalize_dict({1:2}, ['aaa', 'bbb'], 100_000, 2)
+
+        with self.assertRaises(ValueError):
+            finalize_dict(TRAINED_DICT, [], 100_000, 2)
+
+        with self.assertRaises(ValueError):
+            finalize_dict(TRAINED_DICT, SAMPLES, -100, 2)
+
+        with self.assertRaises(ValueError):
+            finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
+
 
 class FileTestCase(unittest.TestCase):
 

@@ -795,6 +795,12 @@ _train_dict(PyObject *module, PyObject *args)
         return NULL;
     }
 
+    /* Check dict_size range */
+    if (dict_size <= 0) {
+        PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
+        return NULL;
+    }
+
     /* Prepare chunk_sizes */
     if (!PyList_Check(dst_data_sizes)) {
         PyErr_SetString(PyExc_TypeError,
@@ -894,6 +900,12 @@ _finalize_dict(PyObject *module, PyObject *args)
     if (!PyArg_ParseTuple(args, "SSOni:_finalize_dict",
                           &custom_dict, &dst_data, &dst_data_sizes,
                           &dict_size, &compression_level)) {
+        return NULL;
+    }
+
+    /* Check dict_size range */
+    if (dict_size <= 0) {
+        PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
         return NULL;
     }
 
