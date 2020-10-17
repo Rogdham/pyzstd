@@ -549,25 +549,136 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
+    def test_decompress_epilogue_flags(self):
+        # TEST_DAT_130KB has a 4 bytes checksum at frame epilogue
+        _130KB = 130 * 1024
+
+        # full unlimited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB)
+        self.assertEqual(len(dat), _130KB)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        dat = d.decompress(b'')
+        self.assertEqual(len(dat), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        dat = d.decompress(b'')
+        self.assertEqual(len(dat), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        # full limited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB, _130KB)
+        self.assertEqual(len(dat), _130KB)
+        self.assertTrue(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        dat = d.decompress(b'', 0)
+        self.assertEqual(len(dat), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        # [:-4] unlimited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-4])
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        dat = d.decompress(b'')
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        # [:-4] limited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-4], _130KB)
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        dat = d.decompress(b'', 0)
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        # [:-3] unlimited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-3])
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        dat = d.decompress(b'')
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        # [:-3] limited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-3], _130KB)
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        dat = d.decompress(b'', 0)
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        # [:-1] unlimited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-1])
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        dat = d.decompress(b'')
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        # [:-1] limited
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-1], _130KB)
+        self.assertEqual(len(dat), _130KB)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        dat = d.decompress(b'', 0)
+        self.assertEqual(len(dat), 0)
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
     def test_compress_flushblock(self):
+        point = len(THIS_FILE_BYTES) // 2
+
         c = ZstdCompressor()
-        dat1 = c.compress(DECOMPRESSED_DAT_100_PLUS_32KB, c.FLUSH_BLOCK)
+        dat1 = c.compress(THIS_FILE_BYTES[:point])
+        dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_BLOCK)
 
         d = ZstdDecompressor()
         dat2 = d.decompress(dat1)
 
-        self.assertEqual(dat2, DECOMPRESSED_DAT_100_PLUS_32KB)
+        self.assertEqual(dat2, THIS_FILE_BYTES)
         self.assertFalse(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
     def test_compress_flushframe(self):
+        point = len(THIS_FILE_BYTES) // 2
+
         c = ZstdCompressor()
-        dat1 = c.compress(DECOMPRESSED_DAT_100_PLUS_32KB, c.FLUSH_FRAME)
+        dat1 = c.compress(THIS_FILE_BYTES[:point])
+        dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_FRAME)
 
         d = ZstdDecompressor()
         dat2 = d.decompress(dat1)
 
-        self.assertEqual(dat2, DECOMPRESSED_DAT_100_PLUS_32KB)
+        self.assertEqual(dat2, THIS_FILE_BYTES)
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
