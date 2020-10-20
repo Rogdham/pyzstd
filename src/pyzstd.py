@@ -105,7 +105,7 @@ def compress(data, level_or_option=None, zstd_dict=None):
     Refer to ZstdCompressor's docstring for a description of the optional
     arguments *level_or_option*, *zstd_dict*.
 
-    For incremental compression, use an ZstdCompressor instead.
+    For incremental compression, use ZstdCompressor instead.
     """
     comp = ZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
@@ -118,23 +118,6 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     """
     comp = RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
-
-
-def decompress(data, zstd_dict=None, option=None):
-    """Decompress a block of data.
-
-    Refer to ZstdDecompressor's docstring for a description of the
-    optional arguments *zstd_dict* and *option*.
-
-    For incremental decompression, use an ZstdDecompressor instead.
-    """
-    decomp = ZstdDecompressor(zstd_dict, option)
-    ret = decomp.decompress(data)
-
-    if not decomp.at_frame_edge:
-        raise ZstdError("Zstd data ends in an incomplete frame.")
-
-    return ret
 
 
 def train_dict(samples, dict_size):

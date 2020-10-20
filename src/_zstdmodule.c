@@ -159,8 +159,8 @@ static const int BUFFER_BLOCK_SIZE[] =
    Return -1 on failure
 */
 static inline int
-OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
-                         ZSTD_outBuffer *ob)
+OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
+                         Py_ssize_t max_length)
 {
     PyObject *b;
     int block_size;
@@ -204,8 +204,8 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, Py_ssize_t max_length,
    Return -1 on failure
 */
 static inline int
-OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, Py_ssize_t init_size,
-                          ZSTD_outBuffer *ob)
+OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
+                          Py_ssize_t init_size)
 {
     PyObject *b;
 
@@ -309,6 +309,17 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
     int8_t *offset;
+    const Py_ssize_t list_len = Py_SIZE(buffer->list);
+
+    /* Fast path for single block */
+    if ((ob->pos == 0 && list_len == 2) ||
+        (ob->pos == ob->size && list_len == 1)) {
+        block = PyList_GET_ITEM(buffer->list, 0);
+        Py_INCREF(block);
+
+        Py_DECREF(buffer->list);
+        return block;
+    }
 
     /* Final bytes object */
     result = PyBytes_FromStringAndSize(NULL, buffer->allocated - (ob->size - ob->pos));
@@ -318,12 +329,12 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     }
 
     /* Memory copy */
-    if (Py_SIZE(buffer->list) > 0) {
+    if (list_len > 0) {
         offset = (int8_t*) PyBytes_AS_STRING(result);
 
         /* Blocks except the last one */
         Py_ssize_t i = 0;
-        for (; i < Py_SIZE(buffer->list)-1; i++) {
+        for (; i < list_len-1; i++) {
             block = PyList_GET_ITEM(buffer->list, i);
             memcpy(offset, PyBytes_AS_STRING(block), Py_SIZE(block));
             offset += Py_SIZE(block);
@@ -1365,11 +1376,12 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 
         /* OutputBuffer(OnError)(&buffer) is after `error` label,
            so initialize the buffer before any `goto error` statement. */
-        if (OutputBuffer_InitWithSize(&buffer, (Py_ssize_t) output_buffer_size, &out) < 0) {
+        if (OutputBuffer_InitWithSize(&buffer, &out,
+                                      (Py_ssize_t) output_buffer_size) < 0) {
             goto error;
         }
     } else {
-        if (OutputBuffer_InitAndGrow(&buffer, -1, &out) < 0) {
+        if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
             goto error;
         }
     }
@@ -1428,7 +1440,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
     in.size = data->len;
     in.pos = 0;
 
-    if (OutputBuffer_InitAndGrow(&buffer, -1, &out) < 0) {
+    if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
         goto error;
     }
 
@@ -1871,7 +1883,8 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 }
 
 static inline PyObject *
-decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in, Py_ssize_t max_length)
+decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
+                Py_ssize_t max_length, Py_ssize_t decompressed_size)
 {
     size_t zstd_ret;
     ZSTD_outBuffer out;
@@ -1880,8 +1893,16 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in, Py_ssize_t max_length
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
-    if (OutputBuffer_InitAndGrow(&buffer, max_length, &out) < 0) {
-        goto error;
+    if (decompressed_size > 0) {
+        assert(max_length < 0);
+
+        if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
+            goto error;
+        }
+    } else {
+        if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
+            goto error;
+        }
     }
     assert(out.pos == 0);
 
@@ -1897,13 +1918,11 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in, Py_ssize_t max_length
         }
 
         /* Set at_frame_edge flag */
-        if (out.pos > 0 || zstd_ret == 0) {
-            /* (zstd_ret == 0) means a frame is completely decoded and fully flushed.
-               check (out.pos > 0):   Set the flag when outputted.
-               check (zstd_ret == 0): In rare case, frame epilogue is decoded, but
-                                      no data outputted.
-               Check these because after decoding a frame, decompress an empty input
-               will cause zstd_ret becomes non-zero. */
+        if (out.pos == 0 && zstd_ret != 0) {
+            /* Skip when the last round has no output.
+               Check these because after decoding a frame, decompress an empty
+               input will cause zstd_ret becomes non-zero. */
+        } else {
             self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
         }
 
@@ -2051,7 +2070,7 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_impl(self, &in, max_length);
+    ret = decompress_impl(self, &in, max_length, 0);
     if (ret == NULL) {
         goto error;
     }
@@ -2190,6 +2209,101 @@ static PyType_Spec zstddecompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstddecompressor_slots,
 };
+
+PyDoc_STRVAR(decompress_doc,
+"decompress(data, zstd_dict=None, option=None)\n"
+"--\n"
+"\n"
+"Decompress a block of data.\n"
+"zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
+"option: A dict object, contains advanced decompress parameters.\n\n"
+"For incremental decompression, use ZstdDecompressor instead.");
+
+static PyObject *
+decompress(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"data", "zstd_dict", "option", NULL};
+    Py_buffer data;
+    PyObject *zstd_dict = Py_None;
+    PyObject *option = Py_None;
+
+    unsigned long long decompressed_size;
+    PyObject *ret = NULL;
+    ZSTD_inBuffer in;
+    ZstdDecompressor self;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|OO:decompress", kwlist,
+                                     &data, &zstd_dict, &option)) {
+        return NULL;
+    }
+
+    /* Initialize self */
+    memset(&self, 0, sizeof(self));
+    self.at_frame_edge = 2;  /* Initialized to 2 only in this function */
+
+    self.dctx = ZSTD_createDCtx();
+    if (self.dctx == NULL) {
+        PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_DCtx instance.");
+        goto error;
+    }
+
+    /* Load dictionary to decompress context */
+    if (zstd_dict != Py_None) {
+        if (load_d_dict(&self, zstd_dict) < 0) {
+            goto error;
+        }
+
+        /* Py_INCREF the dict */
+        Py_INCREF(zstd_dict);
+        self.dict = zstd_dict;
+    }
+
+    /* Set option to decompress context */
+    if (option != Py_None) {
+        if (set_d_parameters(&self, option) < 0) {
+            goto error;
+        }
+    }
+
+    /* Get decompressed size */
+    decompressed_size = ZSTD_getDecompressedSize(data.buf, data.len);
+    if (decompressed_size > PY_SSIZE_T_MAX) {
+        decompressed_size = 0;
+    }
+
+    /* Decompress */
+    in.src = data.buf;
+    in.pos = 0;
+    in.size = data.len;
+
+    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size);
+    if (ret == NULL) {
+        goto error;
+    }
+
+    /* Check data integrity */
+    if ((self.at_frame_edge == 0) ||
+        (self.at_frame_edge == 2 && in.pos != 0)) {
+        PyErr_SetString(static_state.ZstdError, "Zstd data ends in an incomplete frame.");
+        goto error;
+    }
+
+    goto success;
+
+error:
+    Py_CLEAR(ret);
+success:
+    /* Release data */
+    PyBuffer_Release(&data);
+
+    /* Clean up ZstdDecompressor, keep this order. */
+    if (self.dctx) {
+        ZSTD_freeDCtx(self.dctx);
+    }
+    Py_XDECREF(self.dict);
+
+    return ret;
+}
 
 
 PyDoc_STRVAR(_get_cparam_bounds_doc,
@@ -2402,6 +2516,7 @@ success:
 }
 
 static PyMethodDef _zstd_methods[] = {
+    {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
     {"_finalize_dict", (PyCFunction)_finalize_dict, METH_VARARGS, _finalize_dict_doc},
     {"_get_cparam_bounds", (PyCFunction)_get_cparam_bounds, METH_VARARGS, _get_cparam_bounds_doc},

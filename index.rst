@@ -735,7 +735,7 @@ Advanced parameters
 
     .. py:attribute:: jobSize
 
-        Size of a compression job. This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+        Size of a compression job, in bytes. This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
 
         Each compression job is completed in parallel, so this value can indirectly impact the nb of active threads.
 

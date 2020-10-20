@@ -2,3 +2,4 @@
 /dist
 /build
 /.vscode
+/test/__pycache__
