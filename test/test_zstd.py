@@ -835,7 +835,12 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
-    def test_decompress_1(self):
+    def test_decompress_incomplete(self):
+        # empty input
+        dat = decompress(b'')
+        self.assertEqual(dat, b'')
+
+        # 130KB data that has a 4 byte checksum
         output = decompress(TEST_DAT_130KB)
         self.assertEqual(len(output), 130*1024)
 
@@ -847,14 +852,37 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
         with self.assertRaisesRegex(ZstdError, r'incomplete'):
             decompress(TEST_DAT_130KB[:-100])
-        
-        dat = decompress(b'')
-        self.assertEqual(dat, b'')
 
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(TEST_DAT_130KB[:-4])
+
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(TEST_DAT_130KB[:-1])
+
+        # the second frame
         dat = decompress(TEST_DAT_130KB + TEST_DAT_130KB)
         self.assertEqual(len(dat), 2*130*1024)
 
-    def test_decompress_2(self):
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(TEST_DAT_130KB + TEST_DAT_130KB[:20])
+
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(TEST_DAT_130KB + TEST_DAT_130KB[:-1])
+
+        # skipable frame
+        dat = decompress(SKIPPABLE_FRAME)
+        self.assertEqual(dat, b'')
+
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(SKIPPABLE_FRAME[:len(SKIPPABLE_FRAME)//2])
+
+        dat = decompress(TEST_DAT_130KB + SKIPPABLE_FRAME)
+        self.assertEqual(len(dat), 130*1024)
+
+        with self.assertRaisesRegex(ZstdError, r'incomplete'):
+            decompress(TEST_DAT_130KB + SKIPPABLE_FRAME[:len(SKIPPABLE_FRAME)//2])
+
+    def test_decompress_parameter(self):
         with self.assertRaises(TypeError):
             decompress(b'', {})
 

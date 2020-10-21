@@ -1966,6 +1966,78 @@ error:
     return NULL;
 }
 
+static inline PyObject *
+decompress_func_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
+                     Py_ssize_t decompressed_size)
+{
+    size_t zstd_ret;
+    ZSTD_outBuffer out;
+    BlocksOutputBuffer buffer;
+    PyObject *ret;
+
+    /* OutputBuffer(OnError)(&buffer) is after `error` label,
+       so initialize the buffer before any `goto error` statement. */
+    if (decompressed_size > 0) {
+        if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
+            goto error;
+        }
+    } else {
+        if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
+            goto error;
+        }
+    }
+    assert(out.pos == 0);
+
+    while (1) {
+        const size_t in_pos_bak = in->pos;
+
+        Py_BEGIN_ALLOW_THREADS
+        zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
+        Py_END_ALLOW_THREADS
+
+        /* Check error */
+        if (ZSTD_isError(zstd_ret)) {
+            PyErr_SetString(static_state.ZstdError, ZSTD_getErrorName(zstd_ret));
+            goto error;
+        }
+
+        /* Set at_frame_edge flag.
+           In this function, set to 1 when both the input and output data are
+           at a frame edge. */
+        if (out.pos == 0 && in->pos == in_pos_bak) {
+            /* Skip when nothing advanced */
+        } else {
+            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+        }
+
+        if (out.pos == out.size) {
+            /* Output buffer exhausted.
+               Need to check `out` before `in`. Maybe zstd's internal buffer still
+               have a few bytes can be output, grow the output buffer and continue
+               the loop if max_lengh < 0. */
+            if (OutputBuffer_Grow(&buffer, &out) < 0) {
+                goto error;
+            }
+            assert(out.pos == 0);
+
+        } else if (in->pos == in->size) {
+            /* Finished */
+            ret = OutputBuffer_Finish(&buffer, &out);
+            if (ret != NULL) {
+                goto success;
+            } else {
+                goto error;
+            }
+        }
+    }
+
+success:
+    return ret;
+error:
+    OutputBuffer_OnError(&buffer);
+    return NULL;
+}
+
 PyDoc_STRVAR(ZstdDecompressor_decompress_doc,
 "_zstd.ZstdDecompressor.decompress\n"
 "--\n"
@@ -2239,7 +2311,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
 
     /* Initialize self */
     memset(&self, 0, sizeof(self));
-    self.at_frame_edge = 2;  /* Initialized to 2 only in this function */
+    self.at_frame_edge = 1;
 
     self.dctx = ZSTD_createDCtx();
     if (self.dctx == NULL) {
@@ -2265,6 +2337,21 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     }
 
+    /* Fast path for empty input */
+    if (data.len == 0) {
+        ret = PyBytes_FromStringAndSize(NULL, 0);
+        if (ret) {
+            goto success;
+        } else {
+            goto error;
+        }
+    }
+
+    /* Prepare input data */
+    in.src = data.buf;
+    in.pos = 0;
+    in.size = data.len;
+
     /* Get decompressed size */
     decompressed_size = ZSTD_getDecompressedSize(data.buf, data.len);
     if (decompressed_size > PY_SSIZE_T_MAX) {
@@ -2272,18 +2359,15 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     }
 
     /* Decompress */
-    in.src = data.buf;
-    in.pos = 0;
-    in.size = data.len;
-
-    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size);
+    ret = decompress_func_impl(&self, &in, (Py_ssize_t) decompressed_size);
     if (ret == NULL) {
         goto error;
     }
 
-    /* Check data integrity */
-    if ((self.at_frame_edge == 0) ||
-        (self.at_frame_edge == 2 && in.pos != 0)) {
+    /* Check data integrity.
+       In this function, at_frame_edge flag is 1 when both input and output
+       streams are at a frame edge. */
+    if (self.at_frame_edge == 0) {
         PyErr_SetString(static_state.ZstdError, "Zstd data ends in an incomplete frame.");
         goto error;
     }
