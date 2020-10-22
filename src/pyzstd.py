@@ -1,7 +1,8 @@
 
 __all__ = ('compress', 'richmem_compress', 'decompress',
            'train_dict', 'finalize_dict',
-           'ZstdCompressor', 'RichMemZstdCompressor', 'EndlessZstdDecompressor',
+           'ZstdCompressor', 'RichMemZstdCompressor',
+           'ZstdDecompressor', 'EndlessZstdDecompressor',
            'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
@@ -192,46 +193,7 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     return ZstdDict(dict_content)
 
 
-class EndlessDecompressReader(_compression.DecompressReader):
-    """ Endless decompress reader for zstd, since zstd doesn't have
-        an eof marker, the stream can be endless.
-        End when underlying self._fp ends. """
-
-    def read(self, size=-1):
-        if size < 0:
-            return self.readall()
-
-        if not size or self._eof:
-            return b""
-
-        # Depending on the input data, our call to the decompressor may not
-        # return any data. In this case, try again after reading another block.
-        data = None
-        while True:
-            if self._decompressor.needs_input:
-                in_dat = self._fp.read(_compression.BUFFER_SIZE)
-                if not in_dat:
-                    break
-            else:
-                in_dat = b""
-
-            data = self._decompressor.decompress(in_dat, size)
-            if data:
-                break
-
-        # self._fp ends
-        if not data:
-            if not self._decompressor.at_frame_edge:
-                raise ZstdError("Zstd data ends in an incomplete frame.")
-
-            self._eof = True
-            self._size = self._pos  # decompressed size
-            return b""
-
-        # self._pos is current offset in decompressed stream
-        self._pos += len(data)
-        return data
-
+class ZstdDecompressReader(_compression.DecompressReader):
     def readall(self):
         chunks = []
         while True:
@@ -243,7 +205,7 @@ class EndlessDecompressReader(_compression.DecompressReader):
                 break
             chunks.append(data)
         return b''.join(chunks)
-        
+
 
 _MODE_CLOSED   = 0
 _MODE_READ     = 1
@@ -291,8 +253,9 @@ class ZstdFile(_compression.BaseStream):
             raise TypeError("filename must be a str, bytes, file or PathLike object")
 
         if self._mode == _MODE_READ:
-            raw = EndlessDecompressReader(self._fp, EndlessZstdDecompressor,
-                trailing_error=ZstdError, zstd_dict=zstd_dict, option=level_or_option)
+            raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
+                                       trailing_error=ZstdError,
+                                       zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw)
 
     def close(self):

@@ -1303,22 +1303,22 @@ class FileTestCase(unittest.TestCase):
 
     def test_read_incomplete(self):
         with ZstdFile(BytesIO(TEST_DAT_130KB[:-200])) as f:
-            self.assertRaises(ZstdError, f.read)
+            self.assertRaises(EOFError, f.read)
 
     def test_read_truncated(self):
         # Drop stream epilogue: 4 bytes checksum
         truncated = TEST_DAT_130KB[:-4]
         with ZstdFile(BytesIO(truncated)) as f:
-            self.assertRaises(ZstdError, f.read)
+            self.assertRaises(EOFError, f.read)
 
         with ZstdFile(BytesIO(truncated)) as f:
             self.assertEqual(len(f.read(130*1024)), 130*1024)
-            self.assertRaises(ZstdError, f.read, 1)
+            self.assertRaises(EOFError, f.read, 1)
 
         # Incomplete header
         for i in range(20):
             with ZstdFile(BytesIO(truncated[:i])) as f:
-                self.assertEqual(f.read(1), b'')
+                self.assertRaises(EOFError, f.read, 1)
 
     def test_read_bad_args(self):
         f = ZstdFile(BytesIO(COMPRESSED_DAT))
