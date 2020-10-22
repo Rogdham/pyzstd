@@ -1883,8 +1883,8 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 }
 
 static inline PyObject *
-decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                Py_ssize_t max_length, Py_ssize_t decompressed_size)
+decompress_stream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
+                       Py_ssize_t max_length)
 {
     size_t zstd_ret;
     ZSTD_outBuffer out;
@@ -1893,16 +1893,8 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
-    if (decompressed_size > 0) {
-        assert(max_length < 0);
-
-        if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
-            goto error;
-        }
-    } else {
-        if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
-            goto error;
-        }
+    if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
+        goto error;
     }
     assert(out.pos == 0);
 
@@ -1917,7 +1909,11 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
-        /* Set at_frame_edge flag */
+        /* Set at_frame_edge flag.
+           Since ZstdDecompressor may hold some input data in input_buffer,
+           at_frame_edge flag can only indicate that if the output is at a
+           frame edge, it's not possible to indicate that if both the input and
+           output streams are at a frame edge. */
         if (out.pos == 0 && zstd_ret != 0) {
             /* Skip when the last round has no output.
                Check these because after decoding a frame, decompress an empty
@@ -2142,7 +2138,7 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_impl(self, &in, max_length, 0);
+    ret = decompress_stream_impl(self, &in, max_length);
     if (ret == NULL) {
         goto error;
     }
