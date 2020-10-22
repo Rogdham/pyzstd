@@ -16,7 +16,7 @@ from test.support import (
 # from test.support.import_helper import import_module
 
 import pyzstd as zstd
-from pyzstd import ZstdCompressor, RichMemZstdCompressor, ZstdDecompressor, ZstdError, \
+from pyzstd import ZstdCompressor, RichMemZstdCompressor, EndlessZstdDecompressor, ZstdError, \
                  CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
                  ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
                  compressionLevel_values, get_frame_info, get_frame_size, ZstdFile, zstd_open
@@ -158,18 +158,18 @@ class ClassShapeTestCase(unittest.TestCase):
     def test_Decompressor(self):
         # class attributes
         with self.assertRaises(AttributeError):
-            ZstdDecompressor.CONTINUE
+            EndlessZstdDecompressor.CONTINUE
 
         with self.assertRaises(AttributeError):
-            ZstdDecompressor.FLUSH_BLOCK
+            EndlessZstdDecompressor.FLUSH_BLOCK
 
         with self.assertRaises(AttributeError):
-            ZstdDecompressor.FLUSH_FRAME
+            EndlessZstdDecompressor.FLUSH_FRAME
 
         # method & member
-        ZstdDecompressor(TRAINED_DICT, {})
-        ZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
-        d = ZstdDecompressor()
+        EndlessZstdDecompressor(TRAINED_DICT, {})
+        EndlessZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
+        d = EndlessZstdDecompressor()
 
         d.decompress(b'')
         d.decompress(b'', 100)
@@ -189,7 +189,7 @@ class ClassShapeTestCase(unittest.TestCase):
             d.at_frame_edge = True
 
         # name
-        self.assertIn('.ZstdDecompressor', str(type(d)))
+        self.assertIn('.EndlessZstdDecompressor', str(type(d)))
 
         # doesn't support pickle
         with self.assertRaises(TypeError):
@@ -197,7 +197,7 @@ class ClassShapeTestCase(unittest.TestCase):
 
         # doesn't support subclass
         with self.assertRaises(TypeError):
-            class SubClass(ZstdDecompressor):
+            class SubClass(EndlessZstdDecompressor):
                 pass
 
     def test_ZstdDict(self):
@@ -294,23 +294,23 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         with self.assertRaises(ZstdError):
             ZstdCompressor({3333 : 100})
 
-        # ZstdDecompressor
-        self.assertRaises(TypeError, ZstdDecompressor, ())
-        self.assertRaises(TypeError, ZstdDecompressor, zstd_dict=123)
-        self.assertRaises(TypeError, ZstdDecompressor, zstd_dict=b'abc')
-        self.assertRaises(TypeError, ZstdDecompressor, zstd_dict={1:2, 3:4})
+        # EndlessZstdDecompressor
+        self.assertRaises(TypeError, EndlessZstdDecompressor, ())
+        self.assertRaises(TypeError, EndlessZstdDecompressor, zstd_dict=123)
+        self.assertRaises(TypeError, EndlessZstdDecompressor, zstd_dict=b'abc')
+        self.assertRaises(TypeError, EndlessZstdDecompressor, zstd_dict={1:2, 3:4})
 
-        self.assertRaises(TypeError, ZstdDecompressor, option=123)
-        self.assertRaises(TypeError, ZstdDecompressor, option='abc')
-        self.assertRaises(TypeError, ZstdDecompressor, option=b'abc')
+        self.assertRaises(TypeError, EndlessZstdDecompressor, option=123)
+        self.assertRaises(TypeError, EndlessZstdDecompressor, option='abc')
+        self.assertRaises(TypeError, EndlessZstdDecompressor, option=b'abc')
 
         with self.assertRaises(ValueError):
-            ZstdDecompressor(option={2**31 : 100})
+            EndlessZstdDecompressor(option={2**31 : 100})
 
         with self.assertRaises(ZstdError):
-            ZstdDecompressor(option={DParameter.windowLogMax:100})
+            EndlessZstdDecompressor(option={DParameter.windowLogMax:100})
         with self.assertRaises(ZstdError):
-            ZstdDecompressor(option={3333 : 100})
+            EndlessZstdDecompressor(option={3333 : 100})
 
         # Method bad arguments
         zc = ZstdCompressor()
@@ -332,7 +332,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         zc.flush(zc.FLUSH_BLOCK)
         zc.flush(zc.FLUSH_FRAME)
 
-        lzd = ZstdDecompressor()
+        lzd = EndlessZstdDecompressor()
         self.assertRaises(TypeError, lzd.decompress)
         self.assertRaises(TypeError, lzd.decompress, b"foo", b"bar")
         self.assertRaises(TypeError, lzd.decompress, "str")
@@ -388,17 +388,17 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
-        ZstdDecompressor(option=d)
+        EndlessZstdDecompressor(option=d)
 
         # larger than signed int, ValueError
         d1 = d.copy()
         d1[DParameter.windowLogMax] = 2**31
-        self.assertRaises(ValueError, ZstdDecompressor, None, d1)
+        self.assertRaises(ValueError, EndlessZstdDecompressor, None, d1)
 
         # value out of bounds, ZstdError
         d2 = d.copy()
         d2[DParameter.windowLogMax] = 32
-        self.assertRaises(ZstdError, ZstdDecompressor, None, d2)
+        self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
 
     def test_zstd_multithread_compress(self):
         b = THIS_FILE_BYTES * 30
@@ -425,7 +425,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertEqual(dat2, b)
 
     def test_decompress_1byte(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         dat = d.decompress(COMPRESSED_THIS_FILE, 1)
         size = len(dat)
@@ -450,7 +450,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_decompress_2bytes(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         dat = d.decompress(COMPRESSED_THIS_FILE, 2)
         size = len(dat)
@@ -475,7 +475,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_decompress_3_1bytes(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
@@ -500,7 +500,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_decompress_3_2bytes(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
@@ -525,7 +525,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_decompress_1_3bytes(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         bi = BytesIO(COMPRESSED_THIS_FILE)
         size = 0
 
@@ -554,7 +554,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         _130KB = 130 * 1024
 
         # full unlimited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB)
         self.assertEqual(len(dat), _130KB)
         self.assertTrue(d.at_frame_edge)
@@ -571,7 +571,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
         # full limited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB, _130KB)
         self.assertEqual(len(dat), _130KB)
         self.assertTrue(d.at_frame_edge)
@@ -583,7 +583,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
 
         # [:-4] unlimited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-4])
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -595,7 +595,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
         # [:-4] limited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-4], _130KB)
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -607,7 +607,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
 
         # [:-3] unlimited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-3])
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -619,7 +619,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
         # [:-3] limited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-3], _130KB)
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -631,7 +631,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
 
         # [:-1] unlimited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-1])
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -643,7 +643,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
         # [:-1] limited
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB[:-1], _130KB)
         self.assertEqual(len(dat), _130KB)
         self.assertFalse(d.at_frame_edge)
@@ -658,7 +658,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         decompressed_size = get_frame_info(TEST_DAT_130KB).decompressed_size
         self.assertEqual(decompressed_size, 130 * 1024)
 
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat = d.decompress(TEST_DAT_130KB + TEST_DAT_130KB)
         self.assertEqual(len(dat), 2 * 130 * 1024)
         self.assertTrue(d.at_frame_edge)
@@ -671,7 +671,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat1 = c.compress(THIS_FILE_BYTES[:point])
         dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_BLOCK)
 
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat2 = d.decompress(dat1)
 
         self.assertEqual(dat2, THIS_FILE_BYTES)
@@ -685,7 +685,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat1 = c.compress(THIS_FILE_BYTES[:point])
         dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_FRAME)
 
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         dat2 = d.decompress(dat1)
 
         self.assertEqual(dat2, THIS_FILE_BYTES)
@@ -696,7 +696,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 class DecompressorFlagsTestCase(unittest.TestCase):
 
     def test_empty_input(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
@@ -706,7 +706,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
             self.assertTrue(d.needs_input)
 
     def test_empty_input_after_frame(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         # decompress a frame
         d.decompress(COMPRESSED_DAT)
@@ -719,7 +719,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_empty_input_after_32K_dat(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         # decompress first 100 bytes
         d.decompress(DAT_100_PLUS_32KB, 100)
@@ -732,7 +732,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_empty_input_after_32K_dat2(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         # decompress first 100 bytes
         d.decompress(DAT_100_PLUS_32KB, 100)
@@ -755,7 +755,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         data = compress(b'a'*42, option)
 
         # maxlength = 42
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
         d.decompress(data, 42)
         self.assertTrue(d.at_frame_edge)
         self.assertFalse(d.needs_input)
@@ -772,7 +772,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         data = c.compress(b'a'*42, c.FLUSH_FRAME)
         data += c.compress(b'b'*60, c.FLUSH_FRAME)
 
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         # first frame, two steps
         d.decompress(data, 21)
@@ -793,7 +793,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_skippable_frames(self):
-        d = ZstdDecompressor()
+        d = EndlessZstdDecompressor()
 
         # skippable frame
         output = d.decompress(SKIPPABLE_FRAME)

@@ -1,7 +1,7 @@
 
 __all__ = ('compress', 'richmem_compress', 'decompress',
            'train_dict', 'finalize_dict',
-           'ZstdCompressor', 'RichMemZstdCompressor', 'ZstdDecompressor',
+           'ZstdCompressor', 'RichMemZstdCompressor', 'EndlessZstdDecompressor',
            'ZstdDict', 'ZstdError', 'ZstdFile', 'zstd_open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
@@ -291,7 +291,7 @@ class ZstdFile(_compression.BaseStream):
             raise TypeError("filename must be a str, bytes, file or PathLike object")
 
         if self._mode == _MODE_READ:
-            raw = EndlessDecompressReader(self._fp, ZstdDecompressor,
+            raw = EndlessDecompressReader(self._fp, EndlessZstdDecompressor,
                 trailing_error=ZstdError, zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw)
 
