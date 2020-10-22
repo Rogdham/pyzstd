@@ -231,6 +231,9 @@ Stream classes
 
     A stream decompressor. It's thread-safe at method level.
 
+    .. hint::
+        If the decompressed size is known (recorded in frame header), using one-shot :py:func:`decompress` function may be ~9% faster.
+
     .. py:method:: __init__(self, zstd_dict=None, option=None)
 
         Initialize a ZstdDecompressor object.

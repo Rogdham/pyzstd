@@ -18,6 +18,14 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.12.6  (next release)**
+
+decompress() function:
+
+* ~9% faster when: there is one frame, and the decompressed size was recorded in frame header.
+
+* raises ZstdError when input **or** output data is not at a frame edge. Previously, it only raise for output data is not at a frame edge.
+
 **0.12.5  (Oct 12, 2020)**
 
 No longer use `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, now supports Python 3.5+.
@@ -30,4 +38,4 @@ It seems the API is stable.
 
 The first version upload to PyPI.
 
-Includes zstd v1.4.5 source code.
+Includes `zstd v1.4.5 <https://github.com/facebook/zstd/releases/tag/v1.4.5>`_ source code.
