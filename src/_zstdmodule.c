@@ -2855,6 +2855,47 @@ error:
     return -1;
 }
 
+static inline int
+add_type_to_module(PyObject *module, PyType_Spec *type_spec,
+                   const char *name, PyTypeObject **dest)
+{
+    PyObject *temp;
+
+    temp = PyType_FromSpec(type_spec);
+    if (temp == NULL) {
+        return -1;
+    }
+
+    if (PyModule_AddObject(module, name, temp) < 0) {
+        Py_DECREF(temp);
+        return -1;
+    }
+
+    Py_INCREF(temp);
+    *dest = temp;
+
+    return 0;
+}
+
+static inline int
+add_constant_to_type(PyTypeObject *type, const long value, const char *name)
+{
+    PyObject *temp;
+
+    temp = PyLong_FromLong(value);
+    if (temp == NULL) {
+        return -1;
+    }
+
+    if (PyObject_SetAttrString((PyObject*) type, name, temp) < 0) {
+        Py_DECREF(temp);
+        return -1;
+    }
+    Py_DECREF(temp);
+
+    return 0;
+}
+
 PyMODINIT_FUNC
 PyInit__zstd(void)
 {
@@ -2884,94 +2925,63 @@ PyInit__zstd(void)
     }
 
     /* ZstdDict */
-    temp = PyType_FromSpec(&zstddict_type_spec);
-    if (temp == NULL) {
+    if (add_type_to_module(module, 
+                           &zstddict_type_spec,
+                           "ZstdDict",
+                           &static_state.ZstdDict_type) < 0) {
         goto error;
     }
-
-    if (PyModule_AddObject(module, "ZstdDict", temp) < 0) {
-        Py_DECREF(temp);
-        goto error;
-    }
-    Py_INCREF(temp);
-    static_state.ZstdDict_type = (PyTypeObject*) temp;
 
     /* ZstdCompressor */
-    temp = PyType_FromSpec(&zstdcompressor_type_spec);
-    if (temp == NULL) {
+    if (add_type_to_module(module, 
+                           &zstdcompressor_type_spec,
+                           "ZstdCompressor",
+                           &static_state.ZstdCompressor_type) < 0) {
         goto error;
     }
-
-    if (PyModule_AddObject(module, "ZstdCompressor", temp) < 0) {
-        Py_DECREF(temp);
-        goto error;
-    }
-    Py_INCREF(temp);
-    static_state.ZstdCompressor_type = (PyTypeObject*) temp;
 
     /* Add EndDirective enum to ZstdCompressor */
-    temp = PyLong_FromLong(ZSTD_e_continue);
-    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
-                               "CONTINUE", temp) < 0) {
-        Py_DECREF(temp);
+    if (add_constant_to_type(static_state.ZstdCompressor_type,
+                             ZSTD_e_continue,
+                             "CONTINUE") < 0) {
         goto error;
     }
-    Py_DECREF(temp);
 
-    temp = PyLong_FromLong(ZSTD_e_flush);
-    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
-                               "FLUSH_BLOCK", temp) < 0) {
-        Py_DECREF(temp);
+    if (add_constant_to_type(static_state.ZstdCompressor_type,
+                             ZSTD_e_flush,
+                             "FLUSH_BLOCK") < 0) {
         goto error;
     }
-    Py_DECREF(temp);
 
-    temp = PyLong_FromLong(ZSTD_e_end);
-    if (PyObject_SetAttrString((PyObject*)static_state.ZstdCompressor_type,
-                               "FLUSH_FRAME", temp) < 0) {
-        Py_DECREF(temp);
+    if (add_constant_to_type(static_state.ZstdCompressor_type,
+                             ZSTD_e_end,
+                             "FLUSH_FRAME") < 0) {
         goto error;
     }
-    Py_DECREF(temp);
 
     /* RichMemZstdCompressor */
-    temp = PyType_FromSpec(&richmem_zstdcompressor_type_spec);
-    if (temp == NULL) {
+    if (add_type_to_module(module, 
+                           &richmem_zstdcompressor_type_spec,
+                           "RichMemZstdCompressor",
+                           &static_state.RichMemZstdCompressor_type) < 0) {
         goto error;
     }
-
-    if (PyModule_AddObject(module, "RichMemZstdCompressor", temp) < 0) {
-        Py_DECREF(temp);
-        goto error;
-    }
-    Py_INCREF(temp);
-    static_state.RichMemZstdCompressor_type = (PyTypeObject*) temp;
 
     /* ZstdDecompressor */
-    temp = PyType_FromSpec(&ZstdDecompressor_type_spec);
-    if (temp == NULL) {
-        goto error;
-    }
-
-    if (PyModule_AddObject(module, "ZstdDecompressor", temp) < 0) {
-        Py_DECREF(temp);
-        goto error;
-    }
-    Py_INCREF(temp);
-    static_state.ZstdDecompressor_type = (PyTypeObject*) temp;
-
-    /* EndlessZstdDecompressor */
-    temp = PyType_FromSpec(&EndlessZstdDecompressor_type_spec);
-    if (temp == NULL) {
+    if (add_type_to_module(module, 
+                           &ZstdDecompressor_type_spec,
+                           "ZstdDecompressor",
+                           &static_state.ZstdDecompressor_type) < 0) {
         goto error;
     }
 
-    if (PyModule_AddObject(module, "EndlessZstdDecompressor", temp) < 0) {
-        Py_DECREF(temp);
+    /* EndlessZstdDecompressor */
+    if (add_type_to_module(module, 
+                           &EndlessZstdDecompressor_type_spec,
+                           "EndlessZstdDecompressor",
+                           &static_state.EndlessZstdDecompressor_type) < 0) {
         goto error;
     }
-    Py_INCREF(temp);
-    static_state.EndlessZstdDecompressor_type = (PyTypeObject*) temp;
 
     /* zstd_version, ZSTD_versionString() requires zstd v1.3.0+ */
     if (!(temp = PyUnicode_FromString(ZSTD_versionString()))) {
