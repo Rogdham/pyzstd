@@ -1251,6 +1251,15 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
 }
 #endif
 
+static PyObject *
+reduce_cannot_pickle(PyObject *self)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "Cannot pickle %s object.",
+                 Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
 /* -----------------------
      ZstdCompressor code
    ----------------------- */
@@ -1602,21 +1611,12 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
 PyDoc_STRVAR(ZstdCompressor_reduce_doc, "Intentionally not supporting pickle.");
 
-static PyObject *
-ZstdCompressor_reduce(ZstdCompressor *self)
-{
-    PyErr_Format(PyExc_TypeError,
-                 "Cannot pickle %s object.",
-                 Py_TYPE(self)->tp_name);
-    return NULL;
-}
-
 static PyMethodDef _ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)ZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_compress_doc},
     {"flush", (PyCFunction)ZstdCompressor_flush,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_flush_doc},
-    {"__reduce__", (PyCFunction)ZstdCompressor_reduce, METH_NOARGS, ZstdCompressor_reduce_doc},
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdCompressor_reduce_doc},
     {NULL, NULL, 0, NULL}
 };
 
@@ -1749,7 +1749,7 @@ RichMemZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *k
 static PyMethodDef _RichMem_ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)RichMemZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, RichMemZstdCompressor_compress_doc},
-    {"__reduce__", (PyCFunction)ZstdCompressor_reduce, METH_NOARGS, ZstdCompressor_reduce_doc},
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdCompressor_reduce_doc},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2243,19 +2243,10 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
 
 PyDoc_STRVAR(ZstdDecompressor_reduce_doc, "Intentionally not supporting pickle.");
 
-static PyObject *
-ZstdDecompressor_reduce(ZstdDecompressor *self)
-{
-    PyErr_Format(PyExc_TypeError,
-                 "Cannot pickle %s object.",
-                 Py_TYPE(self)->tp_name);
-    return NULL;
-}
-
 static PyMethodDef _ZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)ZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, ZstdDecompressor_decompress_doc},
-    {"__reduce__", (PyCFunction)ZstdDecompressor_reduce, METH_NOARGS, ZstdDecompressor_reduce_doc},
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdDecompressor_reduce_doc},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2375,48 +2366,7 @@ _EndlessZstdDecompressor_dealloc(ZstdDecompressor *self)
     Py_DECREF(tp);
 }
 
-PyDoc_STRVAR(EndlessZstdDecompressor_doc, "Zstd stream decompressor.");
-
-static int
-EndlessZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
-{
-    static char *kwlist[] = {"zstd_dict", "option", NULL};
-    PyObject *zstd_dict = Py_None;
-    PyObject *option = Py_None;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO:EndlessZstdDecompressor.__init__", kwlist,
-                                     &zstd_dict, &option)) {
-        return -1;
-    }
-
-    /* Only called once */
-    if (self->inited) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "EndlessZstdDecompressor.__init__ function was called twice.");
-        return -1;
-    }
-    self->inited = 1;
-
-    /* Load dictionary to decompress context */
-    if (zstd_dict != Py_None) {
-        if (load_d_dict(self->dctx, zstd_dict) < 0) {
-            return -1;
-        }
-
-        /* Py_INCREF the dict */
-        Py_INCREF(zstd_dict);
-        self->dict = zstd_dict;
-    }
-
-    /* Set option to decompress context */
-    if (option != Py_None) {
-        if (set_d_parameters(self->dctx, option) < 0) {
-            return -1;
-        }
-    }
-
-    return 0;
-}
+PyDoc_STRVAR(EndlessZstdDecompressor_doc, "Zstd endless stream decompressor.");
 
 PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 "_zstd.EndlessZstdDecompressor.decompress\n"
@@ -2435,19 +2385,10 @@ EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObj
 
 PyDoc_STRVAR(EndlessZstdDecompressor_reduce_doc, "Intentionally not supporting pickle.");
 
-static PyObject *
-EndlessZstdDecompressor_reduce(ZstdDecompressor *self)
-{
-    PyErr_Format(PyExc_TypeError,
-                 "Cannot pickle %s object.",
-                 Py_TYPE(self)->tp_name);
-    return NULL;
-}
-
 static PyMethodDef _EndlessZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)EndlessZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, EndlessZstdDecompressor_decompress_doc},
-    {"__reduce__", (PyCFunction)EndlessZstdDecompressor_reduce, METH_NOARGS, EndlessZstdDecompressor_reduce_doc},
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, EndlessZstdDecompressor_reduce_doc},
     {NULL, NULL, 0, NULL}
 };
 
@@ -2474,7 +2415,7 @@ static PyMemberDef _EndlessZstdDecompressor_members[] = {
 static PyType_Slot EndlessZstdDecompressor_slots[] = {
     {Py_tp_new, _EndlessZstdDecompressor_new},
     {Py_tp_dealloc, _EndlessZstdDecompressor_dealloc},
-    {Py_tp_init, EndlessZstdDecompressor_init},
+    {Py_tp_init, ZstdDecompressor_init},
     {Py_tp_methods, _EndlessZstdDecompressor_methods},
     {Py_tp_members, _EndlessZstdDecompressor_members},
     {Py_tp_doc, (char*)EndlessZstdDecompressor_doc},
