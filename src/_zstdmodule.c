@@ -1,12 +1,14 @@
-#include "stdint.h"
+/* pyzstd module for Python 3.5+
+   https://github.com/animalize/pyzstd */
+
+#include "stdint.h"     /* For MSVC + Python 3.5 */
 
 #include "Python.h"
-#include "pythread.h"
-#include "structmember.h"      // PyMemberDef
+#include "pythread.h"   /* For Python 3.5 */
+#include "structmember.h"
 
 #include "../lib/zstd.h"
 #include "../lib/dictBuilder/zdict.h"
-
 
 typedef struct {
     PyObject_HEAD
@@ -100,9 +102,9 @@ typedef struct {
 
 static _zstd_state static_state;
 
-/* -----------------------------------
+/* ----------------------------
      BlocksOutputBuffer code
-   ----------------------------------- */
+   ---------------------------- */
 #if 1
 typedef struct {
     /* List of blocks */
@@ -352,9 +354,9 @@ OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 }
 #endif
 
-/* -----------------------------------
+/* -------------------------
      Parameters from zstd
-   ----------------------------------- */
+   ------------------------- */
 #if 1
 typedef struct {
     const int parameter;
@@ -851,9 +853,9 @@ reduce_cannot_pickle(PyObject *self)
 }
 #endif
 
-/* -----------------------------------
+/* ------------------
      ZstdDict code
-   ----------------------------------- */
+   ------------------ */
 #if 1
 static PyObject *
 ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
@@ -1835,7 +1837,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
-        /* Set at_frame_edge flag */
+        /* Set .eof/.at_frame_edge flags */
         if (type == DECOMPRESSOR) {
             /* Frame ends */
             if (zstd_ret == 0) {
@@ -2289,9 +2291,9 @@ static PyType_Spec ZstdDecompressor_type_spec = {
 };
 #endif
 
-/* -------------------------
+/* -------------------------------
      EndlessZstdDecompressor code
-   ------------------------- */
+   ------------------------------- */
 #if 1
 PyDoc_STRVAR(EndlessZstdDecompressor_doc, "Zstd endless stream decompressor.");
 
@@ -2361,6 +2363,11 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
     .slots = EndlessZstdDecompressor_slots,
 };
 #endif
+
+/* --------------------------
+     Module level functions
+   -------------------------- */
+#if 1
 
 PyDoc_STRVAR(decompress_doc,
 "decompress(data, zstd_dict=None, option=None)\n"
@@ -2687,7 +2694,12 @@ static PyMethodDef _zstd_methods[] = {
     {"_get_frame_info", (PyCFunction)_get_frame_info, METH_VARARGS, _get_frame_info_doc},
     {NULL}
 };
+#endif
 
+/* --------------------
+     Initialize code
+   -------------------- */
+#if 1
 static int
 _zstd_traverse(PyObject *module, visitproc visit, void *arg)
 {
@@ -2944,3 +2956,4 @@ error:
     }
     return NULL;
 }
+#endif

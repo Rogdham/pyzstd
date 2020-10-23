@@ -18,13 +18,19 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.12.6  (next release)**
+**0.13.0  (next release)**
 
-decompress() function:
+#. ``ZstdDecompressor`` class: now it has the same behavior and API as the BZ2Decompressor/LZMADecompressor classes in Python standard library, it stops after a frame is decompressed.
 
-* ~9% faster when: there is one frame, and the decompressed size was recorded in frame header.
+#. Add an ``EndlessZstdDecompressor`` class, can decompress data endlessly. It is renamed from previous ``ZstdDecompressor`` class.
 
-* raises ZstdError when input **or** output data is not at a frame edge. Previously, it only raise for output data is not at a frame edge.
+#. Rename ``zstd_open()`` function to ``open()``, consistent with Python standard library.
+
+#. ``decompress()`` function:
+
+    * ~9% faster when: there is one frame, and the decompressed size was recorded in frame header.
+
+    * raises ZstdError when input **or** output data is not at a frame edge. Previously, it only raise for output data is not at a frame edge.
 
 **0.12.5  (Oct 12, 2020)**
 
