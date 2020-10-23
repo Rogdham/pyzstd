@@ -61,7 +61,8 @@ typedef struct {
     /* ZstdDict object in use */
     PyObject *dict;
 
-    /* Data found after the end of the compressed stream */
+    /* For ZstdDecompressor.
+       Data found after the end of the compressed stream */
     PyObject *unused_data;
 
     /* Unconsumed input data */
@@ -72,8 +73,16 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
-    /* Already at end of frame, 0 or 1. */
-    char eof;
+    union {
+        /* For ZstdDecompressor. Already at end of frame, 0 or 1. */
+        char eof;
+
+        /* For EndlessZstdDecompressor.
+        True when the output is at a frame edge, means a frame is completely
+        decoded and fully flushed, or the decompressor just be initialized.
+        The input stream is not necessarily at a frame edge. 0 or 1. */
+        char at_frame_edge;
+    };
 
     /* 0 if input_buffer has unconsumed data, 0 or 1. */
     char needs_input;
@@ -81,35 +90,6 @@ typedef struct {
     /* __init__ has been called, 0 or 1. */
     char inited;
 } ZstdDecompressor;
-
-typedef struct {
-    PyObject_HEAD
-
-    /* Decompress context */
-    ZSTD_DCtx *dctx;
-
-    /* ZstdDict object in use */
-    PyObject *dict;
-
-    /* True when the output is at a frame edge, means a frame is completely
-       decoded and fully flushed, or the decompressor just be initialized.
-       The input stream is not necessarily at a frame edge. 0 or 1. */
-    char at_frame_edge;
-
-    /* False if input_buffer has unconsumed data, 0 or 1. */
-    char needs_input;
-
-    /* Unconsumed input data */
-    uint8_t *input_buffer;
-    size_t input_buffer_size;
-    size_t in_begin, in_end;
-
-    /* Thread lock for compressing */
-    PyThread_type_lock lock;
-
-    /* __init__ has been called, 0 or 1. */
-    char inited;
-} EndlessZstdDecompressor;
 
 typedef struct {
     PyTypeObject *ZstdDict_type;
@@ -2224,7 +2204,7 @@ static PyType_Spec ZstdDecompressor_type_spec = {
     .name = "_zstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
     /* Calling PyType_GetModuleState() on a subclass is not safe.
-       EndlessZstdDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
+       ZstdDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
        which prevents to create a subclass.
        So calling PyType_GetModuleState() in this file is always safe. */
     .flags = Py_TPFLAGS_DEFAULT,
@@ -2238,8 +2218,8 @@ static PyType_Spec ZstdDecompressor_type_spec = {
 static PyObject *
 _EndlessZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
-    EndlessZstdDecompressor *self;
-    self = (EndlessZstdDecompressor*)type->tp_alloc(type, 0);
+    ZstdDecompressor *self;
+    self = (ZstdDecompressor*)type->tp_alloc(type, 0);
     if (self == NULL) {
         goto error;
     }
@@ -2278,7 +2258,7 @@ error:
 }
 
 static void
-_EndlessZstdDecompressor_dealloc(EndlessZstdDecompressor *self)
+_EndlessZstdDecompressor_dealloc(ZstdDecompressor *self)
 {
     /* Free decompress context */
     if (self->dctx) {
@@ -2306,7 +2286,7 @@ _EndlessZstdDecompressor_dealloc(EndlessZstdDecompressor *self)
 PyDoc_STRVAR(EndlessZstdDecompressor_doc, "Zstd stream decompressor.");
 
 static int
-EndlessZstdDecompressor_init(EndlessZstdDecompressor *self, PyObject *args, PyObject *kwargs)
+EndlessZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"zstd_dict", "option", NULL};
     PyObject *zstd_dict = Py_None;
@@ -2347,7 +2327,7 @@ EndlessZstdDecompressor_init(EndlessZstdDecompressor *self, PyObject *args, PyOb
 }
 
 static inline PyObject *
-decompress_endlessstream_impl(EndlessZstdDecompressor *self, ZSTD_inBuffer *in,
+decompress_endlessstream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                               Py_ssize_t max_length)
 {
     size_t zstd_ret;
@@ -2427,7 +2407,7 @@ error:
 }
 
 static inline PyObject *
-decompress_func_impl(EndlessZstdDecompressor *self, ZSTD_inBuffer *in,
+decompress_func_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                      Py_ssize_t decompressed_size)
 {
     size_t zstd_ret;
@@ -2508,7 +2488,7 @@ PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 "*self.needs_input* will be set to True.");
 
 static PyObject *
-EndlessZstdDecompressor_decompress(EndlessZstdDecompressor *self, PyObject *args, PyObject *kwargs)
+EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"data", "max_length", NULL};
     Py_buffer data;
@@ -2686,7 +2666,7 @@ success:
 PyDoc_STRVAR(EndlessZstdDecompressor_reduce_doc, "Intentionally not supporting pickle.");
 
 static PyObject *
-EndlessZstdDecompressor_reduce(EndlessZstdDecompressor *self)
+EndlessZstdDecompressor_reduce(ZstdDecompressor *self)
 {
     PyErr_Format(PyExc_TypeError,
                  "Cannot pickle %s object.",
@@ -2714,9 +2694,9 @@ PyDoc_STRVAR(EndlessZstdDecompressor_at_frame_edge_doc,
 "Note that the input stream is not necessarily at a frame edge.");
 
 static PyMemberDef _EndlessZstdDecompressor_members[] = {
-    {"needs_input", T_BOOL, offsetof(EndlessZstdDecompressor, needs_input),
+    {"needs_input", T_BOOL, offsetof(ZstdDecompressor, needs_input),
       READONLY, EndlessZstdDecompressor_needs_input_doc},
-    {"at_frame_edge", T_BOOL, offsetof(EndlessZstdDecompressor, at_frame_edge),
+    {"at_frame_edge", T_BOOL, offsetof(ZstdDecompressor, at_frame_edge),
       READONLY, EndlessZstdDecompressor_at_frame_edge_doc},
     {NULL}
 };
@@ -2733,7 +2713,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
 
 static PyType_Spec EndlessZstdDecompressor_type_spec = {
     .name = "_zstd.EndlessZstdDecompressor",
-    .basicsize = sizeof(EndlessZstdDecompressor),
+    .basicsize = sizeof(ZstdDecompressor),
     /* Calling PyType_GetModuleState() on a subclass is not safe.
        EndlessZstdDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
        which prevents to create a subclass.
@@ -2749,7 +2729,7 @@ PyDoc_STRVAR(decompress_doc,
 "Decompress a block of data.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option: A dict object, contains advanced decompress parameters.\n\n"
-"For incremental decompression, use EndlessZstdDecompressor instead.");
+"For incremental decompression, use ZstdDecompressor instead.");
 
 static PyObject *
 decompress(PyObject *module, PyObject *args, PyObject *kwargs)
@@ -2762,7 +2742,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     unsigned long long decompressed_size;
     PyObject *ret = NULL;
     ZSTD_inBuffer in;
-    EndlessZstdDecompressor self;
+    ZstdDecompressor self;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|OO:decompress", kwlist,
                                      &data, &zstd_dict, &option)) {
