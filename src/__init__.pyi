@@ -92,8 +92,21 @@ class RichMemZstdCompressor:
     def compress(self, data: ByteString) -> bytes: ...
 
 class ZstdDecompressor:
+    eof: bool
     needs_input: bool
+    unused_data: bytes
+
+    def __init__(self,
+                 zstd_dict: Optional[ZstdDict] = None,
+                 option: Optional[Dict[DParameter, int]] = None) -> None: ...
+
+    def decompress(self,
+                   data: ByteString,
+                   max_length: int = -1) -> bytes: ...
+
+class EndlessZstdDecompressor:
     at_frame_edge: bool
+    needs_input: bool
 
     def __init__(self,
                  zstd_dict: Optional[ZstdDict] = None,
