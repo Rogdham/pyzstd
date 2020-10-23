@@ -16,10 +16,14 @@ from test.support import (
 # from test.support.import_helper import import_module
 
 import pyzstd as zstd
-from pyzstd import ZstdCompressor, RichMemZstdCompressor, EndlessZstdDecompressor, ZstdError, \
-                 CParameter, DParameter, Strategy, compress, richmem_compress, decompress, \
-                 ZstdDict, train_dict, finalize_dict, zstd_version, zstd_version_info, \
-                 compressionLevel_values, get_frame_info, get_frame_size, ZstdFile, zstd_open
+from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
+                   ZstdDecompressor, EndlessZstdDecompressor, ZstdError, \
+                   CParameter, DParameter, Strategy, \
+                   compress, richmem_compress, decompress, \
+                   ZstdDict, train_dict, finalize_dict, \
+                   zstd_version, zstd_version_info, compressionLevel_values, \
+                   get_frame_info, get_frame_size, \
+                   ZstdFile, zstd_open
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
@@ -158,6 +162,55 @@ class ClassShapeTestCase(unittest.TestCase):
     def test_Decompressor(self):
         # class attributes
         with self.assertRaises(AttributeError):
+            ZstdDecompressor.CONTINUE
+
+        with self.assertRaises(AttributeError):
+            ZstdDecompressor.FLUSH_BLOCK
+
+        with self.assertRaises(AttributeError):
+            ZstdDecompressor.FLUSH_FRAME
+
+        # method & member
+        ZstdDecompressor(TRAINED_DICT, {})
+        ZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
+        d = ZstdDecompressor()
+
+        d.decompress(b'')
+        d.decompress(b'', 100)
+        d.decompress(data=b'', max_length = 100)
+
+        d.unused_data
+        d.needs_input
+        d.eof
+
+        with self.assertRaises(AttributeError):
+            d.at_frame_edge
+
+        with self.assertRaises(AttributeError):
+            d.compress(b'')
+
+        # read only attributes
+        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+            d.needs_input = True
+
+        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+            d.eof = True
+
+        # name
+        self.assertIn('.ZstdDecompressor', str(type(d)))
+
+        # doesn't support pickle
+        with self.assertRaises(TypeError):
+            pickle.dumps(d)
+
+        # doesn't support subclass
+        with self.assertRaises(TypeError):
+            class SubClass(ZstdDecompressor):
+                pass
+
+    def test_EndlessDecompressor(self):
+        # class attributes
+        with self.assertRaises(AttributeError):
             EndlessZstdDecompressor.CONTINUE
 
         with self.assertRaises(AttributeError):
@@ -180,6 +233,12 @@ class ClassShapeTestCase(unittest.TestCase):
 
         with self.assertRaises(AttributeError):
             d.compress(b'')
+
+        with self.assertRaises(AttributeError):
+            d.eof
+
+        with self.assertRaises(AttributeError):
+            d.unused_data
 
         # read only attributes
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
@@ -691,6 +750,120 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertEqual(dat2, THIS_FILE_BYTES)
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
+
+    def test_decompressor_arg(self):
+        zd = ZstdDict(b'12345678', True)
+
+        with self.assertRaises(TypeError):
+            d = ZstdDecompressor(zstd_dict={})
+
+        with self.assertRaises(TypeError):
+            d = ZstdDecompressor(option=zd)
+
+        ZstdDecompressor()
+        ZstdDecompressor(zd, {})
+        ZstdDecompressor(zstd_dict=zd, option={DParameter.windowLogMax:25})     
+
+    def test_decompressor_1(self):
+        _130_KB = 130 * 1024
+    
+        # 130KB full
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB)
+
+        self.assertEqual(len(dat), _130_KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+
+        # 130KB full, limit output
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB, _130_KB)
+
+        self.assertEqual(len(dat), _130_KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+
+        # 130KB, without 4 bytes checksum
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-4])
+
+        self.assertEqual(len(dat), _130_KB)
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+
+        # above, limit output
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB[:-4], _130_KB)
+
+        self.assertEqual(len(dat), _130_KB)
+        self.assertFalse(d.eof)
+        self.assertFalse(d.needs_input)
+
+        # full, unused_data
+        TRAIL = b'89234893abcd'
+        d = ZstdDecompressor()
+        dat = d.decompress(TEST_DAT_130KB + TRAIL, _130_KB)
+
+        self.assertEqual(len(dat), _130_KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, TRAIL)
+
+    def test_decompressor_chunks(self):
+        _130_KB = 130 * 1024
+        TRAIL = b'89234893abcd'
+        DAT = TEST_DAT_130KB + TRAIL
+        d = ZstdDecompressor()
+
+        bi = BytesIO(DAT)
+        lst = []
+        while True:
+            if d.needs_input:
+                dat = bi.read(300)
+                if not dat:
+                    break
+            else:
+                raise Exception('should not get here')
+
+            ret = d.decompress(dat)
+            lst.append(ret)
+            if d.eof:
+                break
+
+        ret = b''.join(lst)
+
+        self.assertEqual(len(ret), _130_KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data + bi.read(), TRAIL)
+
+    def test_decompressor_chunks(self):
+        _130_KB = 130 * 1024
+        TRAIL = b'89234893'
+        DAT = TEST_DAT_130KB + TRAIL
+        d = ZstdDecompressor()
+
+        bi = BytesIO(DAT)
+        lst = []
+        while True:
+            if d.needs_input:
+                dat = bi.read(3)
+                if not dat:
+                    break
+            else:
+                dat = b''
+
+            ret = d.decompress(dat, 1)
+            lst.append(ret)
+            if d.eof:
+                break
+
+        ret = b''.join(lst)
+
+        self.assertEqual(len(ret), _130_KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data + bi.read(), TRAIL)
 
 
 class DecompressorFlagsTestCase(unittest.TestCase):
