@@ -1908,9 +1908,28 @@ PyDoc_STRVAR(ZstdDecompressor_decompress_doc,
 "was less than *max_length* bytes, or because *max_length* was negative), "
 "*self.needs_input* will be set to True.");
 
-static inline PyObject *
-decompress_stream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                       Py_ssize_t max_length)
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_INLINE_ATTR __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define FORCE_INLINE_ATTR __forceinline
+#else
+#  define FORCE_INLINE_ATTR
+#endif
+
+typedef enum {
+    DECOMPRESSOR = 1,
+    ENDLESS_DECOMPRESSOR = 2,
+    FUNCTION = 3
+} decompress_type;
+
+/* Decompress implementation for:
+   - ZstdDecompressor
+   - EndlessZstdDecompressor
+   - decompress(), decompressed_size is only available in this type. */
+static inline FORCE_INLINE_ATTR PyObject *
+decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
+                const Py_ssize_t max_length, const Py_ssize_t decompressed_size,
+                const decompress_type type)
 {
     size_t zstd_ret;
     ZSTD_outBuffer out;
@@ -1919,12 +1938,27 @@ decompress_stream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
-    if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
-        goto error;
+    if (type == FUNCTION) {
+        if (decompressed_size > 0) {
+            if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
+                goto error;
+            }
+        } else {
+            if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
+                goto error;
+            }
+        }
+    } else {
+        if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
+            goto error;
+        }
     }
     assert(out.pos == 0);
 
     while (1) {
+        /* Only used in FUNCTION type */
+        const size_t in_pos_bak = in->pos;
+    
         Py_BEGIN_ALLOW_THREADS
         zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
         Py_END_ALLOW_THREADS
@@ -1935,19 +1969,49 @@ decompress_stream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
-        if (zstd_ret == 0) {
+        /* Set at_frame_edge flag */
+        if (type == DECOMPRESSOR) {
             /* Frame ends */
-            self->eof = 1;
-            break;
-        } else if (out.pos == out.size) {
+            if (zstd_ret == 0) {
+                self->eof = 1;
+                break;
+            }
+        } else if (type == ENDLESS_DECOMPRESSOR) {
+            /* Since EndlessZstdDecompressor may hold some input data in
+               input_buffer, at_frame_edge flag can only indicate that if the
+               output is at a frame edge, it's not possible to indicate that if
+               both the input and output streams are at a frame edge. */
+            if (out.pos == 0 && zstd_ret != 0) {
+                /* Skip when the last round has no output.
+                Check these because after decoding a frame, decompress an empty
+                input will cause zstd_ret becomes non-zero. */
+            } else {
+                self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+            }
+        } else if (type == FUNCTION) {
+            /* In decompress() function, set to 1 when both the input and
+               output data are at a frame edge. */
+            if (out.pos == 0 && in->pos == in_pos_bak) {
+                /* Skip when nothing advanced */
+            } else {
+                self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+            }
+        } else {
+            /* Should never get here */
+            assert(0);
+        }
+        
+        if (out.pos == out.size) {
             /* Output buffer exhausted.
                Need to check `out` before `in`. Maybe zstd's internal buffer still
                have a few bytes can be output, grow the output buffer and continue
                the loop if max_lengh < 0. */
 
-            /* Output buffer reached max_length */
-            if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
-                break;
+            if (type != FUNCTION) {
+                /* Output buffer reached max_length */
+                if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
+                    break;
+                }
             }
 
             /* Grow output buffer */
@@ -2070,7 +2134,7 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_stream_impl(self, &in, max_length);
+    ret = decompress_impl(self, &in, max_length, 0, DECOMPRESSOR);
     if (ret == NULL) {
         goto error;
     }
@@ -2326,158 +2390,6 @@ EndlessZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *k
     return 0;
 }
 
-static inline PyObject *
-decompress_endlessstream_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                              Py_ssize_t max_length)
-{
-    size_t zstd_ret;
-    ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer;
-    PyObject *ret;
-
-    /* OutputBuffer(OnError)(&buffer) is after `error` label,
-       so initialize the buffer before any `goto error` statement. */
-    if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
-        goto error;
-    }
-    assert(out.pos == 0);
-
-    while (1) {
-        Py_BEGIN_ALLOW_THREADS
-        zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
-        Py_END_ALLOW_THREADS
-
-        /* Check error */
-        if (ZSTD_isError(zstd_ret)) {
-            PyErr_SetString(static_state.ZstdError, ZSTD_getErrorName(zstd_ret));
-            goto error;
-        }
-
-        /* Set at_frame_edge flag.
-           Since EndlessZstdDecompressor may hold some input data in input_buffer,
-           at_frame_edge flag can only indicate that if the output is at a
-           frame edge, it's not possible to indicate that if both the input and
-           output streams are at a frame edge. */
-        if (out.pos == 0 && zstd_ret != 0) {
-            /* Skip when the last round has no output.
-               Check these because after decoding a frame, decompress an empty
-               input will cause zstd_ret becomes non-zero. */
-        } else {
-            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
-        }
-
-        if (out.pos == out.size) {
-            /* Output buffer exhausted.
-               Need to check `out` before `in`. Maybe zstd's internal buffer still
-               have a few bytes can be output, grow the output buffer and continue
-               the loop if max_lengh < 0. */
-
-            /* Output buffer reached max_length */
-            if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
-                ret = OutputBuffer_Finish(&buffer, &out);
-                if (ret != NULL) {
-                    goto success;
-                } else {
-                    goto error;
-                }
-            }
-
-            /* Grow output buffer */
-            if (OutputBuffer_Grow(&buffer, &out) < 0) {
-                goto error;
-            }
-            assert(out.pos == 0);
-
-        } else if (in->pos == in->size) {
-            /* Finished */
-            ret = OutputBuffer_Finish(&buffer, &out);
-            if (ret != NULL) {
-                goto success;
-            } else {
-                goto error;
-            }
-        }
-    }
-
-success:
-    return ret;
-error:
-    OutputBuffer_OnError(&buffer);
-    return NULL;
-}
-
-static inline PyObject *
-decompress_func_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                     Py_ssize_t decompressed_size)
-{
-    size_t zstd_ret;
-    ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer;
-    PyObject *ret;
-
-    /* OutputBuffer(OnError)(&buffer) is after `error` label,
-       so initialize the buffer before any `goto error` statement. */
-    if (decompressed_size > 0) {
-        if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
-            goto error;
-        }
-    } else {
-        if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
-            goto error;
-        }
-    }
-    assert(out.pos == 0);
-
-    while (1) {
-        const size_t in_pos_bak = in->pos;
-
-        Py_BEGIN_ALLOW_THREADS
-        zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
-        Py_END_ALLOW_THREADS
-
-        /* Check error */
-        if (ZSTD_isError(zstd_ret)) {
-            PyErr_SetString(static_state.ZstdError, ZSTD_getErrorName(zstd_ret));
-            goto error;
-        }
-
-        /* Set at_frame_edge flag.
-           In this function, set to 1 when both the input and output data are
-           at a frame edge. */
-        if (out.pos == 0 && in->pos == in_pos_bak) {
-            /* Skip when nothing advanced */
-        } else {
-            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
-        }
-
-        if (out.pos == out.size) {
-            /* Output buffer exhausted.
-               Need to check `out` before `in`. Maybe zstd's internal buffer still
-               have a few bytes can be output, grow the output buffer and continue
-               the loop if max_lengh < 0. */
-            if (OutputBuffer_Grow(&buffer, &out) < 0) {
-                goto error;
-            }
-            assert(out.pos == 0);
-
-        } else if (in->pos == in->size) {
-            /* Finished */
-            ret = OutputBuffer_Finish(&buffer, &out);
-            if (ret != NULL) {
-                goto success;
-            } else {
-                goto error;
-            }
-        }
-    }
-
-success:
-    return ret;
-error:
-    OutputBuffer_OnError(&buffer);
-    return NULL;
-}
-
 PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 "_zstd.EndlessZstdDecompressor.decompress\n"
 "--\n"
@@ -2582,7 +2494,7 @@ EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObj
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_endlessstream_impl(self, &in, max_length);
+    ret = decompress_impl(self, &in, max_length, 0, ENDLESS_DECOMPRESSOR);
     if (ret == NULL) {
         goto error;
     }
@@ -2799,7 +2711,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     }
 
     /* Decompress */
-    ret = decompress_func_impl(&self, &in, (Py_ssize_t) decompressed_size);
+    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size, FUNCTION);
     if (ret == NULL) {
         goto error;
     }
