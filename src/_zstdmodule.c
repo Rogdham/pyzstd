@@ -62,7 +62,7 @@ typedef struct {
     PyObject *dict;
 
     /* For ZstdDecompressor.
-       Data found after the end of the compressed stream */
+       Data found after the end of the compressed stream. */
     PyObject *unused_data;
 
     /* Unconsumed input data */
@@ -114,7 +114,7 @@ static _zstd_state static_state;
 /* -----------------------------------
      BlocksOutputBuffer code
    ----------------------------------- */
-
+#if 1
 typedef struct {
     /* List of blocks */
     PyObject *list;
@@ -368,12 +368,12 @@ OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 {
     Py_XDECREF(buffer->list);
 }
-
+#endif
 
 /* -----------------------------------
      Parameters from zstd
    ----------------------------------- */
-
+#if 1
 typedef struct {
     const int parameter;
     const char parameter_name[32];
@@ -522,11 +522,12 @@ add_parameters(PyObject *module)
 
     return 0;
 }
-
+#endif
 
 /* -----------------------------------
      ZstdDict code
    ----------------------------------- */
+#if 1
 static void
 capsule_free_cdict(PyObject *capsule)
 {
@@ -784,12 +785,12 @@ static PyType_Spec zstddict_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstddict_slots,
 };
-
+#endif
 
 /* --------------------------
      Train dictionary code
    -------------------------- */
-
+#if 1
 PyDoc_STRVAR(_train_dict_doc,
 "_zstd._train_dict\n"
 "--\n"
@@ -1001,12 +1002,12 @@ error:
     return NULL;
 #endif
 }
-
+#endif
 
 /* -----------------------------------
      Set parameters / load dictionary
    ----------------------------------- */
-
+#if 1
 static int
 check_level_bounds(int compressionLevel, char* buf, int buf_size)
 {
@@ -1248,12 +1249,12 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
     }
     return 0;
 }
-
+#endif
 
 /* -----------------------
      ZstdCompressor code
    ----------------------- */
-
+#if 1
 static PyObject *
 _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -1610,7 +1611,6 @@ ZstdCompressor_reduce(ZstdCompressor *self)
     return NULL;
 }
 
-
 static PyMethodDef _ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)ZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_compress_doc},
@@ -1652,7 +1652,7 @@ static PyType_Spec zstdcompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstdcompressor_slots,
 };
-
+#endif
 
 /* ------------------------------
      RichMemZstdCompressor code
