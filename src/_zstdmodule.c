@@ -73,16 +73,14 @@ typedef struct {
        Data found after the end of the compressed stream. */
     PyObject *unused_data;
 
-    union {
-        /* For ZstdDecompressor. Already at end of frame, 0 or 1. */
-        char eof;
+    /* For ZstdDecompressor. Already reached end of frame, 0 or 1. */
+    char eof;
 
-        /* For EndlessZstdDecompressor.
-        True when the output is at a frame edge, means a frame is completely
-        decoded and fully flushed, or the decompressor just be initialized.
-        The input stream is not necessarily at a frame edge. 0 or 1. */
-        char at_frame_edge;
-    };
+    /* For EndlessZstdDecompressor.
+    True when the output is at a frame edge, means a frame is completely
+    decoded and fully flushed, or the decompressor just be initialized.
+    The input stream is not necessarily at a frame edge. 0 or 1. */
+    char at_frame_edge;
 
     /* 0 if input_buffer has unconsumed data, 0 or 1. */
     char needs_input;
@@ -841,6 +839,8 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
     return 0;
 }
 
+PyDoc_STRVAR(reduce_cannot_pickle_doc, "Intentionally not supporting pickle.");
+
 static PyObject *
 reduce_cannot_pickle(PyObject *self)
 {
@@ -1595,14 +1595,16 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     return ret;
 }
 
-PyDoc_STRVAR(ZstdCompressor_reduce_doc, "Intentionally not supporting pickle.");
-
 static PyMethodDef _ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)ZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_compress_doc},
+
     {"flush", (PyCFunction)ZstdCompressor_flush,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_flush_doc},
-    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdCompressor_reduce_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+    METH_NOARGS, reduce_cannot_pickle_doc},
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -1735,7 +1737,10 @@ RichMemZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *k
 static PyMethodDef _RichMem_ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)RichMemZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, RichMemZstdCompressor_compress_doc},
-    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdCompressor_reduce_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+    METH_NOARGS, reduce_cannot_pickle_doc},
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -2095,7 +2100,7 @@ success:
    ------------------------- */
 #if 1
 static PyObject *
-_ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
+ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
     ZstdDecompressor *self;
     self = (ZstdDecompressor*)type->tp_alloc(type, 0);
@@ -2104,20 +2109,24 @@ _ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(self->dict == NULL);
-    assert(self->eof == 0);
     assert(self->input_buffer == NULL);
     assert(self->input_buffer_size == 0);
     assert(self->in_begin == 0);
     assert(self->in_end == 0);
     assert(self->inited == 0);
 
-    /* unused_data initialized to b'' */
+    /* For ZstdDecompressor */
     self->unused_data = PyBytes_FromStringAndSize(NULL, 0);
     if (self->unused_data == NULL) {
         goto error;
     }
 
-    /* needs_input flag */
+    self->eof = 0;
+
+    /* For EndlessZstdDecompressor */
+    self->at_frame_edge = 1;
+
+    /* For ZstdDecompressor/EndlessZstdDecompressor */
     self->needs_input = 1;
 
     /* Decompress context */
@@ -2141,7 +2150,7 @@ error:
 }
 
 static void
-_ZstdDecompressor_dealloc(ZstdDecompressor *self)
+ZstdDecompressor_dealloc(ZstdDecompressor *self)
 {
     /* Free decompress context */
     if (self->dctx) {
@@ -2226,12 +2235,13 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
     return stream_decompress(self, args, kwargs, DECOMPRESSOR);
 }
 
-PyDoc_STRVAR(ZstdDecompressor_reduce_doc, "Intentionally not supporting pickle.");
-
 static PyMethodDef _ZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)ZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, ZstdDecompressor_decompress_doc},
-    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, ZstdDecompressor_reduce_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+    METH_NOARGS, reduce_cannot_pickle_doc},
+    
     {NULL, NULL, 0, NULL}
 };
 
@@ -2258,8 +2268,8 @@ static PyMemberDef _ZstdDecompressor_members[] = {
 };
 
 static PyType_Slot ZstdDecompressor_slots[] = {
-    {Py_tp_new, _ZstdDecompressor_new},
-    {Py_tp_dealloc, _ZstdDecompressor_dealloc},
+    {Py_tp_new, ZstdDecompressor_new},
+    {Py_tp_dealloc, ZstdDecompressor_dealloc},
     {Py_tp_init, ZstdDecompressor_init},
     {Py_tp_methods, _ZstdDecompressor_methods},
     {Py_tp_members, _ZstdDecompressor_members},
@@ -2283,74 +2293,6 @@ static PyType_Spec ZstdDecompressor_type_spec = {
      EndlessZstdDecompressor code
    ------------------------- */
 #if 1
-static PyObject *
-_EndlessZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
-{
-    ZstdDecompressor *self;
-    self = (ZstdDecompressor*)type->tp_alloc(type, 0);
-    if (self == NULL) {
-        goto error;
-    }
-
-    assert(self->dict == NULL);
-    assert(self->input_buffer == NULL);
-    assert(self->input_buffer_size == 0);
-    assert(self->in_begin == 0);
-    assert(self->in_end == 0);
-    assert(self->inited == 0);
-
-    /* at_frame_edge flag */
-    self->at_frame_edge = 1;
-
-    /* needs_input flag */
-    self->needs_input = 1;
-
-    /* Decompress context */
-    self->dctx = ZSTD_createDCtx();
-    if (self->dctx == NULL) {
-        PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_DCtx instance.");
-        goto error;
-    }
-
-    /* Thread lock */
-    self->lock = PyThread_allocate_lock();
-    if (self->lock == NULL) {
-        PyErr_NoMemory();
-        goto error;
-    }
-    return (PyObject*)self;
-
-error:
-    Py_XDECREF(self);
-    return NULL;
-}
-
-static void
-_EndlessZstdDecompressor_dealloc(ZstdDecompressor *self)
-{
-    /* Free decompress context */
-    if (self->dctx) {
-        ZSTD_freeDCtx(self->dctx);
-    }
-
-    /* Free Unconsumed input data buffer */
-    if (self->input_buffer != NULL) {
-        PyMem_Free(self->input_buffer);
-    }
-
-    /* Py_XDECREF the dict after free decompress context */
-    Py_XDECREF(self->dict);
-
-    /* Free thread lock */
-    if (self->lock) {
-        PyThread_free_lock(self->lock);
-    }
-
-    PyTypeObject *tp = Py_TYPE(self);
-    tp->tp_free((PyObject*)self);
-    Py_DECREF(tp);
-}
-
 PyDoc_STRVAR(EndlessZstdDecompressor_doc, "Zstd endless stream decompressor.");
 
 PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
@@ -2368,12 +2310,13 @@ EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObj
     return stream_decompress(self, args, kwargs, ENDLESS_DECOMPRESSOR);
 }
 
-PyDoc_STRVAR(EndlessZstdDecompressor_reduce_doc, "Intentionally not supporting pickle.");
-
 static PyMethodDef _EndlessZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)EndlessZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, EndlessZstdDecompressor_decompress_doc},
-    {"__reduce__", (PyCFunction)reduce_cannot_pickle, METH_NOARGS, EndlessZstdDecompressor_reduce_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+    METH_NOARGS, reduce_cannot_pickle_doc},
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -2398,8 +2341,8 @@ static PyMemberDef _EndlessZstdDecompressor_members[] = {
 };
 
 static PyType_Slot EndlessZstdDecompressor_slots[] = {
-    {Py_tp_new, _EndlessZstdDecompressor_new},
-    {Py_tp_dealloc, _EndlessZstdDecompressor_dealloc},
+    {Py_tp_new, ZstdDecompressor_new},
+    {Py_tp_dealloc, ZstdDecompressor_dealloc},
     {Py_tp_init, ZstdDecompressor_init},
     {Py_tp_methods, _EndlessZstdDecompressor_methods},
     {Py_tp_members, _EndlessZstdDecompressor_members},
@@ -2858,7 +2801,7 @@ add_type_to_module(PyObject *module, PyType_Spec *type_spec,
     }
 
     Py_INCREF(temp);
-    *dest = temp;
+    *dest = (PyTypeObject*) temp;
 
     return 0;
 }
