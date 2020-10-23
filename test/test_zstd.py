@@ -1,5 +1,6 @@
 import _compression
 from io import BytesIO, UnsupportedOperation
+import builtins
 import re
 import os
 import pathlib
@@ -23,7 +24,7 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDict, train_dict, finalize_dict, \
                    zstd_version, zstd_version_info, compressionLevel_values, \
                    get_frame_info, get_frame_size, \
-                   ZstdFile, zstd_open
+                   ZstdFile, open
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
@@ -1786,14 +1787,14 @@ class FileTestCase(unittest.TestCase):
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
-        with zstd_open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
+        with open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
             self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
         with BytesIO() as bio:
-            with zstd_open(bio, "wb") as f:
+            with open(bio, "wb") as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
-            with zstd_open(bio, "ab") as f:
+            with open(bio, "ab") as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB * 2)
@@ -1801,16 +1802,16 @@ class OpenTestCase(unittest.TestCase):
     def test_text_modes(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
-        with zstd_open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
+        with open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
             self.assertEqual(f.read(), uncompressed)
 
         with BytesIO() as bio:
-            with zstd_open(bio, "wt") as f:
+            with open(bio, "wt") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
 
-            with zstd_open(bio, "at") as f:
+            with open(bio, "at") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed * 2)
@@ -1820,26 +1821,26 @@ class OpenTestCase(unittest.TestCase):
             TESTFN = pathlib.Path(tmp_f.name)
 
         with self.assertRaises(ValueError):
-            zstd_open(TESTFN, "")
+            open(TESTFN, "")
         with self.assertRaises(ValueError):
-            zstd_open(TESTFN, "rbt")
+            open(TESTFN, "rbt")
         with self.assertRaises(ValueError):
-            zstd_open(TESTFN, "rb", encoding="utf-8")
+            open(TESTFN, "rb", encoding="utf-8")
         with self.assertRaises(ValueError):
-            zstd_open(TESTFN, "rb", errors="ignore")
+            open(TESTFN, "rb", errors="ignore")
         with self.assertRaises(ValueError):
-            zstd_open(TESTFN, "rb", newline="\n")
+            open(TESTFN, "rb", newline="\n")
 
         os.remove(TESTFN)
 
     def test_option(self):
         option = {DParameter.windowLogMax:25}
-        with zstd_open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
+        with open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
             self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
 
         option = {CParameter.compressionLevel:12}
         with BytesIO() as bio:
-            with zstd_open(bio, "wb", level_or_option=option) as f:
+            with open(bio, "wb", level_or_option=option) as f:
                 f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
             self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
@@ -1848,27 +1849,27 @@ class OpenTestCase(unittest.TestCase):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
         with BytesIO() as bio:
-            with zstd_open(bio, "wt", encoding="utf-16-le") as f:
+            with open(bio, "wt", encoding="utf-16-le") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-16-le")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
             bio.seek(0)
-            with zstd_open(bio, "rt", encoding="utf-16-le") as f:
+            with open(bio, "rt", encoding="utf-16-le") as f:
                 self.assertEqual(f.read().replace(os.linesep, "\n"), uncompressed)
 
     def test_encoding_error_handler(self):
         with BytesIO(compress(b"foo\xffbar")) as bio:
-            with zstd_open(bio, "rt", encoding="ascii", errors="ignore") as f:
+            with open(bio, "rt", encoding="ascii", errors="ignore") as f:
                 self.assertEqual(f.read(), "foobar")
 
     def test_newline(self):
         # Test with explicit newline (universal newline mode disabled).
         text = THIS_FILE_STR.replace(os.linesep, "\n")
         with BytesIO() as bio:
-            with zstd_open(bio, "wt", newline="\n") as f:
+            with open(bio, "wt", newline="\n") as f:
                 f.write(text)
             bio.seek(0)
-            with zstd_open(bio, "rt", newline="\r") as f:
+            with open(bio, "rt", newline="\r") as f:
                 self.assertEqual(f.readlines(), [text])
 
     def test_x_mode(self):
@@ -1878,21 +1879,21 @@ class OpenTestCase(unittest.TestCase):
         for mode in ("x", "xb", "xt"):
             os.remove(TESTFN)
 
-            with zstd_open(TESTFN, mode):
+            with open(TESTFN, mode):
                 pass
             with self.assertRaises(FileExistsError):
-                with zstd_open(TESTFN, mode):
+                with open(TESTFN, mode):
                     pass
 
         os.remove(TESTFN)
 
     def test_open_dict(self):
         bi = BytesIO()
-        with zstd_open(bi, 'w', zstd_dict=TRAINED_DICT) as f:
+        with open(bi, 'w', zstd_dict=TRAINED_DICT) as f:
             f.write(SAMPLES[0])
 
         bi.seek(0)
-        with zstd_open(bi, zstd_dict=TRAINED_DICT) as f:
+        with open(bi, zstd_dict=TRAINED_DICT) as f:
             dat = f.read()
 
         self.assertEqual(dat, SAMPLES[0])
@@ -1928,7 +1929,7 @@ def prepare_test_data():
                       b'a' * 100
 
     global THIS_FILE_BYTES, THIS_FILE_STR
-    with open(os.path.abspath(__file__), 'rb') as f:
+    with builtins.open(os.path.abspath(__file__), 'rb') as f:
         THIS_FILE_BYTES = f.read()
         THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
 
