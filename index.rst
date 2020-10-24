@@ -241,7 +241,9 @@ Stream decompress classes
 
 .. py:class:: ZstdDecompressor
 
-    A stream decompressor, it has the same behavior and API as ``BZ2Decompressor`` / ``LZMADecompressor`` classes in Python standard library, it stops after a :ref:`frame<frame_block>` is decompressed.
+    A stream decompressor, it has the same API and behavior as `BZ2Decompressor <https://docs.python.org/3/library/bz2.html#bz2.BZ2Decompressor>`_ / `LZMADecompressor <https://docs.python.org/3/library/lzma.html#lzma.LZMADecompressor>`_ classes in Python standard library.
+
+    It stops after a :ref:`frame<frame_block>` is decompressed. For multiple frames data, use :py:class:`EndlessZstdDecompressor`.
 
     Thread-safe at method level.
 
@@ -257,54 +259,63 @@ Stream decompress classes
 
         Decompress *data*, returning decompressed data as a ``bytes`` object.
 
+        It stops after a :ref:`frame<frame_block>` is decompressed.
+
         :param data: Data to be decompressed.
         :type data: bytes-like object
         :param int max_length: Maximum size of returned data. When it is negative, the size of output buffer is unlimited. When it is nonnegative, returns at most *max_length* bytes of decompressed data. If this limit is reached and further output can (or may) be produced, the :py:attr:`~ZstdDecompressor.needs_input` attribute will be set to ``False``. In this case, the next call to this method may provide *data* as ``b''`` to obtain more of the output.
-
-    .. py:attribute:: eof
-
-        ``True`` if the end of frame has been reached.
 
     .. py:attribute:: needs_input
 
         If *max_length* argument in :py:meth:`~ZstdDecompressor.decompress` method is nonnegative, and decompressor has (or may has) unconsumed input data, it will be set to ``False``. In this case, pass ``b''`` to :py:meth:`~ZstdDecompressor.decompress` method can output unconsumed data.
 
+    .. py:attribute:: eof
+
+        ``True`` means the end of the first frame has been reached. If decompress data after that, ``EOFError`` exception will be raised.
+
     .. py:attribute:: unused_data
 
-        Data found after the end of the compressed frame, a ``bytes`` object.
+        A bytes object. When ZstdDecompressor object stops after decompressing a frame, unused input data after the first frame. Otherwise this will be ``b''``.
 
-        Before the end of the frame is reached, this will be ``b''``.
+        This object is created when it is accessed.
 
     .. sourcecode:: python
 
         # unlimited output
         d1 = ZstdDecompressor()
-        decompressed_dat = d1.decompress(dat)
-        assert d1.eof, 'data ends in an incomplete frame.'
+
+        decompressed_dat = d1.decompress(dat1)
+        decompressed_dat += d1.decompress(dat2)
+        decompressed_dat += d1.decompress(dat3)
+
+        assert d1.eof, 'data is an incomplete zstd frame.'
 
         # limit output buffer to 10 MB
         d2 = ZstdDecompressor()
         lst = []
+
         while True:
             if d2.needs_input:
                 dat = fp.read(2*1024*1024)
                 if not dat:
-                    raise EOFError("Compressed file ended before the "
-                                   "end of stream was reached.")
+                    raise EOFError('compressed file ends before the '
+                                   'end of the first frame was reached.')
             else:
                 dat = b''
 
             chunk = d2.decompress(dat, 10*1024*1024)
             lst.append(chunk)
-            if d2.eof:
+
+            if d2.eof: # reach the end of the first frame
                 break
 
         decompressed_dat = b''.join(lst)
+        assert d2.eof, 'data is an incomplete zstd frame.'
 
 
 .. py:class:: EndlessZstdDecompressor
 
-    It can decompress data endlessly as long as data is provided, suitable for communication scenarios.
+    For a stream that consists of multiple zstd :ref:`frames<frame_block>`, can be used in communication scenarios.
 
     Thread-safe at method level.
 
@@ -316,41 +327,48 @@ Stream decompress classes
 
         The parameters are the same as :py:meth:`ZstdDecompressor.decompress` method.
 
-    .. py:attribute:: at_frame_edge
-
-        ``True`` when the output is at a frame edge, means a :ref:`frame<frame_block>` is completely decoded and fully flushed, or the decompressor just be initialized.
-
-        Since zstd data consists of one or more independent frames, this flag could be used to check data integrity.
-
-        Note that the input stream is not necessarily at a frame edge.
+        After decompressing a frame, it doesn't stop like :py:meth:`ZstdDecompressor.decompress`.
 
     .. py:attribute:: needs_input
 
         It's the same as :py:attr:`ZstdDecompressor.needs_input`.
 
+    .. py:attribute:: at_frame_edge
+
+        ``True`` when the output is at a frame edge, means a :ref:`frame<frame_block>` is completely decoded and fully flushed, or the decompressor just be initialized.
+
+        Note that the input stream is not necessarily at a frame edge.
+
+        This flag could be used to check data integrity in some cases.
+
     .. sourcecode:: python
 
-        d = EndlessZstdDecompressor()
-
         # unlimited output
-        decompressed_dat = d.decompress(dat)
-        assert d.at_frame_edge, 'data ends in an incomplete frame.'
+        d1 = EndlessZstdDecompressor()
+
+        decompressed_dat = d1.decompress(dat1)
+        decompressed_dat += d1.decompress(dat2)
+        decompressed_dat += d1.decompress(dat3)
+
+        assert d1.at_frame_edge, 'data ends in an incomplete frame.'
 
         # limit output buffer to 10 MB
+        d2 = EndlessZstdDecompressor()
         lst = []
+
         while True:
-            if d.needs_input:
+            if d2.needs_input:
                 dat = fp.read(2*1024*1024)
-                if not dat:
+                if not dat: # input stream ends
                     break
             else:
                 dat = b''
 
-            chunk = d.decompress(dat, 10*1024*1024)
+            chunk = d2.decompress(dat, 10*1024*1024)
             lst.append(chunk)
 
         decompressed_dat = b''.join(lst)
-        assert d.at_frame_edge, 'data ends in an incomplete frame.'
+        assert d2.at_frame_edge, 'data ends in an incomplete frame.'
 
 .. _zstd_dict:
 
