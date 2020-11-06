@@ -75,9 +75,9 @@ typedef struct {
     char needs_input;
 
     /* For EndlessZstdDecomprssor, 0 or 1.
-       1 when the output is at a frame edge, means a frame is completely 
-       decoded and fully flushed, or the decompressor just be initialized.
-       The input stream is not necessarily at a frame edge. */
+       1 when both input and output streams are at a frame edge, means a
+       frame is completely decoded and fully flushed, or the decompressor
+       just be initialized. */
     char at_frame_edge;
 
     /* For ZstdDecomprssor, 0 or 1.
@@ -1877,12 +1877,13 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
            Check these conditions beacuse after flushing a frame, decompressing
            an empty input will cause zstd_ret become non-zero. */
         if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
-            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
             if (type == DECOMPRESSOR) {
                 if (zstd_ret == 0) {
                     self->eof = 1;
                     break;
                 }
+            } else {
+                self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
             }
         }
         
@@ -2034,10 +2035,18 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
   
     /* Unconsumed input data */
     if (in.pos == in.size) {
-        if (Py_SIZE(ret) != max_length || self->at_frame_edge) {
-            self->needs_input = 1;
-        } else {
-            self->needs_input = 0;
+        if (type == DECOMPRESSOR) {
+            if (Py_SIZE(ret) == max_length || self->eof) {
+                self->needs_input = 0;
+            } else {
+                self->needs_input = 1;
+            }
+        } else if (type == ENDLESS_DECOMPRESSOR) {
+            if (Py_SIZE(ret) == max_length && !self->at_frame_edge) {
+                self->needs_input = 0;
+            } else {
+                self->needs_input = 1;
+            }
         }
 
         if (use_input_buffer) {
@@ -2047,7 +2056,23 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         }
     } else {
         const size_t data_size = in.size - in.pos;
+
+        /*if (type == DECOMPRESSOR) {
+            if (self->eof) {
+                self->needs_input = 0;
+            } else {
+                self->needs_input = 0;
+            }
+        } else if (type == ENDLESS_DECOMPRESSOR) {
+            self->needs_input = 0;
+        }*/
         self->needs_input = 0;
+
+        if (type == ENDLESS_DECOMPRESSOR) {
+            if (self->at_frame_edge) {
+                self->at_frame_edge = 0;
+            }
+        }
 
         if (!use_input_buffer) {
             /* Discard buffer if it's too small
@@ -2377,7 +2402,6 @@ static PyMethodDef _EndlessZstdDecompressor_methods[] = {
 PyDoc_STRVAR(EndlessZstdDecompressor_at_frame_edge_doc,
 "True when the output is at a frame edge, means a zstd frame is completely\n"
 "decoded and fully flushed, or the decompressor just be initialized.\n\n"
-"Note that the input stream is not necessarily at a frame edge.\n\n"
 "This flag could be used to check data integrity in some cases.");
 
 static PyMemberDef _EndlessZstdDecompressor_members[] = {

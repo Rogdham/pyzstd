@@ -315,7 +315,7 @@ Stream decompress classes
 
 .. py:class:: EndlessZstdDecompressor
 
-    For a stream that consists of multiple zstd :ref:`frames<frame_block>`, can be used in communication scenarios.
+    Stream decompressor, accepts multiple concatenated :ref:`frames<frame_block>`, can be used in communication scenarios.
 
     Thread-safe at method level.
 
@@ -335,9 +335,7 @@ Stream decompress classes
 
     .. py:attribute:: at_frame_edge
 
-        ``True`` when the output is at a frame edge, means a :ref:`frame<frame_block>` is completely decoded and fully flushed, or the decompressor just be initialized.
-
-        Note that the input stream is not necessarily at a frame edge.
+        ``True`` when both input and output streams are at a frame edge, means a :ref:`frame<frame_block>` is completely decoded and fully flushed, or the decompressor just be initialized.
 
         This flag could be used to check data integrity in some cases.
 

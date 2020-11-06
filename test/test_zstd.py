@@ -503,7 +503,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
                 break
             size += len(dat)
 
-            if 0 < size < len(THIS_FILE_BYTES):
+            if size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
@@ -528,7 +528,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
                 break
             size += len(dat)
 
-            if 0 < size < len(THIS_FILE_BYTES):
+            if size < len(THIS_FILE_BYTES):
                 self.assertFalse(d.at_frame_edge)
             else:
                 self.assertTrue(d.at_frame_edge)
@@ -1001,7 +1001,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         dat = d.decompress(b'', 0)
         self.assertEqual(dat, b'')
         self.assertFalse(d.eof)
-        self.assertTrue(d.needs_input)
+        self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data, b'')
 
         # 1 frame
@@ -1174,7 +1174,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         dat += d.decompress(self.FRAME_60, 21)
 
         self.assertEqual(dat, self.DECOMPRESSED_42)
-        self.assertTrue(d.at_frame_edge)
+        self.assertFalse(d.at_frame_edge)
         self.assertFalse(d.needs_input)
 
         dat = d.decompress(b'', 60)
@@ -1217,7 +1217,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         dat = d.decompress(self.FRAME_42_60, 42)
 
         self.assertEqual(dat, self.DECOMPRESSED_42)
-        self.assertTrue(d.at_frame_edge)
+        self.assertFalse(d.at_frame_edge)
         self.assertFalse(d.needs_input)
 
         dat = d.decompress(b'')
