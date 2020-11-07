@@ -93,6 +93,19 @@ class RichMemZstdCompressor:
 
 class ZstdDecompressor:
     needs_input: bool
+    eof: bool
+    unused_data: bytes
+
+    def __init__(self,
+                 zstd_dict: Optional[ZstdDict] = None,
+                 option: Optional[Dict[DParameter, int]] = None) -> None: ...
+
+    def decompress(self,
+                   data: ByteString,
+                   max_length: int = -1) -> bytes: ...
+
+class EndlessZstdDecompressor:
+    needs_input: bool
     at_frame_edge: bool
 
     def __init__(self,
@@ -134,7 +147,6 @@ def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 
 def get_frame_size(frame_buffer: ByteString) -> int: ...
 
-
 class ZstdFile(_compression.BaseStream):
     def __init__(self,
                  filename: Union[str, bytes, PathLike, BinaryIO],
@@ -172,13 +184,12 @@ class ZstdFile(_compression.BaseStream):
 
     def tell(self) -> int: ...
 
-
-def zstd_open(filename: Union[str, bytes, PathLike, BinaryIO],
-              mode: str = "rb",
-              *,
-              level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-              zstd_dict: Optional[ZstdDict] = None,
-              encoding: Optional[str] = None,
-              errors: Optional[str] = None,
-              newline: Optional[str] = None) -> Union[ZstdFile, TextIO]: ...
+def open(filename: Union[str, bytes, PathLike, BinaryIO],
+         mode: str = "rb",
+         *,
+         level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
+         zstd_dict: Optional[ZstdDict] = None,
+         encoding: Optional[str] = None,
+         errors: Optional[str] = None,
+         newline: Optional[str] = None) -> Union[ZstdFile, TextIO]: ...
 
