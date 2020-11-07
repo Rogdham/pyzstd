@@ -9,7 +9,7 @@ from collections import namedtuple
 from ._zstd import *
 from . import _zstd
 
-__all__ = ('__doc__', 'compress', 'richmem_compress', 'decompress',
+__all__ = ('compress', 'richmem_compress', 'decompress',
            'train_dict', 'finalize_dict',
            'ZstdCompressor', 'RichMemZstdCompressor',
            'ZstdDecompressor', 'EndlessZstdDecompressor',
@@ -18,13 +18,6 @@ __all__ = ('__doc__', 'compress', 'richmem_compress', 'decompress',
            'get_frame_info', 'get_frame_size',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
 
-__doc__ = '''\
-Python bindings for Zstandard (zstd) compression algorithm, the interface is
-similar to Python's bz2/lzma module.
-
-Documentation: https://pyzstd.readthedocs.io
-GitHub: https://github.com/animalize/pyzstd
-PyPI: https://pypi.org/project/pyzstd'''
 
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
 compressionLevel_values = _nt_values(_zstd._ZSTD_CLEVEL_DEFAULT,

@@ -30,7 +30,10 @@ Common functions
     This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
 
     .. hint::
-        If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+        If there is a big number of same type individual data, reuse a stream object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+
+        | For compression: see :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
+        | For decompression: see :py:class:`EndlessZstdDecompressor`.
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -402,7 +405,7 @@ Dictionary
 
     .. py:attribute:: dict_content
 
-        The content of the zstd dictionary, a ``bytes`` object, it's same as the *dict_content* argument in :py:meth:`~ZstdDict.__init__`. Can be used with other programs.
+        The content of zstd dictionary, a ``bytes`` object, it's the same as *dict_content* argument in :py:meth:`~ZstdDict.__init__` method. It can be used with other programs.
 
     .. py:attribute:: dict_id
 

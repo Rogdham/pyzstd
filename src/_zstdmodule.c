@@ -1015,8 +1015,8 @@ PyDoc_STRVAR(ZstdDict_dictid_doc,
 "for advanced user.");
 
 PyDoc_STRVAR(ZstdDict_dictcontent_doc,
-"The content of zstd dictionary, a bytes object. Can be used with other\n"
-"programs.");
+"The content of zstd dictionary, a bytes object, it's the same as dict_content\n"
+"argument in ZstdDict.__init__() method. It can be used with other programs.");
 
 static PyObject *
 ZstdDict_str(ZstdDict *dict)
@@ -1886,7 +1886,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
             }
         }
-        
+
         if (out.pos == out.size) {
             /* Output buffer exhausted.
                Need to check `out` before `in`. Maybe zstd's internal buffer still
@@ -2032,7 +2032,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     if (ret == NULL) {
         goto error;
     }
-  
+
     /* Unconsumed input data */
     if (in.pos == in.size) {
         if (type == DECOMPRESSOR) {
@@ -2069,9 +2069,10 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         self->needs_input = 0;
 
         if (type == ENDLESS_DECOMPRESSOR) {
-            if (self->at_frame_edge) {
+            /*if (self->at_frame_edge) {
                 self->at_frame_edge = 0;
-            }
+            }*/
+            self->at_frame_edge = 0;
         }
 
         if (!use_input_buffer) {
@@ -2101,13 +2102,6 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         } else {
             /* Use input buffer */
             self->in_begin += in.pos;
-        }
-    }
-
-    /* ZstdDecompressor .eof flag */
-    if (type == DECOMPRESSOR) {
-        if (self->eof) {
-            self->needs_input = 0;
         }
     }
 
@@ -2301,7 +2295,7 @@ static PyMethodDef _ZstdDecompressor_methods[] = {
 
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
     METH_NOARGS, reduce_cannot_pickle_doc},
-    
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -2400,8 +2394,8 @@ static PyMethodDef _EndlessZstdDecompressor_methods[] = {
 };
 
 PyDoc_STRVAR(EndlessZstdDecompressor_at_frame_edge_doc,
-"True when the output is at a frame edge, means a zstd frame is completely\n"
-"decoded and fully flushed, or the decompressor just be initialized.\n\n"
+"True when both input and output streams are at a frame edge, means a frame is\n"
+"completely decoded and fully flushed, or the decompressor just be initialized.\n\n"
 "This flag could be used to check data integrity in some cases.");
 
 static PyMemberDef _EndlessZstdDecompressor_members[] = {
@@ -2929,7 +2923,7 @@ PyInit__zstd(void)
     }
 
     /* ZstdDict */
-    if (add_type_to_module(module, 
+    if (add_type_to_module(module,
                            &zstddict_type_spec,
                            "ZstdDict",
                            &static_state.ZstdDict_type) < 0) {
@@ -2937,7 +2931,7 @@ PyInit__zstd(void)
     }
 
     /* ZstdCompressor */
-    if (add_type_to_module(module, 
+    if (add_type_to_module(module,
                            &zstdcompressor_type_spec,
                            "ZstdCompressor",
                            &static_state.ZstdCompressor_type) < 0) {
@@ -2964,7 +2958,7 @@ PyInit__zstd(void)
     }
 
     /* RichMemZstdCompressor */
-    if (add_type_to_module(module, 
+    if (add_type_to_module(module,
                            &richmem_zstdcompressor_type_spec,
                            "RichMemZstdCompressor",
                            &static_state.RichMemZstdCompressor_type) < 0) {
@@ -2972,7 +2966,7 @@ PyInit__zstd(void)
     }
 
     /* ZstdDecompressor */
-    if (add_type_to_module(module, 
+    if (add_type_to_module(module,
                            &ZstdDecompressor_type_spec,
                            "ZstdDecompressor",
                            &static_state.ZstdDecompressor_type) < 0) {
@@ -2980,7 +2974,7 @@ PyInit__zstd(void)
     }
 
     /* EndlessZstdDecompressor */
-    if (add_type_to_module(module, 
+    if (add_type_to_module(module,
                            &EndlessZstdDecompressor_type_spec,
                            "EndlessZstdDecompressor",
                            &static_state.EndlessZstdDecompressor_type) < 0) {
