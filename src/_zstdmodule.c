@@ -466,11 +466,8 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
 #define ADD_INT_PREFIX_MACRO(module, macro)                  \
     do {                                                     \
         PyObject *o = PyLong_FromLong(macro);                \
-        if (o == NULL) {                                     \
-            return -1;                                       \
-        }                                                    \
         if (PyModule_AddObject(module, "_" #macro, o) < 0) { \
-            Py_DECREF(o);                                    \
+            Py_XDECREF(o);                                   \
             return -1;                                       \
         }                                                    \
     } while(0)
@@ -2811,31 +2808,22 @@ add_constants(PyObject *module)
 
     /* _ZSTD_CLEVEL_DEFAULT */
     temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
-    if (temp == NULL) {
-        goto error;
-    }
     if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         goto error;
     }
 
     /* _ZSTD_minCLevel */
     temp = PyLong_FromLong(ZSTD_minCLevel());
-    if (temp == NULL) {
-        goto error;
-    }
     if (PyModule_AddObject(module, "_ZSTD_minCLevel", temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         goto error;
     }
 
     /* _ZSTD_maxCLevel */
     temp = PyLong_FromLong(ZSTD_maxCLevel());
-    if (temp == NULL) {
-        goto error;
-    }
     if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         goto error;
     }
 
@@ -2845,18 +2833,14 @@ error:
 }
 
 static inline int
-add_type_to_module(PyObject *module, PyType_Spec *type_spec,
-                   const char *name, PyTypeObject **dest)
+add_type_to_module(PyObject *module, const char *name,
+                   PyType_Spec *type_spec, PyTypeObject **dest)
 {
     PyObject *temp;
 
     temp = PyType_FromSpec(type_spec);
-    if (temp == NULL) {
-        return -1;
-    }
-
     if (PyModule_AddObject(module, name, temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         return -1;
     }
 
@@ -2867,7 +2851,7 @@ add_type_to_module(PyObject *module, PyType_Spec *type_spec,
 }
 
 static inline int
-add_constant_to_type(PyTypeObject *type, const long value, const char *name)
+add_constant_to_type(PyTypeObject *type, const char *name, const long value)
 {
     PyObject *temp;
 
@@ -2891,6 +2875,7 @@ PyInit__zstd(void)
     PyObject *module;
     PyObject *temp;
 
+    /* Keep this first, for error label. */
     module = PyModule_Create(&_zstdmodule);
     if (!module) {
         goto error;
@@ -2924,69 +2909,67 @@ PyInit__zstd(void)
 
     /* ZstdDict */
     if (add_type_to_module(module,
-                           &zstddict_type_spec,
                            "ZstdDict",
+                           &zstddict_type_spec,
                            &static_state.ZstdDict_type) < 0) {
         goto error;
     }
 
     /* ZstdCompressor */
     if (add_type_to_module(module,
-                           &zstdcompressor_type_spec,
                            "ZstdCompressor",
+                           &zstdcompressor_type_spec,
                            &static_state.ZstdCompressor_type) < 0) {
         goto error;
     }
 
     /* Add EndDirective enum to ZstdCompressor */
     if (add_constant_to_type(static_state.ZstdCompressor_type,
-                             ZSTD_e_continue,
-                             "CONTINUE") < 0) {
+                             "CONTINUE",
+                             ZSTD_e_continue) < 0) {
         goto error;
     }
 
     if (add_constant_to_type(static_state.ZstdCompressor_type,
-                             ZSTD_e_flush,
-                             "FLUSH_BLOCK") < 0) {
+                             "FLUSH_BLOCK",
+                             ZSTD_e_flush) < 0) {
         goto error;
     }
 
     if (add_constant_to_type(static_state.ZstdCompressor_type,
-                             ZSTD_e_end,
-                             "FLUSH_FRAME") < 0) {
+                             "FLUSH_FRAME",
+                             ZSTD_e_end) < 0) {
         goto error;
     }
 
     /* RichMemZstdCompressor */
     if (add_type_to_module(module,
-                           &richmem_zstdcompressor_type_spec,
                            "RichMemZstdCompressor",
+                           &richmem_zstdcompressor_type_spec,
                            &static_state.RichMemZstdCompressor_type) < 0) {
         goto error;
     }
 
     /* ZstdDecompressor */
     if (add_type_to_module(module,
-                           &ZstdDecompressor_type_spec,
                            "ZstdDecompressor",
+                           &ZstdDecompressor_type_spec,
                            &static_state.ZstdDecompressor_type) < 0) {
         goto error;
     }
 
     /* EndlessZstdDecompressor */
     if (add_type_to_module(module,
-                           &EndlessZstdDecompressor_type_spec,
                            "EndlessZstdDecompressor",
+                           &EndlessZstdDecompressor_type_spec,
                            &static_state.EndlessZstdDecompressor_type) < 0) {
         goto error;
     }
 
     /* zstd_version, ZSTD_versionString() requires zstd v1.3.0+ */
-    if (!(temp = PyUnicode_FromString(ZSTD_versionString()))) {
-        goto error;
-    }
+    temp = PyUnicode_FromString(ZSTD_versionString());
     if (PyModule_AddObject(module, "zstd_version", temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         goto error;
     }
 
