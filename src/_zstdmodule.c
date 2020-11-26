@@ -1879,9 +1879,9 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
 #endif
 
 typedef enum {
-    DECOMPRESSOR = 1,
-    ENDLESS_DECOMPRESSOR = 2,
-    FUNCTION = 3
+    TYPE_DECOMPRESSOR,
+    TYPE_ENDLESS_DECOMPRESSOR,
+    TYPE_FUNCTION
 } decompress_type;
 
 /* Decompress implementation for:
@@ -1900,7 +1900,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
-    if (type != FUNCTION) {
+    if (type != TYPE_FUNCTION) {
         if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
             goto error;
         }
@@ -1936,7 +1936,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
            Check these conditions beacuse after flushing a frame, decompressing
            an empty input will cause zstd_ret become non-zero. */
         if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
-            if (type == DECOMPRESSOR) {
+            if (type == TYPE_DECOMPRESSOR) {
                 if (zstd_ret == 0) {
                     self->eof = 1;
                     break;
@@ -1952,7 +1952,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                have a few bytes can be output, grow the output buffer and continue
                the loop if max_lengh < 0. */
 
-            if (type != FUNCTION) {
+            if (type != TYPE_FUNCTION) {
                 /* Output buffer reached max_length */
                 if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
                     break;
@@ -2004,7 +2004,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     ACQUIRE_LOCK(self);
 
     /* ZstdDecompressor: check .eof flag */
-    if (type == DECOMPRESSOR) {
+    if (type == TYPE_DECOMPRESSOR) {
         if (self->eof) {
             PyErr_SetString(PyExc_EOFError, "Already at the end of frame.");
             assert(ret == NULL);
@@ -2094,13 +2094,13 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
 
     /* Unconsumed input data */
     if (in.pos == in.size) {
-        if (type == DECOMPRESSOR) {
+        if (type == TYPE_DECOMPRESSOR) {
             if (Py_SIZE(ret) == max_length || self->eof) {
                 self->needs_input = 0;
             } else {
                 self->needs_input = 1;
             }
-        } else if (type == ENDLESS_DECOMPRESSOR) {
+        } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
             if (Py_SIZE(ret) == max_length && !self->at_frame_edge) {
                 self->needs_input = 0;
             } else {
@@ -2127,7 +2127,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         }*/
         self->needs_input = 0;
 
-        if (type == ENDLESS_DECOMPRESSOR) {
+        if (type == TYPE_ENDLESS_DECOMPRESSOR) {
             /*if (self->at_frame_edge) {
                 self->at_frame_edge = 0;
             }*/
@@ -2345,7 +2345,7 @@ PyDoc_STRVAR(ZstdDecompressor_decompress_doc,
 static PyObject *
 ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 {
-    return stream_decompress(self, args, kwargs, DECOMPRESSOR);
+    return stream_decompress(self, args, kwargs, TYPE_DECOMPRESSOR);
 }
 
 static PyMethodDef _ZstdDecompressor_methods[] = {
@@ -2439,7 +2439,7 @@ PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 static PyObject *
 EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 {
-    return stream_decompress(self, args, kwargs, ENDLESS_DECOMPRESSOR);
+    return stream_decompress(self, args, kwargs, TYPE_ENDLESS_DECOMPRESSOR);
 }
 
 static PyMethodDef _EndlessZstdDecompressor_methods[] = {
@@ -2561,7 +2561,8 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     }
 
     /* Decompress */
-    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size, FUNCTION);
+    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size,
+                          TYPE_FUNCTION);
     if (ret == NULL) {
         goto error;
     }
@@ -2875,26 +2876,24 @@ add_constants(PyObject *module)
     temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
     if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
         Py_XDECREF(temp);
-        goto error;
+        return -1;
     }
 
     /* _ZSTD_minCLevel */
     temp = PyLong_FromLong(ZSTD_minCLevel());
     if (PyModule_AddObject(module, "_ZSTD_minCLevel", temp) < 0) {
         Py_XDECREF(temp);
-        goto error;
+        return -1;
     }
 
     /* _ZSTD_maxCLevel */
     temp = PyLong_FromLong(ZSTD_maxCLevel());
     if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
         Py_XDECREF(temp);
-        goto error;
+        return -1;
     }
 
     return 0;
-error:
-    return -1;
 }
 
 static inline int
