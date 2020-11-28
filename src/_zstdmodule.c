@@ -2567,15 +2567,16 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
         goto error;
     }
 
-    /* Check data integrity.
-       at_frame_edge flag is 1 when both input and output streams are at a
-       frame edge. */
+    /* Check data integrity. at_frame_edge flag is 1 when both input and output
+       streams are at a frame edge. */
     if (self.at_frame_edge == 0) {
-        PyErr_SetString(static_state.ZstdError,
-                        "Decompression failed, zstd data ends in an "
-                        "incomplete frame. If you want to output as much as "
-                        "possible, use an EndlessZstdDecompressor object to "
-                        "decompress.");
+        char *extra_msg = (Py_SIZE(ret) == 0) ? "" :
+                          " If you want to output these decompressed data, "
+                          "use an EndlessZstdDecompressor object to decompress.";
+        PyErr_Format(static_state.ZstdError,
+                     "Decompression failed: Zstd data ends in an incomplete "
+                     "frame, decompressed data is %zd bytes.%s",
+                     Py_SIZE(ret), extra_msg);
         goto error;
     }
 
