@@ -1932,16 +1932,20 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
-        /* Set at_frame_edge.
-           Check these conditions beacuse after flushing a frame, decompressing
-           an empty input will cause zstd_ret become non-zero. */
-        if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
-            if (type == TYPE_DECOMPRESSOR) {
-                if (zstd_ret == 0) {
-                    self->eof = 1;
-                    break;
-                }
-            } else {
+        if (type == TYPE_DECOMPRESSOR) {
+            /* Set .eof flag.
+               (zstd_ret == 0) when a frame is completely decoded and fully
+               flushed. If decompress an empty input, zstd_ret will != 0. */
+            if (zstd_ret == 0) {
+                self->eof = 1;
+                break;
+            }
+        } else {
+            /* Set .at_frame_edge flag.
+               Check these conditions beacuse after flushing a frame,
+               decompressing an empty input will cause zstd_ret become
+               non-zero. */
+            if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
                 self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
             }
         }
