@@ -665,23 +665,15 @@ _get_DDict(ZstdDict *self)
     return self->d_dict;
 }
 
-static inline int
-check_level_bounds(int compressionLevel, char* buf, int buf_size)
+static inline void
+clamp_compression_level(int *compressionLevel)
 {
-    assert(buf_size >= 120);
-
-    if (compressionLevel > ZSTD_maxCLevel() || compressionLevel < ZSTD_minCLevel()) {
-        PyOS_snprintf(buf, buf_size,
-                      "In zstd v%s, the compression level parameter should %d "
-                      "<= value <= %d, provided value is %d, it will be clamped.",
-                      ZSTD_versionString(), ZSTD_minCLevel(),
-                      ZSTD_maxCLevel(), compressionLevel);
-
-        if (PyErr_WarnEx(PyExc_RuntimeWarning, buf, 1) < 0) {
-            return -1;
-        }
+#if ZSTD_VERSION_NUMBER < 10407
+    /* In zstd v1.4.6-, lower bound is not clamped. */
+    if (*compressionLevel < ZSTD_minCLevel()) {
+        *compressionLevel = ZSTD_minCLevel();
     }
-    return 0;
+#endif
 }
 
 /* Set compressLevel or compress parameters to compress context. */
@@ -695,20 +687,18 @@ set_c_parameters(ZstdCompressor *self,
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
-        const int level = _PyLong_AsInt(level_or_option);
+        int level = _PyLong_AsInt(level_or_option);
         if (level == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Compress level should be 32-bit signed int value.");
             return -1;
         }
 
+        /* Clamp compression level */
+        clamp_compression_level(&level);
+
         /* Save to *compress_level for generating ZSTD_CDICT */
         *compress_level = level;
-
-        /* Check compressionLevel bounds */
-        if (check_level_bounds(level, msg_buf, sizeof(msg_buf)) < 0) {
-            return -1;
-        }
 
         /* Set compressionLevel to compress context */
         zstd_ret = ZSTD_CCtx_setParameter(self->cctx,
@@ -732,7 +722,7 @@ set_c_parameters(ZstdCompressor *self,
 
         while (PyDict_Next(level_or_option, &pos, &key, &value)) {
             /* Both key & value should be 32-bit signed int */
-            int key_v = _PyLong_AsInt(key);
+            const int key_v = _PyLong_AsInt(key);
             if (key_v == -1 && PyErr_Occurred()) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Key of option dict should be 32-bit signed int value.");
@@ -747,13 +737,11 @@ set_c_parameters(ZstdCompressor *self,
             }
 
             if (key_v == ZSTD_c_compressionLevel) {
+                /* Clamp compression level */
+                clamp_compression_level(&value_v);
+
                 /* Save to *compress_level for generating ZSTD_CDICT */
                 *compress_level = value_v;
-
-                /* Check compressionLevel bounds */
-                if (check_level_bounds(value_v, msg_buf, sizeof(msg_buf)) < 0) {
-                    return -1;
-                }
             } else if (key_v == ZSTD_c_nbWorkers) {
                 /* From zstd library doc:
                    1. When nbWorkers >= 1, triggers asynchronous mode when
@@ -841,14 +829,14 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
     pos = 0;
     while (PyDict_Next(option, &pos, &key, &value)) {
         /* Both key & value should be 32-bit signed int */
-        int key_v = _PyLong_AsInt(key);
+        const int key_v = _PyLong_AsInt(key);
         if (key_v == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Key of option dict should be 32-bit signed integer value.");
             return -1;
         }
 
-        int value_v = _PyLong_AsInt(value);
+        const int value_v = _PyLong_AsInt(value);
         if (value_v == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Value of option dict should be 32-bit signed integer value.");
