@@ -71,6 +71,9 @@ typedef struct {
     /* Thread lock for compressing */
     PyThread_type_lock lock;
 
+    /* Unused data */
+    PyObject *unused_data;
+
     /* 0 if decompressor has (or may has) unconsumed input data, 0 or 1. */
     char needs_input;
 
@@ -99,14 +102,6 @@ typedef struct {
 } _zstd_state;
 
 static _zstd_state static_state;
-
-static inline PyObject *empty_bytes(void)
-{
-    PyObject *ret = static_state.empty_bytes;
-
-    Py_INCREF(ret);
-    return ret;
-}
 
 /* ----------------------------
      BlocksOutputBuffer code
@@ -2198,6 +2193,7 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(self->input_buffer_size == 0);
     assert(self->in_begin == 0);
     assert(self->in_end == 0);
+    assert(self->unused_data == NULL);
     assert(self->eof == 0);
     assert(self->inited == 0);
 
@@ -2235,13 +2231,16 @@ ZstdDecompressor_dealloc(ZstdDecompressor *self)
         ZSTD_freeDCtx(self->dctx);
     }
 
+    /* Py_XDECREF the dict after free decompress context */
+    Py_XDECREF(self->dict);
+
     /* Free unconsumed input data buffer */
     if (self->input_buffer != NULL) {
         PyMem_Free(self->input_buffer);
     }
 
-    /* Py_XDECREF the dict after free decompress context */
-    Py_XDECREF(self->dict);
+    /* Free unused data */
+    Py_XDECREF(self->unused_data);
 
     /* Free thread lock */
     if (self->lock) {
@@ -2310,11 +2309,18 @@ unused_data_get(ZstdDecompressor *self, void *Py_UNUSED(ignored))
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
-    if (self->eof && self->in_begin != self->in_end) {
-        ret = PyBytes_FromStringAndSize(self->input_buffer + self->in_begin,
-                                        self->in_end - self->in_begin);
-    } else {
-        ret = empty_bytes();
+    if (!self->eof) {
+        ret = static_state.empty_bytes;
+        Py_INCREF(ret);
+    } else if (self->unused_data == NULL) {
+        self->unused_data = PyBytes_FromStringAndSize(
+                                self->input_buffer + self->in_begin,
+                                self->in_end - self->in_begin);
+        ret = self->unused_data;
+        Py_XINCREF(ret);
+    } else if (self->unused_data != NULL) {
+        ret = self->unused_data;
+        Py_INCREF(ret);
     }
 
     RELEASE_LOCK(self);
@@ -2362,8 +2368,7 @@ PyDoc_STRVAR(ZstdDecompressor_needs_input_doc,
 
 PyDoc_STRVAR(ZstdDecompressor_unused_data_doc,
 "A bytes object. When ZstdDecompressor object stops after a frame is\n"
-"decompressed, unused input data after the frame. Otherwise this will be b''.\n\n"
-"This object is created when it is accessed.");
+"decompressed, unused input data after the frame. Otherwise this will be b''.");
 
 static PyMemberDef _ZstdDecompressor_members[] = {
     {"eof", T_BOOL, offsetof(ZstdDecompressor, eof),

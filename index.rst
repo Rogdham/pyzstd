@@ -280,8 +280,6 @@ Stream decompress classes
 
         A bytes object. When ZstdDecompressor object stops after decompressing a frame, unused input data after the first frame. Otherwise this will be ``b''``.
 
-        This object is created when it is accessed.
-
     .. sourcecode:: python
 
         # unlimited output
