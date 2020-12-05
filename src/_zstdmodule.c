@@ -712,7 +712,7 @@ set_c_parameters(ZstdCompressor *self,
 
     /* Options dict */
     if (PyDict_Check(level_or_option)) {
-        PyObject *key, * value;
+        PyObject *key, *value;
         Py_ssize_t pos = 0;
 
         while (PyDict_Next(level_or_option, &pos, &key, &value)) {
@@ -970,7 +970,8 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
     PyObject *dict_content;
     int is_raw = 0;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "O|p:ZstdDict.__init__", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "O|p:ZstdDict.__init__", kwlist,
                                      &dict_content, &is_raw)) {
         return -1;
     }
@@ -994,7 +995,7 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
        at least 8 bytes */
     if (Py_SIZE(self->dict_content) < 8) {
         PyErr_SetString(PyExc_ValueError,
-                        "dictionary content should at least 8 bytes.");
+                        "Zstd dictionary content should at least 8 bytes.");
         return -1;
     }
 
@@ -1387,7 +1388,8 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
     int compress_level = 0; /* 0 means use zstd's default compression level */
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO:ZstdCompressor.__init__", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "|OO:ZstdCompressor.__init__", kwlist,
                                      &level_or_option, &zstd_dict)) {
         return -1;
     }
@@ -1447,7 +1449,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         size_t output_buffer_size = ZSTD_compressBound(in.size);
         if (output_buffer_size > (size_t) PY_SSIZE_T_MAX) {
             PyErr_NoMemory();
-            return NULL;
+            return NULL;   /* Don't goto error label */
         }
 
         /* OutputBuffer(OnError)(&buffer) is after `error` label,
@@ -1578,7 +1580,8 @@ ZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
     PyObject *ret;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|i:ZstdCompressor.compress", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*|i:ZstdCompressor.compress", kwlist,
                                      &data, &mode)) {
         return NULL;
     }
@@ -1634,7 +1637,8 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
     PyObject *ret;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|i:ZstdCompressor.flush", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "|i:ZstdCompressor.flush", kwlist,
                                      &mode)) {
         return NULL;
     }
@@ -1643,8 +1647,8 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     if (mode != ZSTD_e_end && mode != ZSTD_e_flush) {
         PyErr_SetString(PyExc_ValueError,
                         "mode argument wrong value, it should be "
-                        "ZstdCompressor.FLUSH_BLOCK or "
-                        "ZstdCompressor.FLUSH_FRAME.");
+                        "ZstdCompressor.FLUSH_FRAME or "
+                        "ZstdCompressor.FLUSH_BLOCK.");
         return NULL;
     }
 
@@ -1725,7 +1729,8 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
 
     int compress_level = 0; /* 0 means use zstd's default compression level */
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO:RichMemZstdCompressor.__init__", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "|OO:RichMemZstdCompressor.__init__", kwlist,
                                      &level_or_option, &zstd_dict)) {
         return -1;
     }
@@ -1785,7 +1790,8 @@ RichMemZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *k
 
     PyObject *ret;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*:RichMemZstdCompressor.compress", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*:RichMemZstdCompressor.compress", kwlist,
                                      &data)) {
         return NULL;
     }
@@ -1982,7 +1988,8 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     PyObject *ret = NULL;
     char use_input_buffer;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|n:ZstdDecompressor.decompress", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*|n:ZstdDecompressor.decompress", kwlist,
                                      &data, &max_length)) {
         return NULL;
     }
@@ -1993,7 +2000,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     /* ZstdDecompressor: check .eof flag */
     if (type == TYPE_DECOMPRESSOR) {
         if (self->eof) {
-            PyErr_SetString(PyExc_EOFError, "Already at the end of frame.");
+            PyErr_SetString(PyExc_EOFError, "Already at the end of a zstd frame.");
             assert(ret == NULL);
             goto success;
         }
@@ -2267,7 +2274,8 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
     PyObject *zstd_dict = Py_None;
     PyObject *option = Py_None;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|OO:ZstdDecompressor.__init__", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "|OO:ZstdDecompressor.__init__", kwlist,
                                      &zstd_dict, &option)) {
         return -1;
     }
@@ -2301,7 +2309,7 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
     return 0;
 }
 
-static PyObject*
+static PyObject *
 unused_data_get(ZstdDecompressor *self, void *Py_UNUSED(ignored))
 {
     PyObject *ret;
@@ -2494,7 +2502,8 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
 PyDoc_STRVAR(decompress_doc,
 "decompress(data, zstd_dict=None, option=None)\n"
 "----\n"
-"Decompress a zstd data. Support multiple concatenated frames.\n\n"
+"Decompress a zstd data, return a bytes object.\n\n"
+"Support multiple concatenated frames.\n\n"
 "Arguments\n"
 "data:      A bytes-like object, compressed zstd data.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
@@ -2513,7 +2522,8 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     ZSTD_inBuffer in;
     ZstdDecompressor self;
 
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs, "y*|OO:decompress", kwlist,
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*|OO:decompress", kwlist,
                                      &data, &zstd_dict, &option)) {
         return NULL;
     }
@@ -2746,8 +2756,8 @@ _get_frame_info(PyObject *module, PyObject *args)
         unknown_content_size = 1;
     } else if (content_size == ZSTD_CONTENTSIZE_ERROR) {
         PyErr_SetString(static_state.ZstdError,
-                        "Error when getting a frame's decompressed size, make "
-                        "sure that frame_buffer argument starts from the "
+                        "Error when getting a zstd frame's decompressed size, "
+                        "make sure that frame_buffer argument starts from the "
                         "beginning of a frame and its size larger than the "
                         "frame header (6~18 bytes).");
         goto error;
@@ -2943,14 +2953,14 @@ PyInit__zstd(void)
         goto error;
     }
 
-    /* Constants */
-    if (add_constants(module) < 0) {
-        goto error;
-    }
-
     /* Empty bytes object */
     static_state.empty_bytes = PyBytes_FromStringAndSize(NULL, 0);
     if (static_state.empty_bytes == NULL) {
+        goto error;
+    }
+
+    /* Constants */
+    if (add_constants(module) < 0) {
         goto error;
     }
 
@@ -3053,7 +3063,7 @@ error:
     _zstd_clear(NULL);
     Py_XDECREF(module);
 
-    if(!PyErr_Occurred()) {
+    if (!PyErr_Occurred()) {
         PyErr_SetString(PyExc_SystemError, "Failed to initialize pyzstd module.");
     }
     return NULL;

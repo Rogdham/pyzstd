@@ -101,22 +101,31 @@ class Strategy(enum.IntEnum):
 
 
 def compress(data, level_or_option=None, zstd_dict=None):
-    """Compress a block of data.
+    """Compress a block of data, return a bytes object.
 
     Arguments
-    level_or_option: When it’s an int object, it represents compression level.
-                     When it’s a dict object, it contains advanced compress
+    data:            A bytes-like object, data to be compressed.
+    level_or_option: When it's an int object, it represents compression level.
+                     When it's a dict object, it contains advanced compress
                      parameters.
-    zstd_dict: A ZstdDict object, pre-trained dictionary for compression.
+    zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
     """
     comp = ZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 
 def richmem_compress(data, level_or_option=None, zstd_dict=None):
-    """Compress a block of data, use rich memory mode.
+    """Compress a block of data, return a bytes object.
 
-    The parameters are the same as compress() function.
+    Use rich memory mode, it's faster than compress() in some cases, but
+    allocates more memory.
+
+    Arguments
+    data:            A bytes-like object, data to be compressed.
+    level_or_option: When it's an int object, it represents compression level.
+                     When it's a dict object, it contains advanced compress
+                     parameters.
+    zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
     """
     comp = RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
@@ -208,9 +217,9 @@ class ZstdDecompressReader(_compression.DecompressReader):
         return b''.join(chunks)
 
 
-_MODE_CLOSED   = 0
-_MODE_READ     = 1
-_MODE_WRITE    = 2
+_MODE_CLOSED = 0
+_MODE_READ   = 1
+_MODE_WRITE  = 2
 
 class ZstdFile(_compression.BaseStream):
 

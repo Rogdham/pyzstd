@@ -74,7 +74,7 @@ Common functions
 
 .. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
 
-    Use :ref:`rich memory mode<rich_mem>` to compress *data*. In some cases, it is faster than :py:func:`compress`, but allocate more memory.
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
 
     The parameters are the same as :py:func:`compress` function.
 
@@ -209,7 +209,7 @@ Stream compress classes
 
 .. py:class:: RichMemZstdCompressor
 
-    A compressor use :ref:`rich memory mode<rich_mem>`. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
+    A compressor use :ref:`rich memory mode<rich_mem>`. It's faster than :py:class:`ZstdCompressor` in some cases, but allocates more memory.
 
     Thread-safe at method level.
 
