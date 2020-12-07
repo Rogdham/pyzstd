@@ -5,16 +5,15 @@ Introduction
 
 ``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
+| The API is similar to Python's bz2/lzma/zlib module.
+| Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
+
 Features of zstd:
 
 * Fast compression and decompression speed.
 * Using :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
 * Using :ref:`zstd dictionary<zstd_dict>`, the compression ratio on small data (a few KB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
-
-The interface provided by this module is similar to Python's bz2/lzma module.
-
-Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
 Exception
 ---------

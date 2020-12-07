@@ -64,7 +64,7 @@ class build_ext_compiler_check(build_ext):
 setup(
     name='pyzstd',
     version='0.13.0',
-    description="Python bindings for Zstandard (zstd) compression algorithm, the interface is similar to Python's bz2/lzma module.",
+    description="Python bindings for Zstandard (zstd) compression algorithm, the API is similar to Python's bz2/lzma/zlib module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',
