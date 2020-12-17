@@ -2320,15 +2320,17 @@ unused_data_get(ZstdDecompressor *self, void *Py_UNUSED(ignored))
     if (!self->eof) {
         ret = static_state.empty_bytes;
         Py_INCREF(ret);
-    } else if (self->unused_data == NULL) {
-        self->unused_data = PyBytes_FromStringAndSize(
-                                self->input_buffer + self->in_begin,
-                                self->in_end - self->in_begin);
-        ret = self->unused_data;
-        Py_XINCREF(ret);
-    } else if (self->unused_data != NULL) {
-        ret = self->unused_data;
-        Py_INCREF(ret);
+    } else {
+        if (self->unused_data == NULL) {
+            self->unused_data = PyBytes_FromStringAndSize(
+                                    self->input_buffer + self->in_begin,
+                                    self->in_end - self->in_begin);
+            ret = self->unused_data;
+            Py_XINCREF(ret);
+        } else {
+            ret = self->unused_data;
+            Py_INCREF(ret);
+        }
     }
 
     RELEASE_LOCK(self);
