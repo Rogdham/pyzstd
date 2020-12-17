@@ -1,8 +1,8 @@
 ﻿#!/usr/bin/env python3
-from setuptools import setup, Extension, find_packages
-from setuptools.command.build_ext import build_ext
 import io
 import os
+from setuptools import setup, Extension
+from setuptools.command.build_ext import build_ext
 
 README_PATH = os.path.join(os.path.dirname(__file__), 'README.rst')
 with io.open(README_PATH, 'r', encoding='utf-8') as file:
@@ -63,8 +63,8 @@ class build_ext_compiler_check(build_ext):
 
 setup(
     name='pyzstd',
-    version='0.13.0',
-    description="Python bindings for Zstandard (zstd) compression algorithm, the interface is similar to Python's bz2/lzma module.",
+    version='0.14.0',
+    description="Python bindings for Zstandard (zstd) compression algorithm, the API is similar to Python's bz2/lzma/zlib module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',

@@ -192,4 +192,3 @@ def open(filename: Union[str, bytes, PathLike, BinaryIO],
          encoding: Optional[str] = None,
          errors: Optional[str] = None,
          newline: Optional[str] = None) -> Union[ZstdFile, TextIO]: ...
-

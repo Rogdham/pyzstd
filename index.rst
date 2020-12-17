@@ -5,16 +5,15 @@ Introduction
 
 ``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
+| The API is similar to Python's bz2/lzma/zlib module.
+| Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
+
 Features of zstd:
 
 * Fast compression and decompression speed.
 * Using :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
 * Using :ref:`zstd dictionary<zstd_dict>`, the compression ratio on small data (a few KB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
-
-The interface provided by this module is similar to Python's bz2/lzma module.
-
-Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
 Exception
 ---------
@@ -30,7 +29,10 @@ Common functions
     This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
 
     .. hint::
-        If there is a big number of same type individual data, reuse a :ref:`stream <stream_classes>` object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+        If there is a big number of same type individual data, reuse a stream object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+
+        | For compression: see :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
+        | For decompression: see :py:class:`EndlessZstdDecompressor`.
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -71,7 +73,7 @@ Common functions
 
 .. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
 
-    Use :ref:`rich memory mode<rich_mem>` to compress *data*. In some cases, it is faster than :py:func:`compress`, but allocate more memory.
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
 
     The parameters are the same as :py:func:`compress` function.
 
@@ -206,7 +208,7 @@ Stream compress classes
 
 .. py:class:: RichMemZstdCompressor
 
-    A compressor use :ref:`rich memory mode<rich_mem>`. In some cases, it is faster than :py:class:`ZstdCompressor`, but allocate more memory.
+    A compressor use :ref:`rich memory mode<rich_mem>`. It's faster than :py:class:`ZstdCompressor` in some cases, but allocates more memory.
 
     Thread-safe at method level.
 
@@ -276,8 +278,6 @@ Stream decompress classes
     .. py:attribute:: unused_data
 
         A bytes object. When ZstdDecompressor object stops after decompressing a frame, unused input data after the first frame. Otherwise this will be ``b''``.
-
-        This object is created when it is accessed.
 
     .. sourcecode:: python
 
@@ -402,7 +402,7 @@ Dictionary
 
     .. py:attribute:: dict_content
 
-        The content of the zstd dictionary, a ``bytes`` object, it's same as the *dict_content* argument in :py:meth:`~ZstdDict.__init__`. Can be used with other programs.
+        The content of zstd dictionary, a ``bytes`` object, it's the same as *dict_content* argument in :py:meth:`~ZstdDict.__init__` method. It can be used with other programs.
 
     .. py:attribute:: dict_id
 
