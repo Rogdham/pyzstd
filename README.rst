@@ -5,19 +5,25 @@ Introduction
 
 The API is similar to Python's bz2/lzma/zlib module.
 
-Includes zstd v1.4.5 source code.
+Includes zstd v1.4.7 source code.
 
 
 Links
 -----------
 
-Documentation: https://pyzstd.readthedocs.io/en/latest/
+Documentation: https://pyzstd.readthedocs.io/en/latest
 
 GitHub: https://github.com/animalize/pyzstd
 
 
 Release note
 ------------
+**0.14.0  (Dec 17, 2020)**
+
+#. Update zstd source code from v1.4.5 to `v1.4.7 <https://github.com/facebook/zstd/releases/tag/v1.4.7>`_. (v1.4.6 is a non-public release for Linux kernel)
+
+#. Some improvements, no API changes.
+
 **0.13.0  (Nov 7, 2020)**
 
 #. ``ZstdDecompressor`` class: now it has the same API and behavior as BZ2Decompressor / LZMADecompressor classes in Python standard library, it stops after a frame is decompressed.
@@ -34,7 +40,7 @@ Release note
 
 **0.12.5  (Oct 12, 2020)**
 
-No longer use `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, now supports Python 3.5+.
+No longer use `Argument Clinic <https://docs.python.org/3/howto/clinic.html>`_, now supports Python 3.5+, previously 3.7+.
 
 **0.12.4  (Oct 7, 2020)**
 
@@ -44,4 +50,4 @@ It seems the API is stable.
 
 The first version upload to PyPI.
 
-Includes `zstd v1.4.5 <https://github.com/facebook/zstd/releases/tag/v1.4.5>`_ source code.
+Includes zstd `v1.4.5 <https://github.com/facebook/zstd/releases/tag/v1.4.5>`_ source code.
