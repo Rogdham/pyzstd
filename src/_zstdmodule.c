@@ -106,7 +106,6 @@ static _zstd_state static_state;
 /* ----------------------------
      BlocksOutputBuffer code
    ---------------------------- */
-#if 1
 typedef struct {
     /* List of blocks */
     PyObject *list;
@@ -353,12 +352,10 @@ OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 {
     Py_XDECREF(buffer->list);
 }
-#endif
 
 /* -------------------------
      Parameters from zstd
    ------------------------- */
-#if 1
 typedef struct {
     const int parameter;
     const char parameter_name[32];
@@ -501,14 +498,12 @@ add_parameters(PyObject *module)
 
     return 0;
 }
-#endif
 
 /* --------------------------------------
      Global functions/macros
      Set parameters, load dictionary
      ACQUIRE_LOCK, reduce_cannot_pickle
    -------------------------------------- */
-#if 1
 #define ACQUIRE_LOCK(obj) do {                    \
     if (!PyThread_acquire_lock((obj)->lock, 0)) { \
         Py_BEGIN_ALLOW_THREADS                    \
@@ -900,12 +895,10 @@ reduce_cannot_pickle(PyObject *self)
                  Py_TYPE(self)->tp_name);
     return NULL;
 }
-#endif
 
 /* ------------------
      ZstdDict code
    ------------------ */
-#if 1
 static PyObject *
 ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -1095,12 +1088,10 @@ static PyType_Spec zstddict_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstddict_slots,
 };
-#endif
 
 /* --------------------------
      Train dictionary code
    -------------------------- */
-#if 1
 PyDoc_STRVAR(_train_dict_doc,
 "Internal function, train a zstd dictionary.");
 
@@ -1305,12 +1296,10 @@ error:
     return NULL;
 #endif
 }
-#endif
 
 /* -----------------------
      ZstdCompressor code
    ----------------------- */
-#if 1
 static PyObject *
 _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -1714,12 +1703,10 @@ static PyType_Spec zstdcompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = zstdcompressor_slots,
 };
-#endif
 
 /* ------------------------------
      RichMemZstdCompressor code
    ------------------------------ */
-#if 1
 static int
 RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 {
@@ -1852,12 +1839,10 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = richmem_zstdcompressor_slots,
 };
-#endif
 
 /* -------------------------
    Decompress implementation
    ------------------------- */
-#if 1
 
 #if defined(__GNUC__) || defined(__ICCARM__)
 #  define FORCE_INLINE_ATTR __attribute__((always_inline))
@@ -2180,12 +2165,9 @@ success:
     return ret;
 }
 
-#endif
-
 /* -------------------------
      ZstdDecompressor code
    ------------------------- */
-#if 1
 static PyObject *
 ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 {
@@ -2320,15 +2302,17 @@ unused_data_get(ZstdDecompressor *self, void *Py_UNUSED(ignored))
     if (!self->eof) {
         ret = static_state.empty_bytes;
         Py_INCREF(ret);
-    } else if (self->unused_data == NULL) {
-        self->unused_data = PyBytes_FromStringAndSize(
-                                self->input_buffer + self->in_begin,
-                                self->in_end - self->in_begin);
-        ret = self->unused_data;
-        Py_XINCREF(ret);
-    } else if (self->unused_data != NULL) {
-        ret = self->unused_data;
-        Py_INCREF(ret);
+    } else {
+        if (self->unused_data == NULL) {
+            self->unused_data = PyBytes_FromStringAndSize(
+                                    self->input_buffer + self->in_begin,
+                                    self->in_end - self->in_begin);
+            ret = self->unused_data;
+            Py_XINCREF(ret);
+        } else {
+            ret = self->unused_data;
+            Py_INCREF(ret);
+        }
     }
 
     RELEASE_LOCK(self);
@@ -2416,12 +2400,10 @@ static PyType_Spec ZstdDecompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = ZstdDecompressor_slots,
 };
-#endif
 
 /* -------------------------------
      EndlessZstdDecompressor code
    ------------------------------- */
-#if 1
 PyDoc_STRVAR(EndlessZstdDecompressor_doc,
 "Zstd stream decompressor, accepts multiple concatenated frames.\n\n"
 "EndlessZstdDecompressor.__init__(self, zstd_dict=None, option=None)\n"
@@ -2492,12 +2474,10 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
     .flags = Py_TPFLAGS_DEFAULT,
     .slots = EndlessZstdDecompressor_slots,
 };
-#endif
 
 /* --------------------------
      Module level functions
    -------------------------- */
-#if 1
 
 PyDoc_STRVAR(decompress_doc,
 "decompress(data, zstd_dict=None, option=None)\n"
@@ -2811,12 +2791,10 @@ static PyMethodDef _zstd_methods[] = {
     {"_get_frame_info", (PyCFunction)_get_frame_info, METH_VARARGS, _get_frame_info_doc},
     {NULL}
 };
-#endif
 
 /* --------------------
      Initialize code
    -------------------- */
-#if 1
 static int
 _zstd_traverse(PyObject *module, visitproc visit, void *arg)
 {
@@ -3068,4 +3046,3 @@ error:
     }
     return NULL;
 }
-#endif

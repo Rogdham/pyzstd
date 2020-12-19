@@ -5,7 +5,7 @@ Introduction
 
 The API is similar to Python's bz2/lzma/zlib module.
 
-Includes zstd v1.4.7 source code.
+Includes zstd v1.4.8 source code.
 
 
 Links
@@ -18,9 +18,13 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.14.0  (Dec 17, 2020)**
+**0.14.1  (Dec 19, 2020)**
 
-#. Update zstd source code from v1.4.5 to `v1.4.7 <https://github.com/facebook/zstd/releases/tag/v1.4.7>`_. (v1.4.6 is a non-public release for Linux kernel)
+#. Update zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
+
+    * v1.4.6 is a non-public release for Linux kernel.
+
+    * v1.4.8 is a hotfix for `v1.4.7 <https://github.com/facebook/zstd/releases/tag/v1.4.7>`_.
 
 #. Some improvements, no API changes.
 
