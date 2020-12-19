@@ -3,17 +3,22 @@
 Introduction
 ------------
 
-``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm. The API is similar to Python's bz2/lzma/zlib module.
 
-| The API is similar to Python's bz2/lzma/zlib module.
-| Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
+Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
 Features of zstd:
 
 * Fast compression and decompression speed.
-* Using :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
-* Using :ref:`zstd dictionary<zstd_dict>`, the compression ratio on small data (a few KB) improves dramatically.
+* If use :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
+* If use pre-trained :ref:`zstd dictionary<zstd_dict>`, the compression ratio on small data (a few KB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
+
+.. note::
+    Two other zstd modules on PyPI:
+
+    * `zstd <https://pypi.org/project/zstd/>`_, a very simple module.
+    * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API, supports PyPy.
 
 Exception
 ---------
@@ -54,7 +59,7 @@ Common functions
     compressed_dat = compress(raw_dat, 12)
 
     # use option
-    option = {CParameter.compressionLevel : 10,
+    option = {CParameter.compressionLevel : 12,
               CParameter.checksumFlag : 1}
     compressed_dat = compress(raw_dat, option)
 
@@ -208,7 +213,7 @@ Stream compress classes
 
 .. py:class:: RichMemZstdCompressor
 
-    A compressor use :ref:`rich memory mode<rich_mem>`. It's faster than :py:class:`ZstdCompressor` in some cases, but allocates more memory.
+    A compressor uses :ref:`rich memory mode<rich_mem>`. It's faster than :py:class:`ZstdCompressor` in some cases, but allocates more memory.
 
     Thread-safe at method level.
 
@@ -243,7 +248,7 @@ Stream decompress classes
 
 .. py:class:: ZstdDecompressor
 
-    A stream decompressor, it has the same API and behavior as `BZ2Decompressor <https://docs.python.org/3/library/bz2.html#bz2.BZ2Decompressor>`_ / `LZMADecompressor <https://docs.python.org/3/library/lzma.html#lzma.LZMADecompressor>`_ classes in Python standard library.
+    A stream decompressor.
 
     It stops after a :ref:`frame<frame_block>` is decompressed. For multiple frames data, use :py:class:`EndlessZstdDecompressor`.
 
@@ -315,7 +320,7 @@ Stream decompress classes
 
 .. py:class:: EndlessZstdDecompressor
 
-    Stream decompressor, accepts multiple concatenated :ref:`frames<frame_block>`, can be used in communication scenarios.
+    Stream decompressor, accepts multiple concatenated :ref:`frames<frame_block>`.
 
     Thread-safe at method level.
 
@@ -368,28 +373,41 @@ Stream decompress classes
         decompressed_dat = b''.join(lst)
         assert d2.at_frame_edge, 'data ends in an incomplete frame.'
 
+    .. hint:: Why :py:class:`EndlessZstdDecompressor` doesn't stop at frame edge?
+
+        If so, unused input data after an edge will be copied to an internal buffer, this may be a performance overhead.
+
+        If want to stop at frame edges, write a wrapper using :py:class:`ZstdDecompressor` class. And don't feed too much data every time, the overhead of copying unused input data to :py:attr:`ZstdDecompressor.unused_data` attribute still exists.
+
+
 .. _zstd_dict:
 
 Dictionary
 ----------
 
-    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`, advanced function :py:func:`finalize_dict`.
+    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`, :py:func:`finalize_dict`.
 
-.. attention::
-    Using pre-trained zstd dictionary, the compression ratio achievable on small data (a few KB) improves dramatically, has best effect on data that smaller than 1 KB.
+.. note::
+    If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KB) improves dramatically, has best effect on data that smaller than 1 KB.
 
-    Please note:
+    **Attention**
 
         #. If you lose a zstd dictionary, then can't decompress the corresponding data.
         #. Zstd dictionary is vulnerable.
-        #. Zstd dictionary has negligible effect on large data (multi-MB).
+        #. Zstd dictionary has negligible effect on large data (multi-MB) compression.
+
+    **Background**
+
+    The smaller the amount of data to compress, the more difficult it is to compress. This problem is common to all compression algorithms, and reason is, compression algorithms learn from past data how to compress future data. But at the beginning of a new data set, there is no "past" to build upon.
+
+    Zstd training mode can be used to tune the algorithm for a selected type of data. Training is achieved by providing it with a few samples (one file per sample). The result of this training is stored in a file called "dictionary", which must be loaded before compression and decompression.
 
 
 .. py:class:: ZstdDict
 
-    Represents a pre-trained zstd dictionary, it can be used for compression/decompression.
+    Represents a zstd dictionary, can be used for compression/decompression.
 
-    ZstdDict object is thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
+    It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -402,7 +420,7 @@ Dictionary
 
     .. py:attribute:: dict_content
 
-        The content of zstd dictionary, a ``bytes`` object, it's the same as *dict_content* argument in :py:meth:`~ZstdDict.__init__` method. It can be used with other programs.
+        The content of zstd dictionary, a ``bytes`` object. It's the same as *dict_content* argument in :py:meth:`~ZstdDict.__init__` method. It can be used with other programs.
 
     .. py:attribute:: dict_id
 
@@ -410,7 +428,9 @@ Dictionary
 
         Non-zero means ordinary dictionary, was created by zstd functions, follow a specified format.
 
-        ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user.
+        ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user. (Note that the meaning of ``0`` is different from ``dictionary_id`` in :py:func:`get_frame_info` function.)
+
+        I personally don't recommend using dictionary ID to identify dictionaries, there may be collision and confusion. Consider using a more reliable way to manage dictionaries, such as by file name.
 
     .. sourcecode:: python
 
@@ -430,7 +450,7 @@ Dictionary
     :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
     :type samples: iterable
     :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
-    :return: Trained zstd dictionary.
+    :return: Trained zstd dictionary. If want to save the dictionary to a file, save the :py:attr:`ZstdDict.dict_content` attribute.
     :rtype: ZstdDict
 
     .. sourcecode:: python
@@ -457,21 +477,23 @@ Dictionary
    2. It's recommended to provide a few thousands samples, though this can vary a lot.
    3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
    4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
-
+   5. You may compose a more efficient dictionary by hand, and use :py:func:`finalize_dict` function to finalize a dictionary. For example, use the general parts of some files to compose a more efficient dictionary.
 
 .. py:function:: finalize_dict(zstd_dict, samples, dict_size, level)
 
-    This is an advanced function, see `zstd documentation <https://github.com/facebook/zstd/blob/master/lib/dictBuilder/zdict.h>`_ for usage.
+    Given a custom content as a basis for dictionary, and a set of samples, finalize dictionary by adding headers and statistics according to the zstd dictionary format.
 
-    .. Only available when the underlying zstd library's version is 1.4.5+, otherwise raise a ``NotImplementedError`` exception.
+    You may compose an efficient dictionary content by hand, which is used as basis dictionary, and use some samples to finalize a dictionary. The basis dictionary can be a "raw content" dictionary, see *is_raw* argument in :py:meth:`ZstdDict.__init__` method. When composing text content, pay attention to newline characters.
 
-    :param zstd_dict: An existing zstd dictionary.
+    There is a practical `usage <https://github.com/facebook/zstd/issues/2203>`_ on zstd GitHub Issues.
+
+    :param zstd_dict: A basis dictionary.
     :type zstd_dict: ZstdDict
     :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
     :type samples: iterable
     :param int dict_size: Returned zstd dictionary's **maximum** size, in bytes.
-    :param int level: The compression level expected to use in production.
-    :return: Finalized zstd dictionary.
+    :param int level: The compression level expected to use in production. The statistics for each compression level differ, so tuning the dictionary for the compression level can help quite a bit.
+    :return: Finalized zstd dictionary. If want to save the dictionary to a file, save the :py:attr:`ZstdDict.dict_content` attribute.
     :rtype: ZstdDict
 
 
@@ -484,9 +506,11 @@ Module-level functions
 
     Get zstd frame infomation from a frame header.
 
-    Return a two-items namedtuple: (decompressed_size, dictionary_id).
+    Return a two-items namedtuple: (decompressed_size, dictionary_id)
 
-    If decompressed size is unknown (generated by stream compression), ``decompressed_size`` will be ``None``. If no dictionary, ``dictionary_id`` will be ``0``.
+    If ``decompressed_size`` is ``None``, decompressed size is unknown.
+
+    ``dictionary_id`` is a 32-bit unsigned integer value. ``0`` means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified. (Note that the meaning of ``0`` is different from :py:attr:`ZstdDict.dict_id` attribute.)
 
     It's possible to add more items to the namedtuple in the future.
 
@@ -606,9 +630,11 @@ Advanced parameters
 
     Advanced compress parameters.
 
+    When using, put the parameters in a ``dict`` object, the key is a :py:class:`CParameter` name, the value is a 32-bit signed integer value.
+
     Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
 
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/master/lib/zstd.h>`_, note that these values may be different in different zstd versions.
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. sourcecode:: python
 
@@ -619,7 +645,7 @@ Advanced parameters
         compressed_dat = compress(raw_dat, option)
 
         # used with ZstdCompressor object
-        c = ZstdCompressor(option=option)
+        c = ZstdCompressor(level_or_option=option)
         compressed_dat1 = c.compress(raw_dat)
         compressed_dat2 = c.flush()
 
@@ -863,9 +889,11 @@ Advanced parameters
 
     Advanced decompress parameters.
 
+    When using, put the parameters in a ``dict`` object, the key is a :py:class:`DParameter` name, the value is a 32-bit signed integer value.
+
     Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
 
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/master/lib/zstd.h>`_, note that these values may be different in different zstd versions.
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. sourcecode:: python
 
@@ -946,7 +974,7 @@ Advanced parameters
 
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
 
-    The multi-threaded output is not multiple :ref:`frames<frame_block>`, it's larger a little. Compressing a 520.58 MB data, single-threaded output is 273.55 MB, multi-threaded output is 274.33 MB.
+    The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MB data, single-threaded output is 273.55 MB, multi-threaded output is 274.33 MB.
 
 
 .. _rich_mem:
