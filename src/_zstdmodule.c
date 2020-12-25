@@ -520,7 +520,8 @@ typedef enum {
     ERR_LOAD_C_DICT,
 
     ERR_GET_FRAME_SIZE,
-    ERR_GET_BOUNDS,
+    ERR_GET_C_BOUNDS,
+    ERR_GET_D_BOUNDS,
 
     ERR_TRAIN_DICT,
     ERR_FINALIZE_DICT
@@ -554,8 +555,11 @@ set_zstd_error(const error_type type, const size_t code)
     case ERR_GET_FRAME_SIZE:
         type_msg = "get the size of a zstd frame";
         break;
-    case ERR_GET_BOUNDS:
-        type_msg = "get zstd parameter bounds";
+    case ERR_GET_C_BOUNDS:
+        type_msg = "get zstd compress parameter bounds";
+        break;
+    case ERR_GET_D_BOUNDS:
+        type_msg = "get zstd decompress parameter bounds";
         break;
 
     case ERR_TRAIN_DICT:
@@ -581,7 +585,7 @@ capsule_free_cdict(PyObject *capsule)
     ZSTD_freeCDict(cdict);
 }
 
-static ZSTD_CDict *
+static inline ZSTD_CDict *
 _get_CDict(ZstdDict *self, int compressionLevel)
 {
     PyObject *level = NULL;
@@ -2584,68 +2588,35 @@ success:
     return ret;
 }
 
-PyDoc_STRVAR(_get_cparam_bounds_doc,
-"Internal funciton, get CParameter bounds.");
+PyDoc_STRVAR(_get_param_bounds_doc,
+"Internal funciton, get CParameter/DParameter bounds.");
 
 static PyObject *
-_get_cparam_bounds(PyObject *module, PyObject *args)
+_get_param_bounds(PyObject *module, PyObject *args)
 {
-    int cParam;
+    int is_compress;
+    int parameter;
 
     PyObject *ret;
     PyObject *temp;
+    ZSTD_bounds bound;
 
-    if (!PyArg_ParseTuple(args, "i:_get_cparam_bounds", &cParam)) {
+    if (!PyArg_ParseTuple(args, "ii:_get_param_bounds", &is_compress, &parameter)) {
         return NULL;
     }
 
-    ZSTD_bounds const bound = ZSTD_cParam_getBounds(cParam);
-    if (ZSTD_isError(bound.error)) {
-        set_zstd_error(ERR_GET_BOUNDS, bound.error);
-        return NULL;
-    }
-
-    ret = PyTuple_New(2);
-    if (ret == NULL) {
-        return NULL;
-    }
-
-    temp = PyLong_FromLong(bound.lowerBound);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromLong(bound.upperBound);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
-
-    return ret;
-}
-
-PyDoc_STRVAR(_get_dparam_bounds_doc,
-"Internal funciton, get DParameter bounds.");
-
-static PyObject *
-_get_dparam_bounds(PyObject *module, PyObject *args)
-{
-    int dParam;
-
-    PyObject *ret;
-    PyObject *temp;
-
-    if (!PyArg_ParseTuple(args, "i:_get_dparam_bounds", &dParam)) {
-        return NULL;
-    }
-
-    ZSTD_bounds const bound = ZSTD_dParam_getBounds(dParam);
-    if (ZSTD_isError(bound.error)) {
-        set_zstd_error(ERR_GET_BOUNDS, bound.error);
-        return NULL;
+    if (is_compress) {
+        bound = ZSTD_cParam_getBounds(parameter);
+        if (ZSTD_isError(bound.error)) {
+            set_zstd_error(ERR_GET_C_BOUNDS, bound.error);
+            return NULL;
+        }
+    } else {
+        bound = ZSTD_dParam_getBounds(parameter);
+        if (ZSTD_isError(bound.error)) {
+            set_zstd_error(ERR_GET_D_BOUNDS, bound.error);
+            return NULL;
+        }
     }
 
     ret = PyTuple_New(2);
@@ -2785,8 +2756,7 @@ static PyMethodDef _zstd_methods[] = {
     {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
     {"_finalize_dict", (PyCFunction)_finalize_dict, METH_VARARGS, _finalize_dict_doc},
-    {"_get_cparam_bounds", (PyCFunction)_get_cparam_bounds, METH_VARARGS, _get_cparam_bounds_doc},
-    {"_get_dparam_bounds", (PyCFunction)_get_dparam_bounds, METH_VARARGS, _get_dparam_bounds_doc},
+    {"_get_param_bounds", (PyCFunction)_get_param_bounds, METH_VARARGS, _get_param_bounds_doc},
     {"get_frame_size", (PyCFunction)get_frame_size, METH_VARARGS, get_frame_size_doc},
     {"_get_frame_info", (PyCFunction)_get_frame_info, METH_VARARGS, _get_frame_info_doc},
     {NULL}

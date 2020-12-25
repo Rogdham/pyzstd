@@ -72,7 +72,8 @@ class CParameter(enum.IntEnum):
 
     def bounds(self):
         """Return lower and upper bounds of a parameter, both inclusive."""
-        return _zstd._get_cparam_bounds(self.value)
+        # 1 means compress parameter
+        return _zstd._get_param_bounds(1, self.value)
 
 
 class DParameter(enum.IntEnum):
@@ -80,7 +81,8 @@ class DParameter(enum.IntEnum):
 
     def bounds(self):
         """Return lower and upper bounds of a parameter, both inclusive."""
-        return _zstd._get_dparam_bounds(self.value)
+        # 0 means decompress parameter
+        return _zstd._get_param_bounds(0, self.value)
 
 
 class Strategy(enum.IntEnum):
