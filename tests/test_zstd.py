@@ -6,15 +6,12 @@ import os
 import pathlib
 import pickle
 import random
-import sys
 import tempfile
-from test import support
 import unittest
 
-from test.support import (
+from test.support import (  # type: ignore
     _4G, bigmemtest, run_unittest
 )
-# from test.support.import_helper import import_module
 
 import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
@@ -29,8 +26,8 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
 
-DECOMPRESSED_DAT_100_PLUS_32KB = None
-DAT_100_PLUS_32KB = None
+DECOMPRESSED_100_PLUS_32KB = None
+COMPRESSED_100_PLUS_32KB = None
 
 SKIPPABLE_FRAME = None
 
@@ -43,6 +40,53 @@ COMPRESSED_BOGUS = None
 SAMPLES = None
 
 TRAINED_DICT = None
+
+def setUpModule():
+    global DECOMPRESSED_DAT
+    DECOMPRESSED_DAT = b'abcdefg123456' * 1000
+
+    global COMPRESSED_DAT
+    COMPRESSED_DAT = compress(DECOMPRESSED_DAT)
+
+    global DECOMPRESSED_100_PLUS_32KB
+    DECOMPRESSED_100_PLUS_32KB = b'a' * (100 + 32*1024)
+
+    global COMPRESSED_100_PLUS_32KB
+    COMPRESSED_100_PLUS_32KB = compress(DECOMPRESSED_100_PLUS_32KB)
+
+    global SKIPPABLE_FRAME
+    SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
+                      (32*1024).to_bytes(4, byteorder='little') + \
+                      b'a' * (32*1024)
+
+    global THIS_FILE_BYTES, THIS_FILE_STR
+    with builtins.open(os.path.abspath(__file__), 'rb') as f:
+        THIS_FILE_BYTES = f.read()
+        THIS_FILE_BYTES = re.sub(rb'\r?\n', rb'\n', THIS_FILE_BYTES)
+        THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
+
+    global COMPRESSED_THIS_FILE
+    COMPRESSED_THIS_FILE = compress(THIS_FILE_BYTES)
+
+    global COMPRESSED_BOGUS
+    COMPRESSED_BOGUS = DECOMPRESSED_DAT
+
+    # dict data
+    words = [b'red', b'green', b'yellow', b'black', b'withe', b'blue',
+             b'lilac', b'purple', b'navy', b'glod', b'silver', b'olive',
+             b'dog', b'cat', b'tiger', b'lion', b'fish', b'bird']
+    lst = []
+    for i in range(1500):
+        sample = [b'%s = %d' % (random.choice(words), random.randrange(100))
+                  for j in range(20)]
+        sample = b'\n'.join(sample)
+
+        lst.append(sample)
+    global SAMPLES
+    SAMPLES = lst
+
+    global TRAINED_DICT
+    TRAINED_DICT = train_dict(SAMPLES, 200*1024)
 
 class FunctionsTestCase(unittest.TestCase):
 
@@ -67,15 +111,15 @@ class FunctionsTestCase(unittest.TestCase):
             self.assertEqual(dat2, raw_dat)
 
     def test_get_frame_info(self):
-        info = get_frame_info(DAT_100_PLUS_32KB[:20])
+        info = get_frame_info(COMPRESSED_100_PLUS_32KB[:20])
 
         self.assertEqual(info.decompressed_size, 32*1024+100)
         self.assertEqual(info.dictionary_id, 0)
 
     def test_get_frame_size(self):
-        size = get_frame_size(DAT_100_PLUS_32KB)
+        size = get_frame_size(COMPRESSED_100_PLUS_32KB)
 
-        self.assertEqual(size, len(DAT_100_PLUS_32KB))
+        self.assertEqual(size, len(COMPRESSED_100_PLUS_32KB))
 
 
 class ClassShapeTestCase(unittest.TestCase):
@@ -460,11 +504,30 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
 
     def test_zstd_multithread_compress(self):
-        b = THIS_FILE_BYTES * 30
+        size = 40*1024*1024
+        b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
 
-        dat1 = compress(b, {CParameter.nbWorkers : 2})
+        option = {CParameter.compressionLevel : 4,
+                  CParameter.nbWorkers : 2}
+
+        # compress()
+        dat1 = compress(b, option)
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
+
+        # richmem_compress()
+        with self.assertWarns(ResourceWarning):
+            dat1 = richmem_compress(b, option)
+        dat2 = decompress(dat1)
+        self.assertEqual(dat2, b)
+
+        # ZstdCompressor
+        c = ZstdCompressor(option)
+        dat1 = c.compress(b, c.CONTINUE)
+        dat2 = c.compress(b, c.FLUSH_BLOCK)
+        dat3 = c.compress(b, c.FLUSH_FRAME)
+        dat4 = decompress(dat1+dat2+dat3)
+        self.assertEqual(dat4, b * 3)
 
     def test_rich_mem_compress(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
@@ -816,7 +879,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data, TRAIL)
 
-    def test_decompressor_chunks(self):
+    def test_decompressor_chunks_read_300(self):
         _130_KB = 130 * 1024
         TRAIL = b'89234893abcd'
         DAT = TEST_DAT_130KB + TRAIL
@@ -844,7 +907,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data + bi.read(), TRAIL)
 
-    def test_decompressor_chunks(self):
+    def test_decompressor_chunks_read_3(self):
         _130_KB = 130 * 1024
         TRAIL = b'89234893'
         DAT = TEST_DAT_130KB + TRAIL
@@ -900,7 +963,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
     def test_function_decompress(self):
         self.assertEqual(decompress(b''), b'')
 
-        self.assertEqual(len(decompress(DAT_100_PLUS_32KB)), 100+32*1024)
+        self.assertEqual(len(decompress(COMPRESSED_100_PLUS_32KB)), 100+32*1024)
 
         # 1 frame
         self.assertEqual(decompress(self.FRAME_42), self.DECOMPRESSED_42)
@@ -1072,7 +1135,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
         # 1 frame, 32KB+100, trail
         d = ZstdDecompressor()
-        dat = d.decompress(DAT_100_PLUS_32KB+self.TRAIL, 100) # 100 bytes
+        dat = d.decompress(COMPRESSED_100_PLUS_32KB+self.TRAIL, 100) # 100 bytes
 
         self.assertEqual(len(dat), 100)
         self.assertFalse(d.eof)
@@ -1366,15 +1429,21 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
 class ZstdDictTestCase(unittest.TestCase):
 
-    def test_is_raw_1(self):
-        b = b'12345678abcd'
+    def test_is_raw(self):
+        # content < 8
+        b = b'1234567'
         with self.assertRaises(ValueError):
-            zd = ZstdDict(b)
+            ZstdDict(b)
 
-    def test_is_raw_2(self):
-        b = b'12345678abcd'
+        # content == 8
+        b = b'12345678'
         zd = ZstdDict(b, is_raw=True)
         self.assertEqual(zd.dict_id, 0)
+
+        # is_raw == False
+        b = b'12345678abcd'
+        with self.assertRaises(ValueError):
+            ZstdDict(b)
 
         # read only attributes
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
@@ -1383,41 +1452,72 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
             zd.dict_id = 10000
 
+        # ZstdDict arguments
+        zd = ZstdDict(TRAINED_DICT.dict_content, is_raw=False)
+        self.assertNotEqual(zd.dict_id, 0)
+
+        ZstdDict(TRAINED_DICT.dict_content, is_raw=True)
+        self.assertNotEqual(zd.dict_id, 0) # note this assertion
+
+        with self.assertRaises(TypeError):
+            ZstdDict("12345678abcdef", is_raw=True)
+        with self.assertRaises(TypeError):
+            ZstdDict(TRAINED_DICT)
+
     def test_train_dict(self):
-        DICT_SIZE1 = 100*1024
+        DICT_SIZE1 = 200*1024
 
         global TRAINED_DICT
         TRAINED_DICT = zstd.train_dict(SAMPLES, DICT_SIZE1)
-        temp_dict = ZstdDict(TRAINED_DICT.dict_content, False)
+        ZstdDict(TRAINED_DICT.dict_content, False)
 
         self.assertNotEqual(TRAINED_DICT.dict_id, 0)
         self.assertGreater(len(TRAINED_DICT.dict_content), 0)
         self.assertLessEqual(len(TRAINED_DICT.dict_content), DICT_SIZE1)
-
         self.assertTrue(re.match(r'^<ZstdDict dict_id=\d+ dict_size=\d+>$', str(TRAINED_DICT)))
 
         # compress/decompress
+        c = ZstdCompressor(zstd_dict=TRAINED_DICT)
         for sample in SAMPLES:
             dat1 = compress(sample, zstd_dict=TRAINED_DICT)
             dat2 = decompress(dat1, TRAINED_DICT)
             self.assertEqual(sample, dat2)
 
-        # finalize_dict
+            dat1 = c.compress(sample)
+            dat1 += c.flush()
+            dat2 = decompress(dat1, TRAINED_DICT)
+            self.assertEqual(sample, dat2)
+
+    def test_finalize_dict(self):
         if zstd_version_info < (1, 4, 5):
             return
 
-        DICT_SIZE2 = 80*1024
-        dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, 10)
+        DICT_SIZE2 = 200*1024
+        C_LEVEL = 6
+        dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, C_LEVEL)
 
         self.assertNotEqual(dic2.dict_id, 0)
         self.assertGreater(len(dic2.dict_content), 0)
         self.assertLessEqual(len(dic2.dict_content), DICT_SIZE2)
 
         # compress/decompress
+        c = ZstdCompressor(C_LEVEL, dic2)
         for sample in SAMPLES:
-            dat1 = compress(sample, zstd_dict=dic2)
+            dat1 = compress(sample, C_LEVEL, dic2)
             dat2 = decompress(dat1, dic2)
             self.assertEqual(sample, dat2)
+
+            dat1 = c.compress(sample)
+            dat1 += c.flush()
+            dat2 = decompress(dat1, dic2)
+            self.assertEqual(sample, dat2)
+
+        # dict mismatch
+        self.assertNotEqual(TRAINED_DICT.dict_id, dic2.dict_id)
+
+        dat1 = compress(SAMPLES[0], zstd_dict=TRAINED_DICT)
+        with self.assertRaises(ZstdError):
+            decompress(dat1, dic2)
 
     def test_train_dict_arguments(self):
         with self.assertRaises(ValueError):
@@ -1430,11 +1530,8 @@ class ZstdDictTestCase(unittest.TestCase):
             train_dict(SAMPLES, 0)
 
     def test_finalize_dict_arguments(self):
-        global TRAINED_DICT
-        TRAINED_DICT = zstd.train_dict(SAMPLES, 100*1024)
-
         with self.assertRaises(TypeError):
-            finalize_dict({1:2}, ['aaa', 'bbb'], 100_000, 2)
+            finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
 
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, [], 100_000, 2)
@@ -1449,7 +1546,7 @@ class ZstdDictTestCase(unittest.TestCase):
 class FileTestCase(unittest.TestCase):
 
     def test_init(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             pass
         with ZstdFile(BytesIO(), "w") as f:
             pass
@@ -1477,14 +1574,14 @@ class FileTestCase(unittest.TestCase):
             filename = pathlib.Path(tmp_f.name)
 
         with ZstdFile(filename, "a") as f:
-            f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+            f.write(DECOMPRESSED_100_PLUS_32KB)
         with ZstdFile(filename) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
         with ZstdFile(filename, "a") as f:
-            f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+            f.write(DECOMPRESSED_100_PLUS_32KB)
         with ZstdFile(filename) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB * 2)
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB * 2)
 
         os.remove(filename)
 
@@ -1531,27 +1628,27 @@ class FileTestCase(unittest.TestCase):
 
     def test_init_bad_mode(self):
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), (3, "x"))
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), (3, "x"))
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "xt")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "xt")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "x+")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "x+")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rx")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "rx")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "wx")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "wx")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rt")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "rt")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r+")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r+")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "wt")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "wt")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "w+")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "w+")
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "rw")
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "rw")
 
         # doesn't raise ZstdError, due to:
         # (DParameter.windowLogMax == CParameter.compressionLevel == 100)
@@ -1563,10 +1660,10 @@ class FileTestCase(unittest.TestCase):
                      level_or_option={DParameter.windowLogMax:compressionLevel_values.max+1})
 
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r", level_or_option=12)
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option=12)
 
         with self.assertRaises(ZstdError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r", level_or_option={CParameter.checksumFlag:1})
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option={CParameter.checksumFlag:1})
 
     def test_init_bad_check(self):
         with self.assertRaises(TypeError):
@@ -1578,25 +1675,25 @@ class FileTestCase(unittest.TestCase):
             ZstdFile(BytesIO(), "w", level_or_option={CParameter.windowLog:99})
 
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r", level_or_option=33)
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option=33)
 
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB),
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                              level_or_option={DParameter.windowLogMax:2**31})
 
         with self.assertRaises(ZstdError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB),
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                              level_or_option={444:333})
 
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), zstd_dict={1:2})
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict={1:2})
 
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(DAT_100_PLUS_32KB), zstd_dict=b'dict123456')
+            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict=b'dict123456')
 
 
     def test_close(self):
-        with BytesIO(DAT_100_PLUS_32KB) as src:
+        with BytesIO(COMPRESSED_100_PLUS_32KB) as src:
             f = ZstdFile(src)
             f.close()
             # ZstdFile.close() should not close the underlying file object.
@@ -1620,7 +1717,7 @@ class FileTestCase(unittest.TestCase):
         os.remove(filename)
 
     def test_closed(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:
             self.assertFalse(f.closed)
             f.read()
@@ -1638,7 +1735,7 @@ class FileTestCase(unittest.TestCase):
 
     def test_fileno(self):
         # 1
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:
             self.assertRaises(UnsupportedOperation, f.fileno)
         finally:
@@ -1660,7 +1757,7 @@ class FileTestCase(unittest.TestCase):
         os.remove(filename)
 
     def test_seekable(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:
             self.assertTrue(f.seekable())
             f.read()
@@ -1676,7 +1773,7 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.seekable)
 
-        src = BytesIO(DAT_100_PLUS_32KB)
+        src = BytesIO(COMPRESSED_100_PLUS_32KB)
         src.seekable = lambda: False
         f = ZstdFile(src)
         try:
@@ -1686,7 +1783,7 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.seekable)
 
     def test_readable(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:
             self.assertTrue(f.readable())
             f.read()
@@ -1703,7 +1800,7 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.readable)
 
     def test_writable(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:
             self.assertFalse(f.writable())
             f.read()
@@ -1720,27 +1817,27 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.writable)
 
     def test_read(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
             self.assertEqual(f.read(), b"")
 
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB),
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
             self.assertEqual(f.read(), b"")
 
     def test_read_0(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(0), b"")
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB),
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(0), b"")
 
     def test_read_10(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             chunks = []
             while True:
                 result = f.read(10)
@@ -1748,26 +1845,26 @@ class FileTestCase(unittest.TestCase):
                     break
                 self.assertLessEqual(len(result), 10)
                 chunks.append(result)
-            self.assertEqual(b"".join(chunks), DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(b"".join(chunks), DECOMPRESSED_100_PLUS_32KB)
 
     def test_read_multistream(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB * 5)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB * 5)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB * 5)) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB * 5)
 
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB + SKIPPABLE_FRAME)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME)) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB + COMPRESSED_DAT)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB + DECOMPRESSED_DAT)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB + COMPRESSED_DAT)) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_DAT)
 
     def test_read_multistream_buffer_size_aligned(self):
         # Test the case where a stream boundary coincides with the end
         # of the raw read buffer.
         saved_buffer_size = _compression.BUFFER_SIZE
-        _compression.BUFFER_SIZE = len(DAT_100_PLUS_32KB)
+        _compression.BUFFER_SIZE = len(COMPRESSED_100_PLUS_32KB)
         try:
-            with ZstdFile(BytesIO(DAT_100_PLUS_32KB *  5)) as f:
-                self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB * 5)
+            with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB *  5)) as f:
+                self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB * 5)
         finally:
             _compression.BUFFER_SIZE = saved_buffer_size
 
@@ -1830,36 +1927,36 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(f.read1(), b"")
 
     def test_read1_multistream(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB * 5)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB * 5)) as f:
             blocks = []
             while True:
                 result = f.read1()
                 if not result:
                     break
                 blocks.append(result)
-            self.assertEqual(b"".join(blocks), DECOMPRESSED_DAT_100_PLUS_32KB * 5)
+            self.assertEqual(b"".join(blocks), DECOMPRESSED_100_PLUS_32KB * 5)
             self.assertEqual(f.read1(), b"")
 
     def test_read1_bad_args(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         f.close()
         self.assertRaises(ValueError, f.read1)
         with ZstdFile(BytesIO(), "w") as f:
             self.assertRaises(ValueError, f.read1)
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertRaises(TypeError, f.read1, None)
 
     def test_peek(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             result = f.peek()
             self.assertGreater(len(result), 0)
-            self.assertTrue(DECOMPRESSED_DAT_100_PLUS_32KB.startswith(result))
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+            self.assertTrue(DECOMPRESSED_100_PLUS_32KB.startswith(result))
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             result = f.peek(10)
             self.assertGreater(len(result), 0)
-            self.assertTrue(DECOMPRESSED_DAT_100_PLUS_32KB.startswith(result))
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertTrue(DECOMPRESSED_100_PLUS_32KB.startswith(result))
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
     def test_peek_bad_args(self):
         with ZstdFile(BytesIO(), "w") as f:
@@ -1963,7 +2060,7 @@ class FileTestCase(unittest.TestCase):
         f = ZstdFile(BytesIO(), "w")
         f.close()
         self.assertRaises(ValueError, f.write, b"foo")
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB), "r") as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r") as f:
             self.assertRaises(ValueError, f.write, b"bar")
         with ZstdFile(BytesIO(), "w") as f:
             self.assertRaises(TypeError, f.write, None)
@@ -1984,63 +2081,63 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(dst.getvalue(), expected)
 
     def test_seek_forward(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.seek(555)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[555:])
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[555:])
 
     def test_seek_forward_across_streams(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB * 2)) as f:
-            f.seek(len(DECOMPRESSED_DAT_100_PLUS_32KB) + 123)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[123:])
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB * 2)) as f:
+            f.seek(len(DECOMPRESSED_100_PLUS_32KB) + 123)
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[123:])
 
     def test_seek_forward_relative_to_current(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.read(100)
             f.seek(1236, 1)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[1336:])
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[1336:])
 
     def test_seek_forward_relative_to_end(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.seek(-555, 2)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[-555:])
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[-555:])
 
     def test_seek_backward(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.read(1001)
             f.seek(211)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[211:])
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[211:])
 
     def test_seek_backward_across_streams(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB * 2)) as f:
-            f.read(len(DECOMPRESSED_DAT_100_PLUS_32KB) + 333)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB * 2)) as f:
+            f.read(len(DECOMPRESSED_100_PLUS_32KB) + 333)
             f.seek(737)
             self.assertEqual(f.read(),
-              DECOMPRESSED_DAT_100_PLUS_32KB[737:] + DECOMPRESSED_DAT_100_PLUS_32KB)
+              DECOMPRESSED_100_PLUS_32KB[737:] + DECOMPRESSED_100_PLUS_32KB)
 
     def test_seek_backward_relative_to_end(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.seek(-150, 2)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB[-150:])
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB[-150:])
 
     def test_seek_past_end(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
-            f.seek(len(DECOMPRESSED_DAT_100_PLUS_32KB) + 9001)
-            self.assertEqual(f.tell(), len(DECOMPRESSED_DAT_100_PLUS_32KB))
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
+            f.seek(len(DECOMPRESSED_100_PLUS_32KB) + 9001)
+            self.assertEqual(f.tell(), len(DECOMPRESSED_100_PLUS_32KB))
             self.assertEqual(f.read(), b"")
 
     def test_seek_past_start(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             f.seek(-88)
             self.assertEqual(f.tell(), 0)
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
     def test_seek_bad_args(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         f.close()
         self.assertRaises(ValueError, f.seek, 0)
         with ZstdFile(BytesIO(), "w") as f:
             self.assertRaises(ValueError, f.seek, 0)
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertRaises(ValueError, f.seek, 0, 3)
             # io.BufferedReader raises TypeError instead of ValueError
             self.assertRaises((TypeError, ValueError), f.seek, 9, ())
@@ -2048,7 +2145,7 @@ class FileTestCase(unittest.TestCase):
             self.assertRaises(TypeError, f.seek, b"derp")
 
     def test_tell(self):
-        with ZstdFile(BytesIO(DAT_100_PLUS_32KB)) as f:
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             pos = 0
             while True:
                 self.assertEqual(f.tell(), pos)
@@ -2056,15 +2153,15 @@ class FileTestCase(unittest.TestCase):
                 if not result:
                     break
                 pos += len(result)
-            self.assertEqual(f.tell(), len(DECOMPRESSED_DAT_100_PLUS_32KB))
+            self.assertEqual(f.tell(), len(DECOMPRESSED_100_PLUS_32KB))
         with ZstdFile(BytesIO(), "w") as f:
-            for pos in range(0, len(DECOMPRESSED_DAT_100_PLUS_32KB), 144):
+            for pos in range(0, len(DECOMPRESSED_100_PLUS_32KB), 144):
                 self.assertEqual(f.tell(), pos)
-                f.write(DECOMPRESSED_DAT_100_PLUS_32KB[pos:pos+144])
-            self.assertEqual(f.tell(), len(DECOMPRESSED_DAT_100_PLUS_32KB))
+                f.write(DECOMPRESSED_100_PLUS_32KB[pos:pos+144])
+            self.assertEqual(f.tell(), len(DECOMPRESSED_100_PLUS_32KB))
 
     def test_tell_bad_args(self):
-        f = ZstdFile(BytesIO(DAT_100_PLUS_32KB))
+        f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         f.close()
         self.assertRaises(ValueError, f.tell)
 
@@ -2083,17 +2180,17 @@ class FileTestCase(unittest.TestCase):
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
-        with open(BytesIO(DAT_100_PLUS_32KB), "rb") as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with open(BytesIO(COMPRESSED_100_PLUS_32KB), "rb") as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
         with BytesIO() as bio:
             with open(bio, "wb") as f:
-                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+                f.write(DECOMPRESSED_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
-            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(file_data, DECOMPRESSED_100_PLUS_32KB)
             with open(bio, "ab") as f:
-                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+                f.write(DECOMPRESSED_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
-            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB * 2)
+            self.assertEqual(file_data, DECOMPRESSED_100_PLUS_32KB * 2)
 
     def test_text_modes(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
@@ -2131,15 +2228,15 @@ class OpenTestCase(unittest.TestCase):
 
     def test_option(self):
         option = {DParameter.windowLogMax:25}
-        with open(BytesIO(DAT_100_PLUS_32KB), "rb", level_or_option=option) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_DAT_100_PLUS_32KB)
+        with open(BytesIO(COMPRESSED_100_PLUS_32KB), "rb", level_or_option=option) as f:
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
 
         option = {CParameter.compressionLevel:12}
         with BytesIO() as bio:
             with open(bio, "wb", level_or_option=option) as f:
-                f.write(DECOMPRESSED_DAT_100_PLUS_32KB)
+                f.write(DECOMPRESSED_100_PLUS_32KB)
             file_data = decompress(bio.getvalue())
-            self.assertEqual(file_data, DECOMPRESSED_DAT_100_PLUS_32KB)
+            self.assertEqual(file_data, DECOMPRESSED_100_PLUS_32KB)
 
     def test_encoding(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
@@ -2205,48 +2302,6 @@ def test_main():
         FileTestCase,
         OpenTestCase,
     )
-
-def prepare_test_data():
-    global DECOMPRESSED_DAT
-    DECOMPRESSED_DAT = b'abcdefg123456' * 1000
-
-    global COMPRESSED_DAT
-    COMPRESSED_DAT = compress(DECOMPRESSED_DAT)
-
-    global DECOMPRESSED_DAT_100_PLUS_32KB
-    DECOMPRESSED_DAT_100_PLUS_32KB = b'a' * (100 + 32*1024)
-
-    global DAT_100_PLUS_32KB
-    DAT_100_PLUS_32KB = compress(DECOMPRESSED_DAT_100_PLUS_32KB)
-
-    global SKIPPABLE_FRAME
-    SKIPPABLE_FRAME = (0x184D2A50).to_bytes(4, byteorder='little') + \
-                      (32*1024).to_bytes(4, byteorder='little') + \
-                      b'a' * (32*1024)
-
-    global THIS_FILE_BYTES, THIS_FILE_STR
-    with builtins.open(os.path.abspath(__file__), 'rb') as f:
-        THIS_FILE_BYTES = f.read()
-        THIS_FILE_STR = THIS_FILE_BYTES.decode('utf-8')
-
-    global COMPRESSED_THIS_FILE
-    COMPRESSED_THIS_FILE = compress(THIS_FILE_BYTES)
-
-    global COMPRESSED_BOGUS
-    COMPRESSED_BOGUS = DECOMPRESSED_DAT
-
-    # dict data
-    colors = [b'red', b'green', b'yellow', b'black', b'withe', b'blue',
-              b'lilac', b'purple', b'navy', b'glod', b'silver', b'olive']
-    lst = []
-    for i in range(1800):
-        sample  = b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-        sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-        sample += b'%s = %d\n' % (random.choice(colors), random.randrange(100))
-        sample += b'%s = %d' % (random.choice(colors), random.randrange(100))
-        lst.append(sample)
-    global SAMPLES
-    SAMPLES = lst
 
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
@@ -3431,8 +3486,6 @@ TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae
  b'\xa3-\xb2\xe9\x9e\x8b\x8e\xe5\x82\xc2\xcb\x13\xe4\xb0\x84\xbd\x9c\xe5\xd6S'
  b'5\x11Kd\x91u\x9b\x07\xe3\x14\xd3\x08\xe4\x86\xad_R\x12Ux\xf6%MS'
  b'\xb7\x99\x1b\xce\xc9\t*\x98\x97\xb43z\x01h\x9fu\xf1')
-
-prepare_test_data()
 
 if __name__ == "__main__":
     test_main()
