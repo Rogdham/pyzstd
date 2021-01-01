@@ -1,12 +1,23 @@
 ﻿#!/usr/bin/env python3
 import io
 import os
+import re
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-README_PATH = os.path.join(os.path.dirname(__file__), 'README.rst')
+ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
+
+# read README.rst
+README_PATH = os.path.join(ROOT_PATH, 'README.rst')
 with io.open(README_PATH, 'r', encoding='utf-8') as file:
     long_description = file.read()
+
+# read module version
+INIT_PATH = os.path.join(ROOT_PATH, 'src', '__init__.py')
+with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
+    file_content = file.read()
+    m = re.search(r'''__version__\s*=\s*(['"])(.*?)\1''', file_content)
+    module_version = m.group(2)
 
 zstd_files = [
     'common/fse_decompress.c',
@@ -63,7 +74,7 @@ class build_ext_compiler_check(build_ext):
 
 setup(
     name='pyzstd',
-    version='0.14.1',
+    version=module_version,
     description="Python bindings for Zstandard (zstd) compression algorithm, the API is similar to Python's bz2/lzma/zlib module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
