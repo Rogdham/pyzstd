@@ -111,10 +111,11 @@ typedef struct {
     PyObject *list;
     /* Number of whole allocated size. */
     Py_ssize_t allocated;
-
     /* Max length of the buffer, negative number for unlimited length. */
     Py_ssize_t max_length;
 } BlocksOutputBuffer;
+
+static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 
 /* Block size sequence. Below functions assume the type is int. */
 #define KB (1024)
@@ -123,8 +124,6 @@ static const int BUFFER_BLOCK_SIZE[] =
     { 32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
       32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
       256*MB };
-#undef KB
-#undef MB
 
 /* According to the block sizes defined by BUFFER_BLOCK_SIZE, the whole
    allocated size growth step is:
@@ -197,7 +196,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
     return 0;
 }
 
-/* Initialize the buffer, with an initial size. Only used for zstd compression.
+/* Initialize the buffer, with an initial size.
    init_size: the initial size.
    Return 0 on success
    Return -1 on failure
@@ -212,7 +211,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
     b = PyBytes_FromStringAndSize(NULL, init_size);
     if (b == NULL) {
         buffer->list = NULL; /* For OutputBuffer_OnError() */
-        PyErr_SetString(PyExc_MemoryError, "Unable to allocate output buffer.");
+        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
     }
 
@@ -271,7 +270,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     /* Create the block */
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Unable to allocate output buffer.");
+        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
     }
     if (PyList_Append(buffer->list, b) < 0) {
@@ -304,12 +303,12 @@ static PyObject *
 OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
-    int8_t *offset;
+    int8_t *posi;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
 
     /* Fast path for single block */
-    if ((ob->pos == 0 && list_len == 2) ||
-        (ob->pos == ob->size && list_len == 1)) {
+    if ((list_len == 2 && ob->pos == 0) ||
+        (list_len == 1 && ob->pos == ob->size)) {
         block = PyList_GET_ITEM(buffer->list, 0);
         Py_INCREF(block);
 
@@ -320,24 +319,24 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     /* Final bytes object */
     result = PyBytes_FromStringAndSize(NULL, buffer->allocated - (ob->size - ob->pos));
     if (result == NULL) {
-        PyErr_SetString(PyExc_MemoryError, "Unable to allocate output buffer.");
+        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return NULL;
     }
 
     /* Memory copy */
     if (list_len > 0) {
-        offset = (int8_t*) PyBytes_AS_STRING(result);
+        posi = (int8_t*) PyBytes_AS_STRING(result);
 
         /* Blocks except the last one */
         Py_ssize_t i = 0;
         for (; i < list_len-1; i++) {
             block = PyList_GET_ITEM(buffer->list, i);
-            memcpy(offset, PyBytes_AS_STRING(block), Py_SIZE(block));
-            offset += Py_SIZE(block);
+            memcpy(posi, PyBytes_AS_STRING(block), Py_SIZE(block));
+            posi += Py_SIZE(block);
         }
         /* The last block */
         block = PyList_GET_ITEM(buffer->list, i);
-        memcpy(offset, PyBytes_AS_STRING(block), Py_SIZE(block) - (ob->size - ob->pos));
+        memcpy(posi, PyBytes_AS_STRING(block), ob->pos);
     } else {
         assert(Py_SIZE(result) == 0);
     }
@@ -512,6 +511,8 @@ add_parameters(PyObject *module)
     } } while (0)
 #define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
 
+static const char init_twice_msg[] = "__init__ method is called twice.";
+
 typedef enum {
     ERR_DECOMPRESS,
     ERR_COMPRESS,
@@ -522,6 +523,7 @@ typedef enum {
     ERR_GET_FRAME_SIZE,
     ERR_GET_C_BOUNDS,
     ERR_GET_D_BOUNDS,
+    ERR_SET_C_LEVEL,
 
     ERR_TRAIN_DICT,
     ERR_FINALIZE_DICT
@@ -560,6 +562,9 @@ set_zstd_error(const error_type type, const size_t code)
         break;
     case ERR_GET_D_BOUNDS:
         type_msg = "get zstd decompress parameter bounds";
+        break;
+    case ERR_SET_C_LEVEL:
+        type_msg = "set zstd compression level";
         break;
 
     case ERR_TRAIN_DICT:
@@ -701,9 +706,7 @@ set_c_parameters(ZstdCompressor *self,
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            PyErr_Format(static_state.ZstdError,
-                         "Error when setting compression level: %s",
-                         ZSTD_getErrorName(zstd_ret));
+            set_zstd_error(ERR_SET_C_LEVEL, zstd_ret);
             return -1;
         }
         return 0;
@@ -975,7 +978,7 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
 
     /* Only called once */
     if (self->inited) {
-        PyErr_SetString(PyExc_RuntimeError, "ZstdDict.__init__ function was called twice.");
+        PyErr_SetString(PyExc_RuntimeError, init_twice_msg);
         return -1;
     }
     self->inited = 1;
@@ -1389,8 +1392,7 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
     /* Only called once */
     if (self->inited) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "ZstdCompressor.__init__ function was called twice.");
+        PyErr_SetString(PyExc_RuntimeError, init_twice_msg);
         return -1;
     }
     self->inited = 1;
@@ -1728,8 +1730,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
 
     /* Only called once */
     if (self->inited) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "ZstdCompressor.__init__ function was called twice.");
+        PyErr_SetString(PyExc_RuntimeError, init_twice_msg);
         return -1;
     }
     self->inited = 1;
@@ -2268,8 +2269,7 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
 
     /* Only called once */
     if (self->inited) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "ZstdDecompressor.__init__ function was called twice.");
+        PyErr_SetString(PyExc_RuntimeError, init_twice_msg);
         return -1;
     }
     self->inited = 1;
