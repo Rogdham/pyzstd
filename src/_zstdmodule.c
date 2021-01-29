@@ -307,8 +307,8 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
 
     /* Fast path for single block */
-    if ((list_len == 2 && ob->pos == 0) ||
-        (list_len == 1 && ob->pos == ob->size)) {
+    if ((list_len == 1 && ob->pos == ob->size) ||
+        (list_len == 2 && ob->pos == 0)) {
         block = PyList_GET_ITEM(buffer->list, 0);
         Py_INCREF(block);
 
@@ -1938,6 +1938,11 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             if (type != TYPE_FUNCTION) {
                 /* Output buffer reached max_length */
                 if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
+                    break;
+                }
+            } else {
+                /* Finished, speed up for small data (a few KB). */
+                if (self->at_frame_edge && in->pos == in->size) {
                     break;
                 }
             }
