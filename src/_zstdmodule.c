@@ -1879,11 +1879,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
-    if (type != TYPE_FUNCTION) {
-        if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
-            goto error;
-        }
-    } else {
+    if (type == TYPE_FUNCTION) {
         if (decompressed_size > 0) {
             if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
                 goto error;
@@ -1892,6 +1888,10 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
                 goto error;
             }
+        }
+    } else {
+        if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
+            goto error;
         }
     }
     assert(out.pos == 0);
@@ -1935,14 +1935,14 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                have a few bytes can be output, grow the output buffer and continue
                the loop if max_lengh < 0. */
 
-            if (type != TYPE_FUNCTION) {
-                /* Output buffer reached max_length */
-                if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
+            if (type == TYPE_FUNCTION) {
+                /* Finished, speed up for small data (a few KB). */
+                if (self->at_frame_edge && in->pos == in->size) {
                     break;
                 }
             } else {
-                /* Finished, speed up for small data (a few KB). */
-                if (self->at_frame_edge && in->pos == in->size) {
+                /* Output buffer reached max_length */
+                if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
                     break;
                 }
             }
