@@ -515,6 +515,15 @@ add_parameters(PyObject *module)
     } } while (0)
 #define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
 
+/* Force inlining */
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_INLINE static inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define FORCE_INLINE static inline __forceinline
+#else
+#  define FORCE_INLINE static
+#endif
+
 /* Force no inlining */
 #ifdef _MSC_VER
 #  define FORCE_NO_INLINE static __declspec(noinline)
@@ -1864,14 +1873,6 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
    Decompress implementation
    ------------------------- */
 
-#if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_INLINE_ATTR __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#  define FORCE_INLINE_ATTR __forceinline
-#else
-#  define FORCE_INLINE_ATTR
-#endif
-
 typedef enum {
     TYPE_DECOMPRESSOR,
     TYPE_ENDLESS_DECOMPRESSOR,
@@ -1882,7 +1883,7 @@ typedef enum {
    - ZstdDecompressor
    - EndlessZstdDecompressor
    - decompress(), decompressed_size is only available in this type. */
-static inline FORCE_INLINE_ATTR PyObject *
+FORCE_INLINE PyObject *
 decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 const Py_ssize_t max_length, const Py_ssize_t decompressed_size,
                 const decompress_type type)
@@ -1985,7 +1986,7 @@ error:
 }
 
 /* For ZstdDecompressor, EndlessZstdDecompressor. */
-static inline FORCE_INLINE_ATTR PyObject *
+FORCE_INLINE PyObject *
 stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
                   const decompress_type type)
 {
