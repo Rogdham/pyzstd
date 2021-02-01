@@ -288,11 +288,15 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     return 0;
 }
 
-/* Return the current outputted data size. */
-static inline Py_ssize_t
-OutputBuffer_GetDataSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
+/* Whether the output data has reached max_length.
+   The avail_out must be 0, please check it before calling. */
+static inline int
+OutputBuffer_ReachedMaxLength(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
-    return buffer->allocated - (ob->size - ob->pos);
+    /* Ensure (data size == allocated size) */
+    assert(ob->pos == ob->size);
+
+    return buffer->allocated == buffer->max_length;
 }
 
 /* Finish the buffer.
@@ -345,7 +349,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     return result;
 }
 
-/* clean up the buffer. */
+/* Clean up the buffer */
 static inline void
 OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 {
@@ -1929,11 +1933,10 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             }
         }
 
+        /* Need to check `out` before `in`. Maybe zstd's internal buffer still
+           have a few bytes can be output, grow the buffer and continue. */
         if (out.pos == out.size) {
-            /* Output buffer exhausted.
-               Need to check `out` before `in`. Maybe zstd's internal buffer still
-               have a few bytes can be output, grow the output buffer and continue
-               the loop if max_lengh < 0. */
+            /* Output buffer exhausted */
 
             if (type == TYPE_FUNCTION) {
                 /* Finished, speed up for small data (a few KB). */
@@ -1942,7 +1945,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 }
             } else {
                 /* Output buffer reached max_length */
-                if (OutputBuffer_GetDataSize(&buffer, &out) == max_length) {
+                if (OutputBuffer_ReachedMaxLength(&buffer, &out)) {
                     break;
                 }
             }
