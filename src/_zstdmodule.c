@@ -820,8 +820,9 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     /* Get ZSTD_CDict */
     c_dict = _get_CDict((ZstdDict*)dict, compress_level);
     if (c_dict == NULL) {
-        PyErr_SetString(PyExc_SystemError,
-                        "Failed to get ZSTD_CDict from zstd dictionary content.");
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Failed to get ZSTD_CDict object from "
+                        "zstd dictionary content.");
         return -1;
     }
 
@@ -903,8 +904,9 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
     /* Get ZSTD_DDict */
     d_dict = _get_DDict((ZstdDict*)dict);
     if (d_dict == NULL) {
-        PyErr_SetString(PyExc_SystemError,
-                        "Failed to get ZSTD_DDict from zstd dictionary content.");
+        PyErr_SetString(PyExc_RuntimeError,
+                        "Failed to get ZSTD_DDict object from "
+                        "zstd dictionary content.");
         return -1;
     }
 
@@ -3035,8 +3037,5 @@ error:
     _zstd_clear(NULL);
     Py_XDECREF(module);
 
-    if (!PyErr_Occurred()) {
-        PyErr_SetString(PyExc_SystemError, "Failed to initialize pyzstd module.");
-    }
     return NULL;
 }
