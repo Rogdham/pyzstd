@@ -10,6 +10,10 @@
 #include "../lib/zstd.h"
 #include "../lib/dictBuilder/zdict.h"
 
+#ifndef Py_UNREACHABLE
+    #define Py_UNREACHABLE() assert(0)
+#endif
+
 typedef struct {
     PyObject_HEAD
 
@@ -307,7 +311,6 @@ static PyObject *
 OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
-    int8_t *posi;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
 
     /* Fast path for single block */
@@ -329,7 +332,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 
     /* Memory copy */
     if (list_len > 0) {
-        posi = (int8_t*) PyBytes_AS_STRING(result);
+        char *posi = PyBytes_AS_STRING(result);
 
         /* Blocks except the last one */
         Py_ssize_t i = 0;
@@ -342,7 +345,8 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         block = PyList_GET_ITEM(buffer->list, i);
         memcpy(posi, PyBytes_AS_STRING(block), ob->pos);
     } else {
-        assert(Py_SIZE(result) == 0);
+        /* buffer->list has at least one block, see initialize functions. */
+        Py_UNREACHABLE();
     }
 
     Py_DECREF(buffer->list);
@@ -599,7 +603,7 @@ set_zstd_error(const error_type type, const size_t code)
         break;
 
     default:
-        assert(0);
+        Py_UNREACHABLE();
     }
     PyOS_snprintf(buf, sizeof(buf), "Unable to %s: %s.",
                   type_msg, ZSTD_getErrorName(code));
