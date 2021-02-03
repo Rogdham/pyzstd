@@ -1891,7 +1891,7 @@ typedef enum {
    - decompress(), decompressed_size is only available in this type. */
 FORCE_INLINE PyObject *
 decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                const Py_ssize_t max_length, const Py_ssize_t decompressed_size,
+                const Py_ssize_t max_length, const uint64_t decompressed_size,
                 const decompress_type type)
 {
     size_t zstd_ret;
@@ -1902,8 +1902,12 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     /* OutputBuffer(OnError)(&buffer) is after `error` label,
        so initialize the buffer before any `goto error` statement. */
     if (type == TYPE_FUNCTION) {
-        if (decompressed_size > 0) {
-            if (OutputBuffer_InitWithSize(&buffer, &out, decompressed_size) < 0) {
+        if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
+            /* These two zstd constants always > PY_SSIZE_T_MAX:
+                 ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
+                 ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
+            if (OutputBuffer_InitWithSize(&buffer, &out,
+                                          (Py_ssize_t) decompressed_size) < 0) {
                 goto error;
             }
         } else {
@@ -2572,14 +2576,10 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     in.size = data.len;
 
     /* Get decompressed size */
-    decompressed_size = ZSTD_getDecompressedSize(data.buf, data.len);
-    if (decompressed_size > PY_SSIZE_T_MAX) {
-        decompressed_size = 0;
-    }
+    decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
 
     /* Decompress */
-    ret = decompress_impl(&self, &in, -1, (Py_ssize_t) decompressed_size,
-                          TYPE_FUNCTION);
+    ret = decompress_impl(&self, &in, -1, decompressed_size, TYPE_FUNCTION);
     if (ret == NULL) {
         goto error;
     }
