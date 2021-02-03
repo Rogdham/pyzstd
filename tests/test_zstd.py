@@ -22,6 +22,7 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    zstd_version, zstd_version_info, compressionLevel_values, \
                    get_frame_info, get_frame_size, \
                    ZstdFile, open
+from pyzstd import _zstd
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
@@ -111,16 +112,26 @@ class FunctionsTestCase(unittest.TestCase):
             self.assertEqual(dat2, raw_dat)
 
     def test_get_frame_info(self):
+        # no dict
         info = get_frame_info(COMPRESSED_100_PLUS_32KB[:20])
-
         self.assertEqual(info.decompressed_size, 32*1024+100)
         self.assertEqual(info.dictionary_id, 0)
 
+        # use dict
+        dat = compress(b'a'*345, zstd_dict=TRAINED_DICT)
+        info = get_frame_info(dat)
+        self.assertEqual(info.decompressed_size, 345)
+        self.assertNotEqual(info.dictionary_id, 0)
+
+        with self.assertRaises(ZstdError):
+            get_frame_info(b'aaaaaaaaaaaaaa')
+
     def test_get_frame_size(self):
         size = get_frame_size(COMPRESSED_100_PLUS_32KB)
-
         self.assertEqual(size, len(COMPRESSED_100_PLUS_32KB))
 
+        with self.assertRaises(ZstdError):
+            get_frame_size(b'aaaaaaaaaaaaaa')
 
 class ClassShapeTestCase(unittest.TestCase):
 
@@ -131,22 +142,29 @@ class ClassShapeTestCase(unittest.TestCase):
         ZstdCompressor.FLUSH_FRAME
 
         # method & member
+        ZstdCompressor()
         ZstdCompressor(12, TRAINED_DICT)
-        ZstdCompressor(level_or_option=12, zstd_dict=TRAINED_DICT)
-        c = ZstdCompressor()
+        c = ZstdCompressor(level_or_option=2, zstd_dict=TRAINED_DICT)
 
         c.compress(b'123456')
-        c.compress(b'123456', c.CONTINUE)
+        c.compress(b'123456', ZstdCompressor.CONTINUE)
         c.compress(data=b'123456', mode=c.CONTINUE)
 
         c.flush()
-        c.flush(c.FLUSH_FRAME)
+        c.flush(ZstdCompressor.FLUSH_BLOCK)
         c.flush(mode=c.FLUSH_FRAME)
 
         c.last_mode
 
+        # decompressor method & member
         with self.assertRaises(AttributeError):
             c.decompress(b'')
+        with self.assertRaises(AttributeError):
+            c.at_frame_edge
+        with self.assertRaises(AttributeError):
+            c.eof
+        with self.assertRaises(AttributeError):
+            c.needs_input
 
         # read only attribute
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
@@ -176,21 +194,30 @@ class ClassShapeTestCase(unittest.TestCase):
             RichMemZstdCompressor.FLUSH_FRAME
 
         # method & member
+        RichMemZstdCompressor()
         RichMemZstdCompressor(12, TRAINED_DICT)
-        RichMemZstdCompressor(level_or_option=12, zstd_dict=TRAINED_DICT)
-        c = RichMemZstdCompressor()
+        c = RichMemZstdCompressor(level_or_option=4, zstd_dict=TRAINED_DICT)
 
         c.compress(b'123456')
         c.compress(data=b'123456')
 
+        # ZstdCompressor method & member
         with self.assertRaises(TypeError):
             c.compress(b'123456', ZstdCompressor.FLUSH_FRAME)
-
         with self.assertRaises(AttributeError):
             c.flush()
-
         with self.assertRaises(AttributeError):
             c.last_mode
+
+        # decompressor method & member
+        with self.assertRaises(AttributeError):
+            c.decompress(b'')
+        with self.assertRaises(AttributeError):
+            c.at_frame_edge
+        with self.assertRaises(AttributeError):
+            c.eof
+        with self.assertRaises(AttributeError):
+            c.needs_input
 
         # name
         self.assertIn('.RichMemZstdCompressor', str(type(c)))
@@ -205,42 +232,40 @@ class ClassShapeTestCase(unittest.TestCase):
                 pass
 
     def test_Decompressor(self):
-        # class attributes
-        with self.assertRaises(AttributeError):
-            ZstdDecompressor.CONTINUE
-
-        with self.assertRaises(AttributeError):
-            ZstdDecompressor.FLUSH_BLOCK
-
-        with self.assertRaises(AttributeError):
-            ZstdDecompressor.FLUSH_FRAME
-
         # method & member
+        ZstdDecompressor()
         ZstdDecompressor(TRAINED_DICT, {})
-        ZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
-        d = ZstdDecompressor()
+        d = ZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
 
         d.decompress(b'')
         d.decompress(b'', 100)
         d.decompress(data=b'', max_length = 100)
 
-        d.unused_data
-        d.needs_input
         d.eof
+        d.needs_input
+        d.unused_data
 
+        # ZstdCompressor attributes
+        with self.assertRaises(AttributeError):
+            d.CONTINUE
+        with self.assertRaises(AttributeError):
+            d.FLUSH_BLOCK
+        with self.assertRaises(AttributeError):
+            d.FLUSH_FRAME
+        with self.assertRaises(AttributeError):
+            d.compress(b'')
+        with self.assertRaises(AttributeError):
+            d.flush()
+
+        # EndlessZstdDecompressor attribute
         with self.assertRaises(AttributeError):
             d.at_frame_edge
 
-        with self.assertRaises(AttributeError):
-            d.compress(b'')
-
         # read only attributes
         with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
-            d.needs_input = True
-
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
             d.eof = True
-
+        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+            d.needs_input = True
         with self.assertRaisesRegex(AttributeError, 'not writable'):
             d.unused_data = b''
 
@@ -257,16 +282,6 @@ class ClassShapeTestCase(unittest.TestCase):
                 pass
 
     def test_EndlessDecompressor(self):
-        # class attributes
-        with self.assertRaises(AttributeError):
-            EndlessZstdDecompressor.CONTINUE
-
-        with self.assertRaises(AttributeError):
-            EndlessZstdDecompressor.FLUSH_BLOCK
-
-        with self.assertRaises(AttributeError):
-            EndlessZstdDecompressor.FLUSH_FRAME
-
         # method & member
         EndlessZstdDecompressor(TRAINED_DICT, {})
         EndlessZstdDecompressor(zstd_dict=TRAINED_DICT, option={})
@@ -279,12 +294,21 @@ class ClassShapeTestCase(unittest.TestCase):
         d.at_frame_edge
         d.needs_input
 
+        # ZstdCompressor attributes
+        with self.assertRaises(AttributeError):
+            EndlessZstdDecompressor.CONTINUE
+        with self.assertRaises(AttributeError):
+            EndlessZstdDecompressor.FLUSH_BLOCK
+        with self.assertRaises(AttributeError):
+            EndlessZstdDecompressor.FLUSH_FRAME
         with self.assertRaises(AttributeError):
             d.compress(b'')
+        with self.assertRaises(AttributeError):
+            d.flush()
 
+        # ZstdDecompressor attributes
         with self.assertRaises(AttributeError):
             d.eof
-
         with self.assertRaises(AttributeError):
             d.unused_data
 
@@ -373,7 +397,6 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertEqual(len(t), 2)
         self.assertEqual(type(t[0]), int)
         self.assertEqual(type(t[1]), int)
-
 
 class CompressorDecompressorTestCase(unittest.TestCase):
 
@@ -935,7 +958,6 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data + bi.read(), TRAIL)
 
-
 class DecompressorFlagsTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -1038,6 +1060,9 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertEqual(len(decompress(TEST_DAT_130KB + SKIPPABLE_FRAME + SKIPPABLE_FRAME)),
                          self._130KB)
 
+        self.assertEqual(len(decompress(SKIPPABLE_FRAME + TEST_DAT_130KB + SKIPPABLE_FRAME)),
+                         self._130KB)
+
         # unknown size
         self.assertEqual(decompress(SKIPPABLE_FRAME + self.UNKNOWN_FRAME_60),
                          self.DECOMPRESSED_60)
@@ -1079,7 +1104,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
             decompress(SKIPPABLE_FRAME + SKIPPABLE_FRAME + b'aaaaaaaaa')
 
     def test_decompressor_1(self):
-        # empty
+        # empty 1
         d = ZstdDecompressor()
 
         dat = d.decompress(b'')
@@ -1095,6 +1120,37 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data, b'')
         self.assertEqual(d.unused_data, b'') # twice
+
+        dat = d.decompress(COMPRESSED_100_PLUS_32KB + b'a')
+        self.assertEqual(dat, DECOMPRESSED_100_PLUS_32KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, b'a')
+        self.assertEqual(d.unused_data, b'a') # twice
+
+        # empty 2
+        d = ZstdDecompressor()
+
+        dat = d.decompress(b'', 0)
+        self.assertEqual(dat, b'')
+        self.assertFalse(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
+        self.assertEqual(d.unused_data, b'') # twice
+
+        dat = d.decompress(b'')
+        self.assertEqual(dat, b'')
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
+        self.assertEqual(d.unused_data, b'') # twice
+
+        dat = d.decompress(COMPRESSED_100_PLUS_32KB + b'a')
+        self.assertEqual(dat, DECOMPRESSED_100_PLUS_32KB)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, b'a')
+        self.assertEqual(d.unused_data, b'a') # twice
 
         # 1 frame
         d = ZstdDecompressor()
@@ -1440,6 +1496,9 @@ class ZstdDictTestCase(unittest.TestCase):
         zd = ZstdDict(b, is_raw=True)
         self.assertEqual(zd.dict_id, 0)
 
+        temp = compress(b'aaa12345678', 3, zd)
+        self.assertEqual(b'aaa12345678', decompress(temp, zd))
+
         # is_raw == False
         b = b'12345678abcd'
         with self.assertRaises(ValueError):
@@ -1456,13 +1515,24 @@ class ZstdDictTestCase(unittest.TestCase):
         zd = ZstdDict(TRAINED_DICT.dict_content, is_raw=False)
         self.assertNotEqual(zd.dict_id, 0)
 
-        ZstdDict(TRAINED_DICT.dict_content, is_raw=True)
+        zd = ZstdDict(TRAINED_DICT.dict_content, is_raw=True)
         self.assertNotEqual(zd.dict_id, 0) # note this assertion
 
         with self.assertRaises(TypeError):
             ZstdDict("12345678abcdef", is_raw=True)
         with self.assertRaises(TypeError):
             ZstdDict(TRAINED_DICT)
+
+    def test_invalid_dict(self):
+        DICT_MAGIC = 0xEC30A437.to_bytes(4, byteorder='little')
+        dict = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
+        zd = ZstdDict(dict, is_raw=False)
+
+        with self.assertRaisesRegex(RuntimeError, 'ZSTD_CDict'):
+            compress(b'', 12, zd)
+
+        with self.assertRaisesRegex(RuntimeError, 'ZSTD_DDict'):
+            decompress(b'', zd)
 
     def test_train_dict(self):
         DICT_SIZE1 = 200*1024
@@ -1542,6 +1612,43 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
+    def test_train_dict_c(self):
+        # argument wrong type
+        with self.assertRaises(TypeError):
+            _zstd._train_dict({}, [], 100)
+        with self.assertRaises(TypeError):
+            _zstd._train_dict(b'', 99, 100)
+        with self.assertRaises(TypeError):
+            _zstd._train_dict(b'', [], 100.1)
+
+        # size > size_t
+        with self.assertRaises(ValueError):
+            _zstd._train_dict(b'', [2**64+1], 100)
+
+        # dict_size <= 0
+        with self.assertRaises(ValueError):
+            _zstd._train_dict(b'', [], 0)
+
+    def test_finalize_dict_c(self):
+        # argument wrong type
+        with self.assertRaises(TypeError):
+            _zstd._finalize_dict({}, b'', [], 100, 5)
+        with self.assertRaises(TypeError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, {}, [], 100, 5)
+        with self.assertRaises(TypeError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', 99, 100, 5)
+        with self.assertRaises(TypeError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 100.1, 5)
+        with self.assertRaises(TypeError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 100, 5.1)
+
+        # size > size_t
+        with self.assertRaises(ValueError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [2**64+1], 100, 5)
+
+        # dict_size <= 0
+        with self.assertRaises(ValueError):
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
 
 class FileTestCase(unittest.TestCase):
 
@@ -2176,7 +2283,6 @@ class FileTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
-
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
@@ -2290,7 +2396,6 @@ class OpenTestCase(unittest.TestCase):
             dat = f.read()
 
         self.assertEqual(dat, SAMPLES[0])
-
 
 def test_main():
     run_unittest(
