@@ -1135,16 +1135,17 @@ PyDoc_STRVAR(_train_dict_doc,
 static PyObject *
 _train_dict(PyObject *module, PyObject *args)
 {
-    PyBytesObject *dst_data;
-    PyObject *dst_data_sizes;
+    PyBytesObject *samples_bytes;
+    PyObject *samples_size_list;
     Py_ssize_t dict_size;
 
+    Py_ssize_t chunks_number;
     size_t *chunk_sizes = NULL;
-    PyObject *dict_buffer = NULL;
+    PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
 
     if (!PyArg_ParseTuple(args, "SOn:_train_dict",
-                          &dst_data, &dst_data_sizes, &dict_size)) {
+                          &samples_bytes, &samples_size_list, &dict_size)) {
         return NULL;
     }
 
@@ -1155,13 +1156,13 @@ _train_dict(PyObject *module, PyObject *args)
     }
 
     /* Prepare chunk_sizes */
-    if (!PyList_Check(dst_data_sizes)) {
+    if (!PyList_Check(samples_size_list)) {
         PyErr_SetString(PyExc_TypeError,
-                        "dst_data_sizes argument should be a list.");
+                        "samples_size_list argument should be a list.");
         goto error;
     }
 
-    const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
+    chunks_number = Py_SIZE(samples_size_list);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
@@ -1175,26 +1176,26 @@ _train_dict(PyObject *module, PyObject *args)
     }
 
     for (Py_ssize_t i = 0; i < chunks_number; i++) {
-        PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
+        PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in dst_data_sizes list should be int "
-                            "object, with a size_t value.");
+                            "Items in samples_size_list should be int object, "
+                            "with a size_t value.");
             goto error;
         }
     }
 
     /* Allocate dict buffer */
-    dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
-    if (dict_buffer == NULL) {
+    dst_dict_bytes = PyBytes_FromStringAndSize(NULL, dict_size);
+    if (dst_dict_bytes == NULL) {
         goto error;
     }
 
     /* Train the dictionary. */
     Py_BEGIN_ALLOW_THREADS
-    zstd_ret = ZDICT_trainFromBuffer(PyBytes_AS_STRING(dict_buffer), dict_size,
-                                     PyBytes_AS_STRING(dst_data),
+    zstd_ret = ZDICT_trainFromBuffer(PyBytes_AS_STRING(dst_dict_bytes), dict_size,
+                                     PyBytes_AS_STRING(samples_bytes),
                                      chunk_sizes, (uint32_t)chunks_number);
     Py_END_ALLOW_THREADS
 
@@ -1205,18 +1206,18 @@ _train_dict(PyObject *module, PyObject *args)
     }
 
     /* Resize dict_buffer */
-    if (_PyBytes_Resize(&dict_buffer, zstd_ret) < 0) {
+    if (_PyBytes_Resize(&dst_dict_bytes, zstd_ret) < 0) {
         goto error;
     }
 
     PyMem_Free(chunk_sizes);
-    return dict_buffer;
+    return dst_dict_bytes;
 
 error:
     if (chunk_sizes != NULL) {
         PyMem_Free(chunk_sizes);
     }
-    Py_XDECREF(dict_buffer);
+    Py_XDECREF(dst_dict_bytes);
     return NULL;
 }
 
@@ -1228,25 +1229,26 @@ _finalize_dict(PyObject *module, PyObject *args)
 {
 #if ZSTD_VERSION_NUMBER < 10405
     PyErr_Format(PyExc_NotImplementedError,
-                 "This function only available when the underlying zstd "
-                 "library's version is greater than or equal to v1.4.5, "
+                 "_finalize_dict function only available when the underlying "
+                 "zstd library's version is greater than or equal to v1.4.5, "
                  "the current underlying zstd library's version is v%s.",
                  ZSTD_versionString());
     return NULL;
 #else
-    PyBytesObject *custom_dict;
-    PyBytesObject *dst_data;
-    PyObject *dst_data_sizes;
+    PyBytesObject *custom_dict_bytes;
+    PyBytesObject *samples_bytes;
+    PyObject *samples_size_list;
     Py_ssize_t dict_size;
     int compression_level;
 
+    Py_ssize_t chunks_number;
     size_t *chunk_sizes = NULL;
-    PyObject *dict_buffer = NULL;
+    PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
     ZDICT_params_t params;
 
     if (!PyArg_ParseTuple(args, "SSOni:_finalize_dict",
-                          &custom_dict, &dst_data, &dst_data_sizes,
+                          &custom_dict_bytes, &samples_bytes, &samples_size_list,
                           &dict_size, &compression_level)) {
         return NULL;
     }
@@ -1258,13 +1260,13 @@ _finalize_dict(PyObject *module, PyObject *args)
     }
 
     /* Prepare chunk_sizes */
-    if (!PyList_Check(dst_data_sizes)) {
+    if (!PyList_Check(samples_size_list)) {
         PyErr_SetString(PyExc_TypeError,
-                        "dst_data_sizes argument should be a list.");
+                        "samples_size_list argument should be a list.");
         goto error;
     }
 
-    const Py_ssize_t chunks_number = Py_SIZE(dst_data_sizes);
+    chunks_number = Py_SIZE(samples_size_list);
     if (chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
@@ -1278,19 +1280,19 @@ _finalize_dict(PyObject *module, PyObject *args)
     }
 
     for (Py_ssize_t i = 0; i < chunks_number; i++) {
-        PyObject *size = PyList_GET_ITEM(dst_data_sizes, i);
+        PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in dst_data_sizes list should be int "
-                            "object, with a size_t value.");
+                            "Items in samples_size_list should be int object, "
+                            "with a size_t value.");
             goto error;
         }
     }
 
     /* Allocate dict buffer */
-    dict_buffer = PyBytes_FromStringAndSize(NULL, dict_size);
-    if (dict_buffer == NULL) {
+    dst_dict_bytes = PyBytes_FromStringAndSize(NULL, dict_size);
+    if (dst_dict_bytes == NULL) {
         goto error;
     }
 
@@ -1305,10 +1307,11 @@ _finalize_dict(PyObject *module, PyObject *args)
 
     /* Finalize the dictionary. */
     Py_BEGIN_ALLOW_THREADS
-    zstd_ret = ZDICT_finalizeDictionary(PyBytes_AS_STRING(dict_buffer), dict_size,
-                                        PyBytes_AS_STRING(custom_dict), Py_SIZE(custom_dict),
-                                        PyBytes_AS_STRING(dst_data), chunk_sizes,
-                                        (uint32_t)chunks_number, params);
+    zstd_ret = ZDICT_finalizeDictionary(
+                        PyBytes_AS_STRING(dst_dict_bytes), dict_size,
+                        PyBytes_AS_STRING(custom_dict_bytes), Py_SIZE(custom_dict_bytes),
+                        PyBytes_AS_STRING(samples_bytes), chunk_sizes,
+                        (uint32_t)chunks_number, params);
     Py_END_ALLOW_THREADS
 
     /* Check zstd dict error. */
@@ -1318,18 +1321,18 @@ _finalize_dict(PyObject *module, PyObject *args)
     }
 
     /* Resize dict_buffer */
-    if (_PyBytes_Resize(&dict_buffer, zstd_ret) < 0) {
+    if (_PyBytes_Resize(&dst_dict_bytes, zstd_ret) < 0) {
         goto error;
     }
 
     PyMem_Free(chunk_sizes);
-    return dict_buffer;
+    return dst_dict_bytes;
 
 error:
     if (chunk_sizes != NULL) {
         PyMem_Free(chunk_sizes);
     }
-    Py_XDECREF(dict_buffer);
+    Py_XDECREF(dst_dict_bytes);
     return NULL;
 #endif
 }
@@ -1880,9 +1883,9 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
    ------------------------- */
 
 typedef enum {
-    TYPE_DECOMPRESSOR,
-    TYPE_ENDLESS_DECOMPRESSOR,
-    TYPE_FUNCTION
+    TYPE_DECOMPRESSOR,          /* ZstdDecompressor class */
+    TYPE_ENDLESS_DECOMPRESSOR,  /* EndlessZstdDecompressor class */
+    TYPE_FUNCTION               /* decompress() function */
 } decompress_type;
 
 /* Decompress implementation for:
@@ -1899,8 +1902,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     BlocksOutputBuffer buffer;
     PyObject *ret;
 
-    /* OutputBuffer(OnError)(&buffer) is after `error` label,
-       so initialize the buffer before any `goto error` statement. */
+    /* Initialize output buffer before any `goto error` statement */
     if (type == TYPE_FUNCTION) {
         if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
             /* These two zstd constants always > PY_SSIZE_T_MAX:
@@ -1927,6 +1929,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
         const size_t in_pos_bak = in->pos;
         const size_t out_pos_bak = out.pos;
 
+        /* Decompress */
         Py_BEGIN_ALLOW_THREADS
         zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
         Py_END_ALLOW_THREADS
@@ -1937,19 +1940,21 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
             goto error;
         }
 
+        /* Set .eof/.af_frame_edge flag */
         if (type == TYPE_DECOMPRESSOR) {
-            /* Set .eof flag.
+            /* ZstdDecompressor class stops when a frame is decompressed.
                (zstd_ret == 0) when a frame is completely decoded and fully
-               flushed. If decompress an empty input, zstd_ret will != 0. */
+               flushed. Otherwise, decompressing an empty input will make
+               zstd_ret non-zero. */
             if (zstd_ret == 0) {
                 self->eof = 1;
                 break;
             }
         } else {
-            /* Set .at_frame_edge flag.
+            /* EndlessZstdDecompressor class and decompress() function support
+               multiple frames.
                Check these conditions beacuse after flushing a frame,
-               decompressing an empty input will cause zstd_ret become
-               non-zero. */
+               decompressing an empty input will make zstd_ret non-zero. */
             if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
                 self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
             }

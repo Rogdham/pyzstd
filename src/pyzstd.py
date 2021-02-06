@@ -155,8 +155,8 @@ def train_dict(samples, dict_size):
     if not chunks:
         raise ValueError("The samples are empty content, can't train dictionary.")
 
-    # chunks: samples be stored concatenated in a single flat buffer.
-    # chunk_sizes: a list of each sample's size.
+    # samples_bytes: samples be stored concatenated in a single flat buffer.
+    # samples_size_list: a list of each sample's size.
     # dict_size: size of the dictionary, in bytes.
     dict_content = _zstd._train_dict(chunks, chunk_sizes, dict_size)
 
@@ -203,11 +203,11 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     if not chunks:
         raise ValueError("The samples are empty content, can't finalize dictionary.")
 
-    # zstd_dict: existing dictionary.
-    # chunks: samples be stored concatenated in a single flat buffer.
-    # chunk_sizes: a list of each sample's size.
+    # custom_dict_bytes: existing dictionary.
+    # samples_bytes: samples be stored concatenated in a single flat buffer.
+    # samples_size_list: a list of each sample's size.
     # dict_size: maximal size of the dictionary, in bytes.
-    # level: compression level expected to use in production.
+    # compression_level: compression level expected to use in production.
     dict_content = _zstd._finalize_dict(zstd_dict.dict_content,
                                         chunks, chunk_sizes,
                                         dict_size, level)
