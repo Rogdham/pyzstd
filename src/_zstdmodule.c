@@ -39,7 +39,7 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
 
-    /* Compress context */
+    /* Compression context */
     ZSTD_CCtx *cctx;
 
     /* ZstdDict object in use */
@@ -61,7 +61,7 @@ typedef struct {
 typedef struct {
     PyObject_HEAD
 
-    /* Decompress context */
+    /* Decompression context */
     ZSTD_DCtx *dctx;
 
     /* ZstdDict object in use */
@@ -476,7 +476,7 @@ add_parameters(PyObject *module)
 {
     /* If add new parameters, please also add to cp_list/dp_list above. */
 
-    /* Compress parameters */
+    /* Compression parameters */
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_compressionLevel);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_windowLog);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_hashLog);
@@ -500,7 +500,7 @@ add_parameters(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_jobSize);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_overlapLog);
 
-    /* Decompress parameters */
+    /* Decompression parameters */
     ADD_INT_PREFIX_MACRO(module, ZSTD_d_windowLogMax);
 
     return 0;
@@ -586,10 +586,10 @@ set_zstd_error(const error_type type, const size_t code)
         type_msg = "get the size of a zstd frame";
         break;
     case ERR_GET_C_BOUNDS:
-        type_msg = "get zstd compress parameter bounds";
+        type_msg = "get zstd compression parameter bounds";
         break;
     case ERR_GET_D_BOUNDS:
-        type_msg = "get zstd decompress parameter bounds";
+        type_msg = "get zstd decompression parameter bounds";
         break;
     case ERR_SET_C_LEVEL:
         type_msg = "set zstd compression level";
@@ -703,7 +703,7 @@ clamp_compression_level(int *compressionLevel)
 #endif
 }
 
-/* Set compressLevel or compress parameters to compress context. */
+/* Set compressLevel or compression parameters to compression context. */
 static int
 set_c_parameters(ZstdCompressor *self,
                  PyObject *level_or_option,
@@ -717,7 +717,7 @@ set_c_parameters(ZstdCompressor *self,
         int level = _PyLong_AsInt(level_or_option);
         if (level == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Compress level should be 32-bit signed int value.");
+                            "Compression level should be 32-bit signed int value.");
             return -1;
         }
 
@@ -727,7 +727,7 @@ set_c_parameters(ZstdCompressor *self,
         /* Save to *compress_level for generating ZSTD_CDICT */
         *compress_level = level;
 
-        /* Set compressionLevel to compress context */
+        /* Set compressionLevel to compression context */
         zstd_ret = ZSTD_CCtx_setParameter(self->cctx,
                                           ZSTD_c_compressionLevel,
                                           level);
@@ -782,7 +782,7 @@ set_c_parameters(ZstdCompressor *self,
                 }
             }
 
-            /* Set parameter to compress context */
+            /* Set parameter to compression context */
             zstd_ret = ZSTD_CCtx_setParameter(self->cctx, key_v, value_v);
             if (ZSTD_isError(zstd_ret)) {
                 get_parameter_error_msg(msg_buf, sizeof(msg_buf),
@@ -799,7 +799,7 @@ set_c_parameters(ZstdCompressor *self,
     return -1;
 }
 
-/* Load dictionary (ZSTD_CDict instance) to compress context (ZSTD_CCtx instance). */
+/* Load dictionary (ZSTD_CDict instance) to compression context (ZSTD_CCtx instance). */
 static int
 load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
 {
@@ -821,7 +821,7 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     c_dict = _get_CDict((ZstdDict*)dict, compress_level);
     if (c_dict == NULL) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "Failed to get ZSTD_CDict object from "
+                        "Failed to get ZSTD_CDict instance from "
                         "zstd dictionary content.");
         return -1;
     }
@@ -837,7 +837,7 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     return 0;
 }
 
-/* Set decompress parameters to decompress context. */
+/* Set decompression parameters to decompression context. */
 static int
 set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
 {
@@ -869,7 +869,7 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
             return -1;
         }
 
-        /* Set parameter to compress context */
+        /* Set parameter to compression context */
         zstd_ret = ZSTD_DCtx_setParameter(dctx, key_v, value_v);
 
         /* Check error */
@@ -883,7 +883,7 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
     return 0;
 }
 
-/* Load dictionary (ZSTD_DDict instance) to decompress context (ZSTD_DCtx instance). */
+/* Load dictionary (ZSTD_DDict instance) to decompression context (ZSTD_DCtx instance). */
 static int
 load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
 {
@@ -905,7 +905,7 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
     d_dict = _get_DDict((ZstdDict*)dict);
     if (d_dict == NULL) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "Failed to get ZSTD_DDict object from "
+                        "Failed to get ZSTD_DDict instance from "
                         "zstd dictionary content.");
         return -1;
     }
@@ -1353,7 +1353,7 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(self->zstd_multi_threaded == 0);
     assert(self->inited == 0);
 
-    /* Compress context */
+    /* Compression context */
     self->cctx = ZSTD_createCCtx();
     if (self->cctx == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_CCtx instance.");
@@ -1379,12 +1379,12 @@ error:
 static void
 _ZstdCompressor_dealloc(ZstdCompressor *self)
 {
-    /* Compress context */
+    /* Compression context */
     if (self->cctx) {
         ZSTD_freeCCtx(self->cctx);
     }
 
-    /* Py_XDECREF the dict after free the compress context */
+    /* Py_XDECREF the dict after free the compression context */
     Py_XDECREF(self->dict);
 
     /* Thread lock */
@@ -1404,7 +1404,7 @@ PyDoc_STRVAR(ZstdCompressor_doc,
 "Initialize a ZstdCompressor object.\n\n"
 "Arguments\n"
 "level_or_option: When it's an int object, it represents the compression level.\n"
-"                 When it's a dict object, it contains advanced compress\n"
+"                 When it's a dict object, it contains advanced compression\n"
 "                 parameters.\n"
 "zstd_dict:       A ZstdDict object, pre-trained zstd dictionary.");
 
@@ -1430,14 +1430,14 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     }
     self->inited = 1;
 
-    /* Set compressLevel/option to compress context */
+    /* Set compressLevel/option to compression context */
     if (level_or_option != Py_None) {
         if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
             return -1;
         }
     }
 
-    /* Load dictionary to compress context */
+    /* Load dictionary to compression context */
     if (zstd_dict != Py_None) {
         if (load_c_dict(self, zstd_dict, compress_level) < 0) {
             return -1;
@@ -1768,7 +1768,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
     }
     self->inited = 1;
 
-    /* Set compressLevel/option to compress context */
+    /* Set compressLevel/option to compression context */
     if (level_or_option != Py_None) {
         if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
             return -1;
@@ -1786,7 +1786,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
         }
     }
 
-    /* Load dictionary to compress context */
+    /* Load dictionary to compression context */
     if (zstd_dict != Py_None) {
         if (load_c_dict(self, zstd_dict, compress_level) < 0) {
             return -1;
@@ -1854,7 +1854,7 @@ PyDoc_STRVAR(RichMemZstdCompressor_doc,
 "Initialize a RichMemZstdCompressor object.\n\n"
 "Arguments\n"
 "level_or_option: When it's an int object, it represents the compression level.\n"
-"                 When it's a dict object, it contains advanced compress\n"
+"                 When it's a dict object, it contains advanced compression\n"
 "                 parameters.\n"
 "zstd_dict:       A ZstdDict object, pre-trained zstd dictionary.");
 
@@ -2232,7 +2232,7 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* needs_input flag */
     self->needs_input = 1;
 
-    /* Decompress context */
+    /* Decompression context */
     self->dctx = ZSTD_createDCtx();
     if (self->dctx == NULL) {
         PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_DCtx instance.");
@@ -2255,12 +2255,12 @@ error:
 static void
 ZstdDecompressor_dealloc(ZstdDecompressor *self)
 {
-    /* Free decompress context */
+    /* Free decompression context */
     if (self->dctx) {
         ZSTD_freeDCtx(self->dctx);
     }
 
-    /* Py_XDECREF the dict after free decompress context */
+    /* Py_XDECREF the dict after free decompression context */
     Py_XDECREF(self->dict);
 
     /* Free unconsumed input data buffer */
@@ -2287,7 +2287,7 @@ PyDoc_STRVAR(ZstdDecompressor_doc,
 "----\n"
 "Initialize a ZstdDecompressor object.\n\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
-"option:    A dict object that contains advanced decompress parameters.");
+"option:    A dict object that contains advanced decompression parameters.");
 
 static int
 ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
@@ -2309,7 +2309,7 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
     }
     self->inited = 1;
 
-    /* Load dictionary to decompress context */
+    /* Load dictionary to decompression context */
     if (zstd_dict != Py_None) {
         if (load_d_dict(self->dctx, zstd_dict) < 0) {
             return -1;
@@ -2320,7 +2320,7 @@ ZstdDecompressor_init(ZstdDecompressor *self, PyObject *args, PyObject *kwargs)
         self->dict = zstd_dict;
     }
 
-    /* Set option to decompress context */
+    /* Set option to decompression context */
     if (option != Py_None) {
         if (set_d_parameters(self->dctx, option) < 0) {
             return -1;
@@ -2449,7 +2449,7 @@ PyDoc_STRVAR(EndlessZstdDecompressor_doc,
 "----\n"
 "Initialize an EndlessZstdDecompressor object.\n\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
-"option:    A dict object that contains advanced decompress parameters.");
+"option:    A dict object that contains advanced decompression parameters.");
 
 PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 "decompress(data, max_length=-1)\n"
@@ -2526,7 +2526,7 @@ PyDoc_STRVAR(decompress_doc,
 "Arguments\n"
 "data:      A bytes-like object, compressed zstd data.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
-"option:    A dict object, contains advanced decompress parameters.");
+"option:    A dict object, contains advanced decompression parameters.");
 
 static PyObject *
 decompress(PyObject *module, PyObject *args, PyObject *kwargs)
@@ -2557,7 +2557,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
         goto error;
     }
 
-    /* Load dictionary to decompress context */
+    /* Load dictionary to decompression context */
     if (zstd_dict != Py_None) {
         if (load_d_dict(self.dctx, zstd_dict) < 0) {
             goto error;
@@ -2568,7 +2568,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
         self.dict = zstd_dict;
     }
 
-    /* Set option to decompress context */
+    /* Set option to decompression context */
     if (option != Py_None) {
         if (set_d_parameters(self.dctx, option) < 0) {
             goto error;
