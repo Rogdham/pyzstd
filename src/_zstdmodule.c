@@ -170,7 +170,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
 
     /* Set & check max_length */
     buffer->max_length = max_length;
-    if (max_length >= 0 && BUFFER_BLOCK_SIZE[0] > max_length) {
+    if (0 <= max_length && max_length < BUFFER_BLOCK_SIZE[0]) {
         block_size = (int) max_length;
     } else {
         block_size = BUFFER_BLOCK_SIZE[0];
@@ -183,7 +183,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
         return -1;
     }
 
-    /* Create list */
+    /* Create the list */
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
@@ -219,7 +219,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
         return -1;
     }
 
-    /* Create list */
+    /* Create the list */
     buffer->list = PyList_New(1);
     if (buffer->list == NULL) {
         Py_DECREF(b);
@@ -269,6 +269,12 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         if (block_size > buffer->max_length - buffer->allocated) {
             block_size = (int) (buffer->max_length - buffer->allocated);
         }
+    }
+
+    /* Check buffer->allocated overflow */
+    if (block_size > PY_SSIZE_T_MAX - buffer->allocated) {
+        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+        return -1;
     }
 
     /* Create the block */
