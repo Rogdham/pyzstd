@@ -653,6 +653,9 @@ _get_CDict(ZstdDict *self, int compressionLevel)
         Py_END_ALLOW_THREADS
 
         if (cdict == NULL) {
+            PyErr_SetString(static_state.ZstdError,
+                            "Failed to get ZSTD_CDict instance from zstd "
+                            "dictionary content.");
             goto error;
         }
 
@@ -692,6 +695,12 @@ _get_DDict(ZstdDict *self)
         self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
                                         Py_SIZE(self->dict_content));
         Py_END_ALLOW_THREADS
+
+        if (self->d_dict == NULL) {
+            PyErr_SetString(static_state.ZstdError,
+                            "Failed to get ZSTD_DDict instance from zstd "
+                            "dictionary content.");
+        }
     }
     RELEASE_LOCK(self);
 
@@ -826,9 +835,6 @@ load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
     /* Get ZSTD_CDict */
     c_dict = _get_CDict((ZstdDict*)dict, compress_level);
     if (c_dict == NULL) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "Failed to get ZSTD_CDict instance from "
-                        "zstd dictionary content.");
         return -1;
     }
 
@@ -910,9 +916,6 @@ load_d_dict(ZSTD_DCtx *dctx, PyObject *dict)
     /* Get ZSTD_DDict */
     d_dict = _get_DDict((ZstdDict*)dict);
     if (d_dict == NULL) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "Failed to get ZSTD_DDict instance from "
-                        "zstd dictionary content.");
         return -1;
     }
 
@@ -1362,7 +1365,8 @@ _ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* Compression context */
     self->cctx = ZSTD_createCCtx();
     if (self->cctx == NULL) {
-        PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_CCtx instance.");
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_CCtx instance.");
         goto error;
     }
 
@@ -2241,7 +2245,8 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* Decompression context */
     self->dctx = ZSTD_createDCtx();
     if (self->dctx == NULL) {
-        PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_DCtx instance.");
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_DCtx instance.");
         goto error;
     }
 
@@ -2559,7 +2564,8 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
 
     self.dctx = ZSTD_createDCtx();
     if (self.dctx == NULL) {
-        PyErr_SetString(PyExc_RuntimeError, "Unable to create ZSTD_DCtx instance.");
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_DCtx instance.");
         goto error;
     }
 
@@ -2583,8 +2589,8 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
 
     /* Prepare input data */
     in.src = data.buf;
-    in.pos = 0;
     in.size = data.len;
+    in.pos = 0;
 
     /* Get decompressed size */
     decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);

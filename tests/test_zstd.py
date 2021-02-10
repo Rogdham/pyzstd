@@ -1528,10 +1528,10 @@ class ZstdDictTestCase(unittest.TestCase):
         dict = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
         zd = ZstdDict(dict, is_raw=False)
 
-        with self.assertRaisesRegex(RuntimeError, 'ZSTD_CDict'):
+        with self.assertRaisesRegex(ZstdError, 'ZSTD_CDict'):
             compress(b'', 12, zd)
 
-        with self.assertRaisesRegex(RuntimeError, 'ZSTD_DDict'):
+        with self.assertRaisesRegex(ZstdError, 'ZSTD_DDict'):
             decompress(b'', zd)
 
     def test_train_dict(self):
