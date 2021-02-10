@@ -2063,14 +2063,14 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         use_input_buffer = 1;
 
         /* Unconsumed data size in input_buffer */
-        const Py_ssize_t used_now = self->in_end - self->in_begin;
+        const size_t used_now = self->in_end - self->in_begin;
         /* Number of bytes we can append to input buffer */
-        const Py_ssize_t avail_now = self->input_buffer_size - self->in_end;
+        const size_t avail_now = self->input_buffer_size - self->in_end;
         /* Number of bytes we can append if we move existing contents to
            beginning of buffer */
-        const Py_ssize_t avail_total = self->input_buffer_size - used_now;
+        const size_t avail_total = self->input_buffer_size - used_now;
 
-        if (avail_total < data.len) {
+        if (avail_total < (size_t) data.len) {
             char *tmp;
             const size_t new_size = used_now + data.len;
 
@@ -2094,11 +2094,12 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             /* Set begin & end position */
             self->in_begin = 0;
             self->in_end = used_now;
-        } else if (avail_now < data.len) {
-            /* Move unconsumed data to the beginning */
-            memmove(self->input_buffer,
-                    self->input_buffer + self->in_begin,
-                    used_now);
+        } else if (avail_now < (size_t) data.len) {
+            /* Move unconsumed data to the beginning.
+               dst < src, so using memcpy() is safe. */
+            memcpy(self->input_buffer,
+                   self->input_buffer + self->in_begin,
+                   used_now);
 
             /* Set begin & end position */
             self->in_begin = 0;
@@ -2197,12 +2198,12 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
 
 error:
     /* Reset variables */
-    self->at_frame_edge = 1;
-    self->needs_input = 1;
-    self->eof = 0;
-
     self->in_begin = 0;
     self->in_end = 0;
+
+    self->needs_input = 1;
+    self->at_frame_edge = 1;
+    self->eof = 0;
 
     /* Resetting session never fail */
     ZSTD_DCtx_reset(self->dctx, ZSTD_reset_session_only);
