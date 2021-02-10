@@ -1,8 +1,10 @@
 import _compression
 from io import BytesIO, UnsupportedOperation
 import builtins
-import re
+import itertools
 import os
+import re
+import sys
 import pathlib
 import pickle
 import random
@@ -10,7 +12,7 @@ import tempfile
 import unittest
 
 from test.support import (  # type: ignore
-    _4G, bigmemtest, run_unittest
+    _1G, bigmemtest, run_unittest
 )
 
 import pyzstd as zstd
@@ -1650,6 +1652,194 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
 
+class OutputBufferTestCase(unittest.TestCase):
+
+    def setUp(self):
+        KB = 1024
+        MB = 1024 * 1024
+
+        # should be same as the definition in _zstdmodule.c
+        self.BLOCK_SIZE = \
+             [ 32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
+               32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
+               256*MB ]
+
+        # accumulated size
+        self.ACCUMULATED_SIZE = list(itertools.accumulate(self.BLOCK_SIZE))
+
+        self.TEST_RANGE = 5
+
+        self.NO_SIZE_OPTION = {CParameter.compressionLevel: compressionLevel_values.min,
+                               CParameter.contentSizeFlag: 0}
+
+    def compress_unknown_size(self, size):
+        return compress(b'a' * size, self.NO_SIZE_OPTION)
+
+    def test_empty_input(self):
+        dat1 = b''
+
+        # decompress() function
+        dat2 = decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+
+        # ZstdDecompressor class
+        d = ZstdDecompressor()
+        dat2 = d.decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+
+        # EndlessZstdDecompressor class
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+    def test_zero_size_output(self):
+        dat1 = self.compress_unknown_size(0)
+
+        # decompress() function
+        dat2 = decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+
+        # ZstdDecompressor class
+        d = ZstdDecompressor()
+        dat2 = d.decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+
+        # EndlessZstdDecompressor class
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1)
+        self.assertEqual(len(dat2), 0)
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+    def test_edge_sizes(self):
+        for index in range(self.TEST_RANGE):
+            for extra in [-1, 0, 1]:
+                SIZE = self.ACCUMULATED_SIZE[index] + extra
+                dat1 = self.compress_unknown_size(SIZE)
+
+                # decompress() function
+                dat2 = decompress(dat1)
+                self.assertEqual(len(dat2), SIZE)
+
+                # ZstdDecompressor class
+                d = ZstdDecompressor()
+                dat2 = d.decompress(dat1)
+                self.assertEqual(len(dat2), SIZE)
+                self.assertTrue(d.eof)
+                self.assertFalse(d.needs_input)
+
+                # EndlessZstdDecompressor class
+                d = EndlessZstdDecompressor()
+                dat2 = d.decompress(dat1)
+                self.assertEqual(len(dat2), SIZE)
+                self.assertTrue(d.at_frame_edge)
+                self.assertTrue(d.needs_input)
+
+    def test_edge_sizes_stream(self):
+        SIZE = self.ACCUMULATED_SIZE[self.TEST_RANGE]
+        dat1 = self.compress_unknown_size(SIZE)
+
+        # ZstdDecompressor class
+        d = ZstdDecompressor()
+        d.decompress(dat1, 0)
+
+        for index in range(self.TEST_RANGE+1):
+            B_SIZE = self.BLOCK_SIZE[index]
+            dat2 = d.decompress(b'', B_SIZE)
+
+            self.assertEqual(len(dat2), B_SIZE)
+            self.assertFalse(d.needs_input)
+            if index < self.TEST_RANGE:
+                self.assertFalse(d.eof)
+            else:
+                self.assertTrue(d.eof)
+
+        # EndlessZstdDecompressor class
+        d = EndlessZstdDecompressor()
+        d.decompress(dat1, 0)
+
+        for index in range(self.TEST_RANGE+1):
+            B_SIZE = self.BLOCK_SIZE[index]
+            dat2 = d.decompress(b'', B_SIZE)
+
+            self.assertEqual(len(dat2), B_SIZE)
+            if index < self.TEST_RANGE:
+                self.assertFalse(d.at_frame_edge)
+                self.assertFalse(d.needs_input)
+            else:
+                self.assertTrue(d.at_frame_edge)
+                self.assertTrue(d.needs_input)
+
+    def test_endlessdecompressor_2_frames(self):
+        self.assertGreater(self.TEST_RANGE - 2, 0)
+
+        for extra in [-1, 0, 1]:
+            # frame 1 size
+            SIZE1 = self.ACCUMULATED_SIZE[self.TEST_RANGE - 2] + extra
+            # frame 2 size
+            SIZE2 = self.ACCUMULATED_SIZE[self.TEST_RANGE] - SIZE1
+
+            FRAME1 = self.compress_unknown_size(SIZE1)
+            FRAME2 = self.compress_unknown_size(SIZE2)
+
+            # one step
+            d = EndlessZstdDecompressor()
+
+            dat2 = d.decompress(FRAME1 + FRAME2)
+            self.assertEqual(len(dat2), SIZE1 + SIZE2)
+            self.assertTrue(d.at_frame_edge)
+            self.assertTrue(d.needs_input)
+
+            # two step
+            d = EndlessZstdDecompressor()
+
+            # frame 1
+            dat2 = d.decompress(FRAME1 + FRAME2, SIZE1)
+            self.assertEqual(len(dat2), SIZE1)
+            self.assertFalse(d.at_frame_edge) # input stream not at a frame edge
+            self.assertFalse(d.needs_input)
+
+            # frame 2
+            dat2 = d.decompress(b'')
+            self.assertEqual(len(dat2), SIZE2)
+            self.assertTrue(d.at_frame_edge)
+            self.assertTrue(d.needs_input)
+
+    def test_known_size(self):
+        # only decompress() function supports first frame with known size
+
+        # 1 frame, the decompressed size is known
+        SIZE1 = 123_456
+        known_size = compress(b'a' * SIZE1)
+
+        dat = decompress(known_size)
+        self.assertEqual(len(dat), SIZE1)
+
+        # 2 frame, the second frame's decompressed size is unknown
+        for extra in [-1, 0, 1]:
+            SIZE2 = self.BLOCK_SIZE[1] + self.BLOCK_SIZE[2] + extra
+            unkown_size = self.compress_unknown_size(SIZE2)
+
+            dat = decompress(known_size + unkown_size)
+            self.assertEqual(len(dat), SIZE1 + SIZE2)
+
+    @bigmemtest(size = 2*_1G, memuse = 1)
+    @unittest.skipUnless(sys.maxsize > 2**32, '64-bit build test')
+    def test_large_output(self, size):
+        SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
+        dat1 = self.compress_unknown_size(SIZE)
+
+        dat2 = decompress(dat1)
+        leng_dat2 = len(dat2)
+        del dat2
+        self.assertEqual(leng_dat2, SIZE)
+
 class FileTestCase(unittest.TestCase):
 
     def test_init(self):
@@ -2404,6 +2594,7 @@ def test_main():
         CompressorDecompressorTestCase,
         DecompressorFlagsTestCase,
         ZstdDictTestCase,
+        OutputBufferTestCase,
         FileTestCase,
         OpenTestCase,
     )

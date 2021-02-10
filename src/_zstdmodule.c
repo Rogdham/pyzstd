@@ -421,11 +421,11 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     if (is_compress) {
         list = cp_list;
         list_size = Py_ARRAY_LENGTH(cp_list);
-        type = "compress";
+        type = "compression";
     } else {
         list = dp_list;
         list_size = Py_ARRAY_LENGTH(dp_list);
-        type = "decompress";
+        type = "decompression";
     }
 
     /* Find parameter's name */
@@ -1526,7 +1526,6 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 
         /* Output buffer should be exhausted, grow the buffer. */
         assert(out.pos == out.size);
-
         if (out.pos == out.size) {
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
@@ -1585,7 +1584,6 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
 
         /* Output buffer should be exhausted, grow the buffer. */
         assert(out.pos == out.size);
-
         if (out.pos == out.size) {
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
@@ -1893,15 +1891,62 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
    ------------------------- */
 
 typedef enum {
-    TYPE_DECOMPRESSOR,          /* ZstdDecompressor class */
-    TYPE_ENDLESS_DECOMPRESSOR,  /* EndlessZstdDecompressor class */
-    TYPE_FUNCTION               /* decompress() function */
+    TYPE_DECOMPRESSOR,          /* <D>, ZstdDecompressor class */
+    TYPE_ENDLESS_DECOMPRESSOR,  /* <E>, EndlessZstdDecompressor class */
+    TYPE_FUNCTION               /* <F>, decompress() function */
 } decompress_type;
 
-/* Decompress implementation for:
-   - ZstdDecompressor
-   - EndlessZstdDecompressor
-   - decompress(), decompressed_size is only available in this type. */
+/* Decompress implementation for <D>, <E>, <F>, pseudo code:
+
+        initialize_output_buffer
+        while True:
+            decompress_data
+            set_object_flag   # .eof for <D>, .at_frame_edge for <E>, <F>.
+
+            if output_buffer_exhausted:
+                if output_buffer_reached_max_length:   # only for <D>, <E>.
+                    finish
+                grow_output_buffer
+            elif input_buffer_exhausted:
+                finish
+
+    ZSTD_decompressStream()'s size_t return value:
+      - 0 when a frame is completely decoded and fully flushed, zstd's internal
+        buffer has no data.
+      - An error code, which can be tested using ZSTD_isError().
+      - Or any other value > 0, which means there is still some decoding or
+        flushing to do to complete current frame.
+
+      Note, decompressing "an empty input" in any case will make it > 0.
+
+    <E>, <F> support multiple frames, they have a .at_frame_edge flag, which
+    means both the input and output streams are at a frame edge. It can be set
+    by this statement:
+
+        .at_frame_edge = (zstd_ret == 0) ? 1 : 0
+
+    But if decompressing "an empty input" at "a frame edge", zstd_ret will be
+    non-zero, then .at_frame_edge will be wrongly set to false. To solve this
+    problem, two AFE checks are needed to ensure that: when at "a frame edge",
+    empty input will not be decompressed.
+
+        // AFE check
+        if (self->at_frame_edge && in->pos == in->size) {
+            finish
+        }
+
+    In <E>, if .at_frame_edge is eventually set to true, but input stream has
+    unconsumed data (in->pos < in->size), then the outer function
+    stream_decompress() will set .at_frame_edge to false. In this case,
+    although the output stream is at a frame edge, for the caller, the input
+    stream is not at a frame edge, see below diagram. This behavior does not
+    affect the next AFE check, since (in->pos < in->size).
+
+    input stream:  --------------|---
+                                    ^
+    output stream: ====================|
+                                       ^
+*/
 FORCE_INLINE PyObject *
 decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 const Py_ssize_t max_length, const uint64_t decompressed_size,
@@ -1911,6 +1956,15 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     ZSTD_outBuffer out;
     BlocksOutputBuffer buffer;
     PyObject *ret;
+
+    /* The first AFE check for setting .at_frame_edge flag */
+    if (type != TYPE_DECOMPRESSOR) {
+        if (self->at_frame_edge && in->pos == in->size) {
+            ret = static_state.empty_bytes;
+            Py_INCREF(ret);
+            return ret;
+        }
+    }
 
     /* Initialize output buffer before any `goto error` statement */
     if (type == TYPE_FUNCTION) {
@@ -1935,10 +1989,6 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     assert(out.pos == 0);
 
     while (1) {
-        /* Save in & out positions */
-        const size_t in_pos_bak = in->pos;
-        const size_t out_pos_bak = out.pos;
-
         /* Decompress */
         Py_BEGIN_ALLOW_THREADS
         zstd_ret = ZSTD_decompressStream(self->dctx, &out, in);
@@ -1952,35 +2002,28 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 
         /* Set .eof/.af_frame_edge flag */
         if (type == TYPE_DECOMPRESSOR) {
-            /* ZstdDecompressor class stops when a frame is decompressed.
-               (zstd_ret == 0) when a frame is completely decoded and fully
-               flushed. Otherwise, decompressing an empty input will make
-               zstd_ret non-zero. */
+            /* ZstdDecompressor class stops when a frame is decompressed */
             if (zstd_ret == 0) {
                 self->eof = 1;
                 break;
             }
         } else {
             /* EndlessZstdDecompressor class and decompress() function support
-               multiple frames.
-               Check these conditions beacuse after flushing a frame,
-               decompressing an empty input will make zstd_ret non-zero. */
-            if (out.pos != out_pos_bak || in->pos != in_pos_bak) {
-                self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+               multiple frames */
+            self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+
+            /* The second AFE check for setting .at_frame_edge flag */
+            if (self->at_frame_edge && in->pos == in->size) {
+                break;
             }
         }
 
-        /* Need to check `out` before `in`. Maybe zstd's internal buffer still
-           have a few bytes can be output, grow the buffer and continue. */
+        /* Need to check out before in. Maybe zstd's internal buffer still has
+           a few bytes can be output, grow the buffer and continue. */
         if (out.pos == out.size) {
             /* Output buffer exhausted */
 
-            if (type == TYPE_FUNCTION) {
-                /* Finished, speed up for small data (a few KB). */
-                if (self->at_frame_edge && in->pos == in->size) {
-                    break;
-                }
-            } else {
+            if (type != TYPE_FUNCTION) {
                 /* Output buffer reached max_length */
                 if (OutputBuffer_ReachedMaxLength(&buffer, &out)) {
                     break;
