@@ -44,7 +44,7 @@ def get_frame_info(frame_buffer):
     not recorded in frame header, the frame may or may not need a dictionary to
     be decoded, and the ID of such a dictionary is not specified.
 
-    It's possible to add more items to the namedtuple in the future."""
+    It's possible to append more items to the namedtuple in the future."""
 
     ret_tuple = _zstd._get_frame_info(frame_buffer)
     return _nt_frame_info(*ret_tuple)
@@ -76,7 +76,7 @@ class CParameter(enum.IntEnum):
 
     def bounds(self):
         """Return lower and upper bounds of a parameter, both inclusive."""
-        # 1 means compress parameter
+        # 1 means compression parameter
         return _zstd._get_param_bounds(1, self.value)
 
 
@@ -85,7 +85,7 @@ class DParameter(enum.IntEnum):
 
     def bounds(self):
         """Return lower and upper bounds of a parameter, both inclusive."""
-        # 0 means decompress parameter
+        # 0 means decompression parameter
         return _zstd._get_param_bounds(0, self.value)
 
 
@@ -112,7 +112,7 @@ def compress(data, level_or_option=None, zstd_dict=None):
     Arguments
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
-                     When it's a dict object, it contains advanced compress
+                     When it's a dict object, it contains advanced compression
                      parameters.
     zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
     """
@@ -129,7 +129,7 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     Arguments
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
-                     When it's a dict object, it contains advanced compress
+                     When it's a dict object, it contains advanced compression
                      parameters.
     zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
     """
@@ -219,9 +219,9 @@ class ZstdDecompressReader(_compression.DecompressReader):
     def readall(self):
         chunks = []
         while True:
-            # sys.maxsize means that the max length of output buffer is
-            # unlimited, so that the whole input buffer can be decompressed
-            # within one .decompress() call.
+            # sys.maxsize means the max length of output buffer is unlimited,
+            # so that the whole input buffer can be decompressed within one
+            # .decompress() call.
             data = self.read(sys.maxsize)
             if not data:
                 break
