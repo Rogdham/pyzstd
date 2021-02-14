@@ -60,16 +60,16 @@ c_files.append('src/_zstdmodule.c')
 
 _zstd_extension = Extension('pyzstd._zstd',
                             c_files,
-                            extra_compile_args=["-DZSTD_MULTITHREAD"])
+                            extra_compile_args=['-DZSTD_MULTITHREAD'])
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
-        if 'msvc' in self.compiler.compiler_type:
+        if 'msvc' in self.compiler.compiler_type.lower():
             for extension in self.extensions:
                 if extension == _zstd_extension:
                     # more aggressive inlining than /Ob2
                     # https://github.com/facebook/zstd/issues/2314
-                    extension.extra_compile_args.append("/Ob3")
+                    extension.extra_compile_args.append('/Ob3')
         super().build_extensions()
 
 setup(
@@ -82,7 +82,7 @@ setup(
     author_email='malincns@163.com',
     url='https://github.com/animalize/pyzstd',
     license='The 3-Clause BSD License',
-    python_requires=">=3.5",
+    python_requires='>=3.5',
 
     classifiers=[
         "Development Status :: 4 - Beta",
@@ -95,13 +95,13 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],
-    keywords="zstandard zstd compression decompression compress decompress",
+    keywords='zstandard zstd compression decompression compress decompress',
 
     package_dir={'pyzstd': 'src'},
     py_modules=['pyzstd.__init__', 'pyzstd.pyzstd'],
 
-    packages=["pyzstd"],
-    package_data={"pyzstd": ['__init__.pyi', 'py.typed']},
+    packages=['pyzstd'],
+    package_data={'pyzstd': ['__init__.pyi', 'py.typed']},
 
     ext_modules=[_zstd_extension],
     cmdclass={'build_ext': build_ext_compiler_check}
