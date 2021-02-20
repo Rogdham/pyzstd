@@ -2,7 +2,7 @@ import _compression
 import io
 from enum import IntEnum
 from os import PathLike
-from typing import Dict, ByteString, Optional, Union, \
+from typing import Dict, ByteString, Optional, Union, Callable, \
                    ClassVar, Tuple, NamedTuple, BinaryIO, TextIO
 
 __version__: str
@@ -146,6 +146,13 @@ class frame_info(NamedTuple):
 def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 
 def get_frame_size(frame_buffer: ByteString) -> int: ...
+
+def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
+                    level_or_option: Union[None, int, Dict[CParameter, int]] = None,
+                    zstd_dict: Optional[ZstdDict] = None,
+                    pledged_input_size: int = (2**64-1),
+                    read_size: int = (128*1024), write_size: int = (128*1024),
+                    callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
 class ZstdFile(_compression.BaseStream):
     def __init__(self,

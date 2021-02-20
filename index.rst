@@ -407,7 +407,7 @@ Dictionary
     .. sourcecode:: python
 
         # load a zstd dictionary from file
-        with open(dict_path, 'rb') as f:
+        with io.open(dict_path, 'rb') as f:
             file_content = f.read()
         zd = ZstdDict(file_content)
 
@@ -435,7 +435,7 @@ Dictionary
             for parent, dirnames, filenames in os.walk(rootdir):
                 for filename in filenames:
                     path = os.path.join(parent, filename)
-                    with open(path, 'rb') as f:
+                    with io.open(path, 'rb') as f:
                         dat = f.read()
                     yield dat
 
@@ -472,7 +472,48 @@ Dictionary
 Module-level functions
 ----------------------
 
-    This section contains function :py:func:`get_frame_info`, :py:func:`get_frame_size`.
+    This section contains function :py:func:`compress_stream`, :py:func:`get_frame_info`, :py:func:`get_frame_size`.
+
+.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=(128*1024), write_size=(128*1024), callback=None)
+
+    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*.
+
+    If increase *read_size* and *write_size* arguments, it may be faster.
+
+    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If it's ``None``, the *callback* argument must be non-None.
+    :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
+    :type level_or_option: int or dict
+    :param zstd_dict: Pre-trained dictionary for compression.
+    :type zstd_dict: ZstdDict
+    :param pledged_input_size: If set this argument to the size of input data, the size will be written into frame header. If the actual input data does not match it, an error will be raised.
+    :type pledged_input_size: int
+    :param read_size: Input buffer size, in bytes.
+    :type read_size: int
+    :param write_size: Output buffer size, in bytes.
+    :type write_size: int
+    :param callback: A callback function that accepts four parameters: ``(total_read, total_write, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :type callback: callable
+    :return: A 2-items tuple, ``(total_read, total_write)``, the items are ``int`` objects.
+    :rtype: tuple
+
+.. sourcecode:: python
+
+    # compress an input file, and write to an output file.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            ret = compress_stream(ifh, ofh)
+            print(f'Read {ret[0]} bytes, write {ret[1]} bytes.')
+
+    # with callback function
+    def func(total_read, total_write, read_data, write_data):
+        percent = 100 * total_read / input_file_size
+        print(f'Progress: {percent:.1f}%')
+
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            compress_stream(ifh, ofh, callback=func)
+
 
 .. py:function:: get_frame_info(frame_buffer)
 

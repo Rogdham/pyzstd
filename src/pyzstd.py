@@ -16,6 +16,7 @@ __all__ = ('compress', 'richmem_compress', 'decompress',
            'ZstdDict', 'ZstdError', 'ZstdFile', 'open',
            'CParameter', 'DParameter', 'Strategy',
            'get_frame_info', 'get_frame_size',
+           'compress_stream',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
 
 
