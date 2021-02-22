@@ -67,9 +67,13 @@ class build_ext_compiler_check(build_ext):
         if 'msvc' in self.compiler.compiler_type.lower():
             for extension in self.extensions:
                 if extension == _zstd_extension:
-                    # more aggressive inlining than /Ob2
+                    # The default is /Ox optimization
+                    # /Ob3 is more aggressive inlining than /Ob2:
                     # https://github.com/facebook/zstd/issues/2314
-                    extension.extra_compile_args.append('/Ob3')
+                    # /GF eliminates duplicate strings
+                    # /Gy does function level linking
+                    more_options = ['/Ob3', '/GF', '/Gy']
+                    extension.extra_compile_args.extend(more_options)
         super().build_extensions()
 
 setup(
