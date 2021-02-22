@@ -2844,7 +2844,7 @@ PyDoc_STRVAR(compress_stream_doc,
 "compress_stream(input_stream, output_stream, *,\n"
 "                level_or_option=None, zstd_dict=None,\n"
 "                pledged_input_size=(2**64-1),\n"
-"                read_size=(128*1024), write_size=(128*1024),\n"
+"                read_size=131_072, write_size=131_591,\n"
 "                callback=None)\n"
 "----\n"
 "Compress from input_stream to output_stream.\n\n"
@@ -2879,8 +2879,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
     uint64_t pledged_input_size = ZSTD_CONTENTSIZE_UNKNOWN;
-    Py_ssize_t read_size = 128*1024;
-    Py_ssize_t write_size = 128*1024;
+    Py_ssize_t read_size = ZSTD_CStreamInSize();
+    Py_ssize_t write_size = ZSTD_CStreamOutSize();
     PyObject *callback = Py_None;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
@@ -2893,14 +2893,14 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     }
 
     /* Check parameters */
-    if (!PyObject_HasAttrString(input_stream, "readinto")) {
+    if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
         PyErr_SetString(PyExc_ValueError,
                         "input_stream argument must have a .readinto(b) method.");
         return NULL;
     }
 
     if (output_stream != Py_None) {
-        if (!PyObject_HasAttrString(output_stream, "write")) {
+        if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
             PyErr_SetString(PyExc_ValueError,
                             "output_stream argument must have a .write(b) method.");
             return NULL;
@@ -2929,8 +2929,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     ZSTD_outBuffer out = {.dst = NULL};
     PyObject *in_memoryview = NULL;
     PyObject *out_memoryview;
-    uint64_t total_read_size = 0;
-    uint64_t total_write_size = 0;
+    uint64_t total_input_size = 0;
+    uint64_t total_output_size = 0;
     PyObject *ret = NULL;
 
     /* Initialize & set ZstdCompressor */
@@ -3010,10 +3010,10 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
             }
 
             /* Don't generate empty frame */
-            if (read_bytes == 0 && total_read_size == 0) {
+            if (read_bytes == 0 && total_input_size == 0) {
                 break;
             }
-            total_read_size += (size_t) read_bytes;
+            total_input_size += (size_t) read_bytes;
         }
 
         in.size = (size_t) read_bytes;
@@ -3041,6 +3041,9 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                 set_zstd_error(ERR_COMPRESS, zstd_ret);
                 goto error;
             }
+
+            /* Accumulate output bytes */
+            total_output_size += out.pos;
 
             /* Write all output to output_stream */
             if (output_stream != Py_None) {
@@ -3081,7 +3084,6 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                                             "returned wrong value.");
                             goto error;
                         }
-                        total_write_size += (size_t) write_bytes;
                         write_pos += (size_t) write_bytes;
                     }
                 }
@@ -3119,7 +3121,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
                 /* callback function arguments */
                 cb_args = Py_BuildValue("(KKOO)",
-                                        total_read_size, total_write_size,
+                                        total_input_size, total_output_size,
                                         cb_in_memoryview, cb_out_memoryview);
                 if (cb_args == NULL) {
                     Py_DECREF(cb_in_memoryview);
@@ -3177,13 +3179,13 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         goto error;
     }
 
-    temp = PyLong_FromUnsignedLongLong(total_read_size);
+    temp = PyLong_FromUnsignedLongLong(total_input_size);
     if (temp == NULL) {
         goto error;
     }
     PyTuple_SET_ITEM(ret, 0, temp);
 
-    temp = PyLong_FromUnsignedLongLong(total_write_size);
+    temp = PyLong_FromUnsignedLongLong(total_output_size);
     if (temp == NULL) {
         goto error;
     }
@@ -3204,6 +3206,364 @@ success:
     return ret;
 }
 
+PyDoc_STRVAR(decompress_stream_doc,
+"decompress_stream(input_stream, output_stream, *,\n"
+"                  zstd_dict=None, option=None,\n"
+"                  read_size=131_075, write_size=131_072,\n"
+"                  callback=None)\n"
+"----\n"
+"Decompress from input_stream to output_stream.\n\n"
+"Return a tuple, (total_read, total_write), the items are int objects.\n\n"
+"Arguments\n\n"
+"input_stream: Input stream that has a .readinto(b) method.\n"
+"output_stream: Output stream that has a .write(b) method. If it's None,\n"
+"    the callback argument must be non-None.\n"
+"zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
+"option: A dict object, contains advanced decompression parameters.\n"
+"read_size: Input buffer size, in bytes.\n"
+"write_size: Output buffer size, in bytes.\n"
+"callback: A callback function that accepts four parameters:\n"
+"    (total_read, total_write, read_data, write_data), the first two are int\n"
+"    objects, the last two are readonly memoryview objects."
+);
+
+static PyObject *
+decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"input_stream", "output_stream",
+                             "zstd_dict", "option",
+                             "read_size", "write_size",
+                             "callback", NULL};
+    PyObject *input_stream;
+    PyObject *output_stream;
+    PyObject *zstd_dict = Py_None;
+    PyObject *option = Py_None;
+    Py_ssize_t read_size = ZSTD_DStreamInSize();
+    Py_ssize_t write_size = ZSTD_DStreamOutSize();
+    PyObject *callback = Py_None;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "OO|$OOnnO:decompress_stream", kwlist,
+                                     &input_stream, &output_stream,
+                                     &zstd_dict, &option,
+                                     &read_size, &write_size,
+                                     &callback)) {
+        return NULL;
+    }
+
+    /* Check parameters */
+    if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "input_stream argument must have a .readinto(b) method.");
+        return NULL;
+    }
+
+    if (output_stream != Py_None) {
+        if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
+            PyErr_SetString(PyExc_ValueError,
+                            "output_stream argument must have a .write(b) method.");
+            return NULL;
+        }
+    } else {
+        if (callback == Py_None) {
+            PyErr_SetString(PyExc_ValueError,
+                            "At least one of output_stream argument and "
+                            "callback argument should be non-None.");
+            return NULL;
+        }
+    }
+
+    if (read_size <= 0 || write_size <= 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "read_size argument and write_size argument should "
+                        "be positive numbers.");
+        return NULL;
+    }
+
+    size_t zstd_ret;
+    PyObject *temp;
+    ZstdDecompressor self = {0};
+    ZSTD_inBuffer in = {.src = NULL};
+    ZSTD_outBuffer out = {.dst = NULL};
+    PyObject *in_memoryview = NULL;
+    PyObject *out_memoryview;
+    uint64_t total_input_size = 0;
+    uint64_t total_output_size = 0;
+    PyObject *ret = NULL;
+
+    /* Initialize & set ZstdDecompressor */
+    self.dctx = ZSTD_createDCtx();
+    if (self.dctx == NULL) {
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_DCtx instance.");
+        goto error;
+    }
+    self.at_frame_edge = 1;
+
+    if (zstd_dict != Py_None) {
+        if (load_d_dict(self.dctx, zstd_dict) < 0) {
+            goto error;
+        }
+    }
+
+    if (option != Py_None) {
+        if (set_d_parameters(self.dctx, option) < 0) {
+            goto error;
+        }
+    }
+
+    /* Input buffer, in.size and in.pos will be set later. */
+    in.src = PyMem_Malloc(read_size);
+    if (in.src == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+    in_memoryview = PyMemoryView_FromMemory((char*) in.src, read_size, PyBUF_WRITE);
+    if (in_memoryview == NULL) {
+        goto error;
+    }
+
+    /* Output buffer, out.pos will be set later. */
+    out.dst = PyMem_Malloc(write_size);
+    if (out.dst == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+    out.size = write_size;
+
+    /* Read */
+    while (1) {
+        Py_ssize_t read_bytes;
+        size_t callback_read_pos;
+
+        /* Check KeyboardInterrupt */
+        PyErr_CheckSignals();
+
+        /* Invoke .readinto() method */
+        temp = PyObject_CallMethodObjArgs(input_stream,
+                                          static_state.str_readinto,
+                                          in_memoryview, NULL);
+        if (temp == NULL) {
+            goto error;
+        } else if (temp == Py_None) {
+            /* Non-blocking mode and no bytes are available */
+            Py_DECREF(temp);
+            continue;
+        } else {
+            read_bytes = PyLong_AsSsize_t(temp);
+            Py_DECREF(temp);
+            if (read_bytes < 0 || read_bytes > read_size) {
+                PyErr_SetString(PyExc_ValueError,
+                                "input_stream.readinto(b) method returned "
+                                "wrong value.");
+                goto error;
+            }
+            total_input_size += (size_t) read_bytes;
+        }
+
+        in.size = (size_t) read_bytes;
+        in.pos = 0;
+        callback_read_pos = 0;
+
+        /* Decompress & write */
+        while (1) {
+            /* AFE check for setting .at_frame_edge flag, search "AFE check" in
+               this file to see details. */
+            if (self.at_frame_edge && in.pos == in.size) {
+                break;
+            }
+
+            /* Output position */
+            out.pos = 0;
+
+            /* Decompress */
+            Py_BEGIN_ALLOW_THREADS
+            zstd_ret = ZSTD_decompressStream(self.dctx, &out, &in);
+            Py_END_ALLOW_THREADS
+
+            if (ZSTD_isError(zstd_ret)) {
+                set_zstd_error(ERR_DECOMPRESS, zstd_ret);
+                goto error;
+            }
+
+            /* Set .af_frame_edge flag */
+            self.at_frame_edge = (zstd_ret == 0) ? 1 : 0;
+
+            /* Accumulate output bytes */
+            total_output_size += out.pos;
+
+            /* Write all output to output_stream */
+            if (output_stream != Py_None) {
+                size_t write_pos = 0;
+
+                while (write_pos < out.pos) {
+                    const Py_ssize_t left_bytes = out.pos - write_pos;
+
+                    /* Invoke .write() method */
+                    out_memoryview = PyMemoryView_FromMemory(
+                                        (char*) out.dst + write_pos,
+                                        left_bytes, PyBUF_READ);
+                    if (out_memoryview == NULL) {
+                        goto error;
+                    }
+
+                    temp = PyObject_CallMethodObjArgs(output_stream,
+                                                      static_state.str_write,
+                                                      out_memoryview, NULL);
+                    Py_DECREF(out_memoryview);
+
+                    if (temp == NULL) {
+                        goto error;
+                    } else if (temp == Py_None) {
+                        /* The raw stream is set not to block and no single
+                           byte could be readily written to it */
+                        Py_DECREF(temp);
+
+                        /* Check KeyboardInterrupt, prevent loop infinitely. */
+                        PyErr_CheckSignals();
+                        continue;
+                    } else {
+                        Py_ssize_t write_bytes = PyLong_AsSsize_t(temp);
+                        Py_DECREF(temp);
+                        if (write_bytes < 0 || write_bytes > left_bytes) {
+                            PyErr_SetString(PyExc_ValueError,
+                                            "output_stream.write(b) method "
+                                            "returned wrong value.");
+                            goto error;
+                        }
+                        write_pos += (size_t) write_bytes;
+                    }
+                }
+            } /* Write all output to output_stream */
+
+            /* Invoke callback */
+            if (callback != Py_None) {
+                PyObject *cb_in_memoryview;
+                PyObject *cb_out_memoryview;
+                PyObject *cb_args;
+                PyObject *cb_ret;
+                char cb_referenced;
+
+                /* Input memoryview */
+                cb_in_memoryview = PyMemoryView_FromMemory(
+                                      (char*) in.src,
+                                      in.size - callback_read_pos,
+                                      PyBUF_READ);
+                /* Only yield read data once */
+                callback_read_pos = in.size;
+
+                if (cb_in_memoryview == NULL) {
+                    goto error;
+                }
+
+                /* Output memoryview */
+                cb_out_memoryview = PyMemoryView_FromMemory(
+                                        out.dst,
+                                        out.pos,
+                                        PyBUF_READ);
+                if (cb_out_memoryview == NULL) {
+                    Py_DECREF(cb_in_memoryview);
+                    goto error;
+                }
+
+                /* callback function arguments */
+                cb_args = Py_BuildValue("(KKOO)",
+                                        total_input_size, total_output_size,
+                                        cb_in_memoryview, cb_out_memoryview);
+                if (cb_args == NULL) {
+                    Py_DECREF(cb_in_memoryview);
+                    Py_DECREF(cb_out_memoryview);
+                    goto error;
+                }
+
+                /* Callback */
+                cb_ret = PyObject_CallObject(callback, cb_args);
+
+                cb_referenced = Py_REFCNT(cb_in_memoryview) > 2 ||
+                                Py_REFCNT(cb_out_memoryview) > 2;
+                Py_DECREF(cb_args);
+                Py_DECREF(cb_in_memoryview);
+                Py_DECREF(cb_out_memoryview);
+
+                if (cb_ret == NULL) {
+                    goto error;
+                }
+                Py_DECREF(cb_ret);
+
+                /* memoryview object was referenced in callback function */
+                if (cb_referenced) {
+                    PyErr_SetString(
+                        PyExc_RuntimeError,
+                        "The third and fourth parameters of callback function "
+                        "are memoryview objects. If want to reference them "
+                        "outside the callback function, convert them to bytes "
+                        "object using bytes() function.");
+                    goto error;
+                }
+            } /* Invoke callback */
+
+            /* Finished. When a frame is fully decoded, but not fully flushed,
+               the last byte is kept as hostage, it will be released when all
+               output is flushed. */
+            if (in.pos == in.size) {
+                break;
+            }
+        } /* Decompress & write loop */
+
+        /* Input stream ended */
+        if (read_bytes == 0) {
+            /* Check data integrity. at_frame_edge flag is 1 when both input
+               and output streams are at a frame edge. */
+            if (self.at_frame_edge == 0) {
+                char *extra_msg = (total_output_size == 0) ? "" :
+                                  " If you want to output these decompressed "
+                                  "data, use an EndlessZstdDecompressor "
+                                  "object to decompress.";
+                PyErr_Format(static_state.ZstdError,
+                             "Decompression failed: Zstd data ends in an "
+                             "incomplete frame, decompressed data is %zd "
+                             "bytes.%s",
+                             total_output_size, extra_msg);
+                goto error;
+            }
+
+            break;
+        }
+    } /* Read loop */
+
+    /* Return tuple */
+    ret = PyTuple_New(2);
+    if (ret == NULL) {
+        goto error;
+    }
+
+    temp = PyLong_FromUnsignedLongLong(total_input_size);
+    if (temp == NULL) {
+        goto error;
+    }
+    PyTuple_SET_ITEM(ret, 0, temp);
+
+    temp = PyLong_FromUnsignedLongLong(total_output_size);
+    if (temp == NULL) {
+        goto error;
+    }
+    PyTuple_SET_ITEM(ret, 1, temp);
+
+    goto success;
+
+error:
+    Py_CLEAR(ret);
+
+success:
+    ZSTD_freeDCtx(self.dctx);
+
+    Py_XDECREF(in_memoryview);
+    PyMem_Free((char*) in.src);
+    PyMem_Free(out.dst);
+
+    return ret;
+}
+
 static PyMethodDef _zstd_methods[] = {
     {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
@@ -3212,6 +3572,7 @@ static PyMethodDef _zstd_methods[] = {
     {"get_frame_size", (PyCFunction)get_frame_size, METH_VARARGS, get_frame_size_doc},
     {"_get_frame_info", (PyCFunction)_get_frame_info, METH_VARARGS, _get_frame_info_doc},
     {"compress_stream", (PyCFunction)compress_stream, METH_VARARGS|METH_KEYWORDS, compress_stream_doc},
+    {"decompress_stream", (PyCFunction)decompress_stream, METH_VARARGS|METH_KEYWORDS, decompress_stream_doc},
     {NULL}
 };
 

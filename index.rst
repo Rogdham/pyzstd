@@ -474,11 +474,11 @@ Module-level functions
 
     This section contains function :py:func:`compress_stream`, :py:func:`get_frame_info`, :py:func:`get_frame_size`.
 
-.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=(128*1024), write_size=(128*1024), callback=None)
+.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=131_072, write_size=131_591, callback=None)
 
     A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*.
 
-    If increase *read_size* and *write_size* arguments, it may be faster.
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If it's ``None``, the *callback* argument must be non-None.
@@ -492,9 +492,9 @@ Module-level functions
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_read, total_write, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
     :type callback: callable
-    :return: A 2-items tuple, ``(total_read, total_write)``, the items are ``int`` objects.
+    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :rtype: tuple
 
 .. sourcecode:: python
@@ -506,13 +506,55 @@ Module-level functions
             print(f'Read {ret[0]} bytes, write {ret[1]} bytes.')
 
     # with callback function
-    def func(total_read, total_write, read_data, write_data):
-        percent = 100 * total_read / input_file_size
+    def func(total_input, total_output, read_data, write_data):
+        percent = 100 * total_input / input_file_size
         print(f'Progress: {percent:.1f}%')
 
     with io.open(input_file_path, 'rb') as ifh:
         with io.open(output_file_path, 'wb') as ofh:
             compress_stream(ifh, ofh, callback=func)
+
+
+.. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
+
+    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*.
+
+    Supports multiple concatenated frames.
+
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+
+    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If it's ``None``, the *callback* argument must be non-None.
+    :param zstd_dict: Pre-trained dictionary for compression.
+    :type zstd_dict: ZstdDict
+    :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
+    :type option: dict
+    :param read_size: Input buffer size, in bytes.
+    :type read_size: int
+    :param write_size: Output buffer size, in bytes.
+    :type write_size: int
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :type callback: callable
+    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
+    :rtype: tuple
+    :raises ZstdError: If decompression fails.
+
+.. sourcecode:: python
+
+    # decompress an input file, and write to an output file.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            ret = decompress_stream(ifh, ofh)
+            print(f'Read {ret[0]} bytes, write {ret[1]} bytes.')
+
+    # with callback function
+    def func(total_input, total_output, read_data, write_data):
+        percent = 100 * total_input / input_file_size
+        print(f'Progress: {percent:.1f}%')
+
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:function:: get_frame_info(frame_buffer)
