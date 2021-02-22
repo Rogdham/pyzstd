@@ -986,9 +986,7 @@ ZstdDict_dealloc(ZstdDict *self)
     Py_XDECREF(self->c_dicts);
 
     /* Free ZSTD_DDict instance */
-    if (self->d_dict) {
-        ZSTD_freeDDict(self->d_dict);
-    }
+    ZSTD_freeDDict(self->d_dict);
 
     /* Release dict_content after Free ZSTD_CDict/ZSTD_DDict instances */
     Py_XDECREF(self->dict_content);
@@ -1220,15 +1218,14 @@ _train_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
-    PyMem_Free(chunk_sizes);
-    return dst_dict_bytes;
+    goto success;
 
 error:
-    if (chunk_sizes != NULL) {
-        PyMem_Free(chunk_sizes);
-    }
-    Py_XDECREF(dst_dict_bytes);
-    return NULL;
+    Py_CLEAR(dst_dict_bytes);
+
+success:
+    PyMem_Free(chunk_sizes);
+    return dst_dict_bytes;
 }
 
 PyDoc_STRVAR(_finalize_dict_doc,
@@ -1335,15 +1332,14 @@ _finalize_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
-    PyMem_Free(chunk_sizes);
-    return dst_dict_bytes;
+    goto success;
 
 error:
-    if (chunk_sizes != NULL) {
-        PyMem_Free(chunk_sizes);
-    }
-    Py_XDECREF(dst_dict_bytes);
-    return NULL;
+    Py_CLEAR(dst_dict_bytes);
+
+success:
+    PyMem_Free(chunk_sizes);
+    return dst_dict_bytes;
 #endif
 }
 
@@ -1390,10 +1386,8 @@ error:
 static void
 _ZstdCompressor_dealloc(ZstdCompressor *self)
 {
-    /* Compression context */
-    if (self->cctx) {
-        ZSTD_freeCCtx(self->cctx);
-    }
+    /* Free compression context */
+    ZSTD_freeCCtx(self->cctx);
 
     /* Py_XDECREF the dict after free the compression context */
     Py_XDECREF(self->dict);
@@ -2312,17 +2306,13 @@ static void
 ZstdDecompressor_dealloc(ZstdDecompressor *self)
 {
     /* Free decompression context */
-    if (self->dctx) {
-        ZSTD_freeDCtx(self->dctx);
-    }
+    ZSTD_freeDCtx(self->dctx);
 
     /* Py_XDECREF the dict after free decompression context */
     Py_XDECREF(self->dict);
 
     /* Free unconsumed input data buffer */
-    if (self->input_buffer != NULL) {
-        PyMem_Free(self->input_buffer);
-    }
+    PyMem_Free(self->input_buffer);
 
     /* Free unused data */
     Py_XDECREF(self->unused_data);
@@ -2592,37 +2582,31 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     PyObject *zstd_dict = Py_None;
     PyObject *option = Py_None;
 
-    unsigned long long decompressed_size;
-    PyObject *ret = NULL;
-    ZSTD_inBuffer in;
-    ZstdDecompressor self;
-
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "y*|OO:decompress", kwlist,
                                      &data, &zstd_dict, &option)) {
         return NULL;
     }
 
-    /* Initialize self */
-    memset(&self, 0, sizeof(self));
-    self.at_frame_edge = 1;
+    unsigned long long decompressed_size;
+    ZstdDecompressor self = {0};
+    ZSTD_inBuffer in;
+    PyObject *ret = NULL;
 
+    /* Initialize & set ZstdDecompressor */
     self.dctx = ZSTD_createDCtx();
     if (self.dctx == NULL) {
         PyErr_SetString(static_state.ZstdError,
                         "Unable to create ZSTD_DCtx instance.");
         goto error;
     }
+    self.at_frame_edge = 1;
 
     /* Load dictionary to decompression context */
     if (zstd_dict != Py_None) {
         if (load_d_dict(self.dctx, zstd_dict) < 0) {
             goto error;
         }
-
-        /* Py_INCREF the dict */
-        Py_INCREF(zstd_dict);
-        self.dict = zstd_dict;
     }
 
     /* Set option to decompression context */
@@ -2667,11 +2651,8 @@ success:
     /* Release data */
     PyBuffer_Release(&data);
 
-    /* Clean up ZstdDecompressor, keep this order. */
-    if (self.dctx) {
-        ZSTD_freeDCtx(self.dctx);
-    }
-    Py_XDECREF(self.dict);
+    /* Free decompression context */
+    ZSTD_freeDCtx(self.dctx);
 
     return ret;
 }

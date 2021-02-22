@@ -131,6 +131,19 @@ def decompress(data: ByteString,
                zstd_dict: Optional[ZstdDict] = None,
                option: Optional[Dict[DParameter, int]] = None) -> bytes: ...
 
+def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
+                    level_or_option: Union[None, int, Dict[CParameter, int]] = None,
+                    zstd_dict: Optional[ZstdDict] = None,
+                    pledged_input_size: int = (2**64-1),
+                    read_size: int = 131_072, write_size: int = 131_591,
+                    callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
+
+def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
+                      zstd_dict: Optional[ZstdDict] = None,
+                      option: Optional[Dict[DParameter, int]] = None,
+                      read_size: int = 131_075, write_size: int = 131_072,
+                      callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
+
 def train_dict(samples: Iterable[ByteString],
                dict_size: int) -> ZstdDict: ...
 
@@ -146,19 +159,6 @@ class frame_info(NamedTuple):
 def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 
 def get_frame_size(frame_buffer: ByteString) -> int: ...
-
-def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
-                    level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-                    zstd_dict: Optional[ZstdDict] = None,
-                    pledged_input_size: int = (2**64-1),
-                    read_size: int = 131_072, write_size: int = 131_591,
-                    callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
-
-def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
-                      zstd_dict: Optional[ZstdDict] = None,
-                      option: Union[None, Dict[DParameter, int]] = None,
-                      read_size: int = 131_075, write_size: int = 131_072,
-                      callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
 class ZstdFile(_compression.BaseStream):
     def __init__(self,
