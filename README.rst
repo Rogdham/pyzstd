@@ -18,6 +18,12 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.14.2  (Feb 24, 2021)**
+
+#. Add two convenient functions: `compress_stream() <https://pyzstd.readthedocs.io/en/latest/#compress_stream>`_, `decompress_stream() <https://pyzstd.readthedocs.io/en/latest/#decompress_stream>`_.
+
+#. Some improvements.
+
 **0.14.1  (Dec 19, 2020)**
 
 #. Update zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
