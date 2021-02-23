@@ -31,7 +31,10 @@ Exception
 Common functions
 ----------------
 
-    This section contains function :py:func:`compress`, :py:func:`richmem_compress`, :py:func:`decompress`.
+    This section contains:
+
+        * function :py:func:`compress`
+        * function :py:func:`decompress`
 
     .. hint::
         If there is a big number of same type individual data, reuse a stream object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
@@ -65,13 +68,6 @@ Common functions
     compressed_dat = compress(raw_dat, option)
 
 
-.. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
-
-    Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
-
-    The parameters are the same as :py:func:`compress` function.
-
-
 .. py:function:: decompress(data, zstd_dict=None, option=None)
 
     Decompress *data*, return the decompressed data.
@@ -89,14 +85,115 @@ Common functions
     :raises ZstdError: If decompression fails.
 
 
-.. _stream_classes:
-
-Stream compress classes
+Rich memory compression
 -----------------------
 
-    This section contains class :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
+    Compress data using :ref:`rich memory mode<rich_mem>`. This mode is designed to allocate more memory, but faster in some cases.
+
+    This section contains:
+
+        * function :py:func:`richmem_compress`
+        * class :py:class:`RichMemZstdCompressor`, a reusable compressor.
+
+
+.. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
+
+    Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
+
+    The parameters are the same as :py:func:`compress` function.
+
+
+.. py:class:: RichMemZstdCompressor
+
+    A reusable compressor using :ref:`rich memory mode<rich_mem>`. It can be reused for big number of same type individual data.
+
+    Since it can only generates individual :ref:`frames<frame_block>`, it's not suitable for streaming compression, otherwise the compression ratio will be reduced. For streaming compression, see :py:func:`compress_stream` function, :py:class:`ZstdCompressor` class.
+
+    Thread-safe at method level.
+
+    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
+
+        The parameters are the same as :py:meth:`ZstdCompressor.__init__` method.
+
+    .. py:method:: compress(self, data)
+
+        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+
+        :param data: Data to be compressed.
+        :type data: bytes-like object
+        :return: A single zstd frame.
+        :rtype: bytes
+
+    .. sourcecode:: python
+
+        c = RichMemZstdCompressor()
+        frame1 = c.compress(raw_dat1)
+        frame2 = c.compress(raw_dat2)
+
+
+Stream compression
+------------------
+
+    This section contains:
+
+        * function :py:func:`compress_stream`, a fast and convenient function.
+        * class :py:class:`ZstdCompressor`, similar to compressors in Python standard library.
 
     It would be nice to know some knowledge about zstd data, see :ref:`frame and block<frame_block>`.
+
+
+.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=131_072, write_size=131_591, callback=None)
+
+    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It's zero memory copy.
+
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+
+    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
+    :type level_or_option: int or dict
+    :param zstd_dict: Pre-trained dictionary for compression.
+    :type zstd_dict: ZstdDict
+    :param pledged_input_size: If set this argument to the size of input data, the size will be written into frame header. If the actual input data does not match it, an error will be raised.
+    :type pledged_input_size: int
+    :param read_size: Input buffer size, in bytes.
+    :type read_size: int
+    :param write_size: Output buffer size, in bytes.
+    :type write_size: int
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :type callback: callable
+    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
+    :rtype: tuple
+
+.. sourcecode:: python
+
+    # compress an input file, and write to an output file.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            compress_stream(ifh, ofh)
+
+    # compress a bytes object, and write to a file.
+    with io.BytesIO(raw_dat) as bi:
+        with io.open(output_file_path, 'wb') as ofh:
+            compress_stream(bi, ofh)
+
+    # compress an input file, obtain a bytes object.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.BytesIO() as bo:
+            # note, on different platforms, the performance of
+            # writing to BytesIO object is different. on Windows
+            # it's slower.
+            compress_stream(ifh, bo)
+            compressed_dat = bo.getvalue()
+
+    # with callback function
+    def func(total_input, total_output, read_data, write_data):
+        percent = 100 * total_input / input_file_size
+        print(f'Progress: {percent:.1f}%')
+
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            compress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdCompressor
@@ -184,41 +281,69 @@ Stream compress classes
         #. More convenient than compress() followed by a flush().
 
 
-.. py:class:: RichMemZstdCompressor
+Stream decompression
+--------------------
 
-    A reusable compressor uses :ref:`rich memory mode<rich_mem>`. It's faster in some cases, but allocates more memory.
+    This section contains:
 
-    Since it can only generate individual frames, it's not suitable for streaming compression. For streaming compression, see :py:class:`ZstdCompressor` class.
-
-    Thread-safe at method level.
-
-    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
-
-        The parameters are the same as :py:meth:`ZstdCompressor.__init__` method.
-
-    .. py:method:: compress(self, data)
-
-        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
-
-        :param data: Data to be compressed.
-        :type data: bytes-like object
-        :return: A single zstd frame.
-        :rtype: bytes
-
-    .. sourcecode:: python
-
-        c = RichMemZstdCompressor()
-        frame1 = c.compress(raw_dat1)
-        frame2 = c.compress(raw_dat2)
+        * function :py:func:`decompress_stream`, a fast and convenient function.
+        * class :py:class:`ZstdDecompressor`, similar to decompressors in Python standard library.
+        * class :py:class:`EndlessZstdDecompressor`, a decompressor accepts multiple concatenated :ref:`frames<frame_block>`.
 
 
-Stream decompress classes
--------------------------
+.. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
-    This section contains class :py:class:`ZstdDecompressor`, :py:class:`EndlessZstdDecompressor`.
+    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It's zero memory copy.
 
-    .. hint::
-        If there is one frame, and the decompressed size is known (recorded in frame header), using one-shot :py:func:`decompress` function may be ~9% faster.
+    Supports multiple concatenated frames.
+
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+
+    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param zstd_dict: Pre-trained dictionary for compression.
+    :type zstd_dict: ZstdDict
+    :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
+    :type option: dict
+    :param read_size: Input buffer size, in bytes.
+    :type read_size: int
+    :param write_size: Output buffer size, in bytes.
+    :type write_size: int
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :type callback: callable
+    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
+    :rtype: tuple
+    :raises ZstdError: If decompression fails.
+
+.. sourcecode:: python
+
+    # decompress an input file, and write to an output file.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            decompress_stream(ifh, ofh)
+
+    # decompress a bytes object, and write to a file.
+    with io.BytesIO(compressed_dat) as bi:
+        with io.open(output_file_path, 'wb') as ofh:
+            decompress_stream(bi, ofh)
+
+    # decompress an input file, obtain a bytes object.
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.BytesIO() as bo:
+            # note, on different platforms, the performance of
+            # writing to BytesIO object is different. on Windows
+            # it's slower.
+            decompress_stream(ifh, bo)
+            decompressed_dat = bo.getvalue()
+
+    # with callback function
+    def func(total_input, total_output, read_data, write_data):
+        percent = 100 * total_input / input_file_size
+        print(f'Progress: {percent:.1f}%')
+
+    with io.open(input_file_path, 'rb') as ifh:
+        with io.open(output_file_path, 'wb') as ofh:
+            decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdDecompressor
@@ -251,7 +376,7 @@ Stream decompress classes
 
         If the *max_length* output limit in :py:meth:`~ZstdDecompressor.decompress` method has been reached, and the decompressor has (or may has) unconsumed input data, it will be set to ``False``. In this case, pass ``b''`` to :py:meth:`~ZstdDecompressor.decompress` method may output further data.
 
-        If ignore this attribute, there will be a little performance loss because of extra memory copy for input data.
+        If ignore this attribute when there is unconsumed input data, there will be a little performance loss because of extra memory copy.
 
     .. py:attribute:: eof
 
@@ -472,89 +597,7 @@ Dictionary
 Module-level functions
 ----------------------
 
-    This section contains function :py:func:`compress_stream`, :py:func:`get_frame_info`, :py:func:`get_frame_size`.
-
-.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=131_072, write_size=131_591, callback=None)
-
-    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*.
-
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
-
-    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If it's ``None``, the *callback* argument must be non-None.
-    :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
-    :type level_or_option: int or dict
-    :param zstd_dict: Pre-trained dictionary for compression.
-    :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the size will be written into frame header. If the actual input data does not match it, an error will be raised.
-    :type pledged_input_size: int
-    :param read_size: Input buffer size, in bytes.
-    :type read_size: int
-    :param write_size: Output buffer size, in bytes.
-    :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
-    :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
-
-.. sourcecode:: python
-
-    # compress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            ret = compress_stream(ifh, ofh)
-            print(f'Read {ret[0]} bytes, write {ret[1]} bytes.')
-
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
-
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh, callback=func)
-
-
-.. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
-
-    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*.
-
-    Supports multiple concatenated frames.
-
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
-
-    :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If it's ``None``, the *callback* argument must be non-None.
-    :param zstd_dict: Pre-trained dictionary for compression.
-    :type zstd_dict: ZstdDict
-    :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
-    :type option: dict
-    :param read_size: Input buffer size, in bytes.
-    :type read_size: int
-    :param write_size: Output buffer size, in bytes.
-    :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
-    :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
-    :raises ZstdError: If decompression fails.
-
-.. sourcecode:: python
-
-    # decompress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            ret = decompress_stream(ifh, ofh)
-            print(f'Read {ret[0]} bytes, write {ret[1]} bytes.')
-
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
-
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(ifh, ofh, callback=func)
+    This section contains function :py:func:`get_frame_info`, :py:func:`get_frame_size`.
 
 
 .. py:function:: get_frame_info(frame_buffer)
@@ -878,7 +921,8 @@ Advanced parameters
             * :py:func:`compress` function
             * :py:func:`richmem_compress` function
             * :py:class:`RichMemZstdCompressor` class
-            * :py:class:`ZstdCompressor` class with a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
+            * :py:func:`compress_stream` function setting *pledged_input_size* argument.
+            * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
 
         In traditional streaming compression, content size is unknown.
 

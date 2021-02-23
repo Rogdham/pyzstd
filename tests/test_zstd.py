@@ -19,7 +19,8 @@ import pyzstd as zstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDecompressor, EndlessZstdDecompressor, ZstdError, \
                    CParameter, DParameter, Strategy, \
-                   compress, richmem_compress, decompress, \
+                   compress, compress_stream, richmem_compress, \
+                   decompress, decompress_stream, \
                    ZstdDict, train_dict, finalize_dict, \
                    zstd_version, zstd_version_info, compressionLevel_values, \
                    get_frame_info, get_frame_size, \
@@ -2587,6 +2588,162 @@ class OpenTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
+class StreamFunctionsTestCase(unittest.TestCase):
+
+    def test_compress_stream(self):
+        bi = BytesIO(THIS_FILE_BYTES)
+        bo = BytesIO()
+        compress_stream(bi, bo,
+                        level_or_option=1, zstd_dict=TRAINED_DICT,
+                        read_size=200_000, write_size=200_000)
+        self.assertEqual(decompress(bo.getvalue(), TRAINED_DICT), THIS_FILE_BYTES)
+        bi.close()
+        bo.close()
+
+        # empty input
+        bi = BytesIO()
+        bo = BytesIO()
+        compress_stream(bi, bo)
+        self.assertEqual(bo.getvalue(), b'')
+        bi.close()
+        bo.close()
+
+        # wrong arguments
+        b1 = BytesIO()
+        b2 = BytesIO()
+        with self.assertRaisesRegex(TypeError, r'input_stream'):
+            compress_stream(123, b1)
+        with self.assertRaisesRegex(TypeError, r'output_stream'):
+            compress_stream(b1, 123)
+        with self.assertRaisesRegex(TypeError, r'level_or_option'):
+            compress_stream(b1, b2, level_or_option='3')
+        with self.assertRaisesRegex(TypeError, r'zstd_dict'):
+            compress_stream(b1, b2, zstd_dict={})
+        with self.assertRaisesRegex(ValueError, r'read_size'):
+            compress_stream(b1, b2, read_size=-1)
+        with self.assertRaises(OverflowError):
+            compress_stream(b1, b2, write_size=2**64+1)
+        with self.assertRaisesRegex(TypeError, r'callback'):
+            compress_stream(b1, None, callback=None)
+        b1.close()
+        b2.close()
+
+    def test_compress_stream_callback(self):
+        in_lst = []
+        out_lst = []
+        def func(total_input, total_output, read_data, write_data):
+            in_lst.append(read_data.tobytes())
+            out_lst.append(write_data.tobytes())
+
+        bi = BytesIO(THIS_FILE_BYTES)
+        bo = BytesIO()
+
+        option = {CParameter.compressionLevel : 1,
+                  CParameter.checksumFlag : 1}
+        compress_stream(bi, bo, level_or_option=option,
+                        read_size=701, write_size=101,
+                        callback=func)
+        bi.close()
+        bo.close()
+
+        in_dat = b''.join(in_lst)
+        out_dat = b''.join(out_lst)
+
+        self.assertEqual(in_dat, THIS_FILE_BYTES)
+        self.assertEqual(decompress(out_dat), THIS_FILE_BYTES)
+
+    def test_compress_stream_multi_thread(self):
+        size = 40*1024*1024
+        b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
+        option = {CParameter.compressionLevel : 1,
+                  CParameter.checksumFlag : 1,
+                  CParameter.nbWorkers : 2}
+
+        bi = BytesIO(b)
+        bo = BytesIO()
+        compress_stream(bi, bo, level_or_option=option)
+        self.assertEqual(decompress(bo.getvalue()), b)
+        bi.close()
+        bo.close()
+
+    def test_decompress_stream(self):
+        bi = BytesIO(COMPRESSED_THIS_FILE)
+        bo = BytesIO()
+        decompress_stream(bi, bo,
+                          option={DParameter.windowLogMax:26},
+                          read_size=200_000, write_size=200_000)
+        self.assertEqual(bo.getvalue(), THIS_FILE_BYTES)
+        bi.close()
+        bo.close()
+
+        # empty input
+        bi = BytesIO()
+        bo = BytesIO()
+        decompress_stream(bi, bo)
+        self.assertEqual(bo.getvalue(), b'')
+        bi.close()
+        bo.close()
+
+        # wrong arguments
+        b1 = BytesIO()
+        b2 = BytesIO()
+        with self.assertRaisesRegex(TypeError, r'input_stream'):
+            decompress_stream(123, b1)
+        with self.assertRaisesRegex(TypeError, r'output_stream'):
+            decompress_stream(b1, 123)
+        with self.assertRaisesRegex(TypeError, r'zstd_dict'):
+            decompress_stream(b1, b2, zstd_dict={})
+        with self.assertRaisesRegex(TypeError, r'option'):
+            decompress_stream(b1, b2, option=3)
+        with self.assertRaisesRegex(ValueError, r'read_size'):
+            decompress_stream(b1, b2, read_size=-1)
+        with self.assertRaises(OverflowError):
+            decompress_stream(b1, b2, write_size=2**64+1)
+        with self.assertRaisesRegex(TypeError, r'callback'):
+            decompress_stream(b1, None, callback=None)
+        b1.close()
+        b2.close()
+
+    def test_decompress_stream_callback(self):
+        in_lst = []
+        out_lst = []
+        def func(total_input, total_output, read_data, write_data):
+            in_lst.append(read_data.tobytes())
+            out_lst.append(write_data.tobytes())
+
+        bi = BytesIO(COMPRESSED_THIS_FILE)
+        bo = BytesIO()
+
+        option = {DParameter.windowLogMax : 26}
+        decompress_stream(bi, bo, option=option,
+                          read_size=701, write_size=401,
+                          callback=func)
+        bi.close()
+        bo.close()
+
+        in_dat = b''.join(in_lst)
+        out_dat = b''.join(out_lst)
+
+        self.assertEqual(in_dat, COMPRESSED_THIS_FILE)
+        self.assertEqual(out_dat, THIS_FILE_BYTES)
+
+    def test_decompress_stream_multi_frames(self):
+        dat = COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME + COMPRESSED_100_PLUS_32KB
+        bi = BytesIO(dat)
+        bo = BytesIO()
+        decompress_stream(bi, bo, read_size=200_000, write_size=50_000)
+        self.assertEqual(bo.getvalue(), DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_100_PLUS_32KB)
+        bi.close()
+        bo.close()
+
+        # incomplete frame
+        bi = BytesIO(dat[:-1])
+        bo = BytesIO()
+        with self.assertRaisesRegex(ZstdError, 'incomplete'):
+            decompress_stream(bi, bo)
+        bi.close()
+        bo.close()
+
 def test_main():
     run_unittest(
         FunctionsTestCase,
@@ -2597,6 +2754,7 @@ def test_main():
         OutputBufferTestCase,
         FileTestCase,
         OpenTestCase,
+        StreamFunctionsTestCase,
     )
 
 # uncompressed size 130KB, more than a zstd block.

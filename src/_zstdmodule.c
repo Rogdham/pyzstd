@@ -2875,20 +2875,20 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
     /* Check parameters */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
-        PyErr_SetString(PyExc_ValueError,
+        PyErr_SetString(PyExc_TypeError,
                         "input_stream argument must have a .readinto(b) method.");
         return NULL;
     }
 
     if (output_stream != Py_None) {
         if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
-            PyErr_SetString(PyExc_ValueError,
+            PyErr_SetString(PyExc_TypeError,
                             "output_stream argument must have a .write(b) method.");
             return NULL;
         }
     } else {
         if (callback == Py_None) {
-            PyErr_SetString(PyExc_ValueError,
+            PyErr_SetString(PyExc_TypeError,
                             "At least one of output_stream argument and "
                             "callback argument should be non-None.");
             return NULL;
@@ -2967,8 +2967,10 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         size_t callback_read_pos;
         ZSTD_EndDirective end_directive;
 
-        /* Check KeyboardInterrupt */
-        PyErr_CheckSignals();
+        /* Interrupted by a signal, put here for .readinto() returning None. */
+        if (PyErr_CheckSignals()) {
+            goto error;
+        }
 
         /* Invoke .readinto() method */
         temp = PyObject_CallMethodObjArgs(input_stream,
@@ -3053,8 +3055,10 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                            byte could be readily written to it */
                         Py_DECREF(temp);
 
-                        /* Check KeyboardInterrupt, prevent loop infinitely. */
-                        PyErr_CheckSignals();
+                        /* Check signal, prevent loop infinitely. */
+                        if (PyErr_CheckSignals()) {
+                            goto error;
+                        }
                         continue;
                     } else {
                         Py_ssize_t write_bytes = PyLong_AsSsize_t(temp);
@@ -3234,20 +3238,20 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
     /* Check parameters */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
-        PyErr_SetString(PyExc_ValueError,
+        PyErr_SetString(PyExc_TypeError,
                         "input_stream argument must have a .readinto(b) method.");
         return NULL;
     }
 
     if (output_stream != Py_None) {
         if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
-            PyErr_SetString(PyExc_ValueError,
+            PyErr_SetString(PyExc_TypeError,
                             "output_stream argument must have a .write(b) method.");
             return NULL;
         }
     } else {
         if (callback == Py_None) {
-            PyErr_SetString(PyExc_ValueError,
+            PyErr_SetString(PyExc_TypeError,
                             "At least one of output_stream argument and "
                             "callback argument should be non-None.");
             return NULL;
@@ -3317,8 +3321,10 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         Py_ssize_t read_bytes;
         size_t callback_read_pos;
 
-        /* Check KeyboardInterrupt */
-        PyErr_CheckSignals();
+        /* Interrupted by a signal, put here for .readinto() returning None. */
+        if (PyErr_CheckSignals()) {
+            goto error;
+        }
 
         /* Invoke .readinto() method */
         temp = PyObject_CallMethodObjArgs(input_stream,
@@ -3400,8 +3406,10 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                            byte could be readily written to it */
                         Py_DECREF(temp);
 
-                        /* Check KeyboardInterrupt, prevent loop infinitely. */
-                        PyErr_CheckSignals();
+                        /* Check signal, prevent loop infinitely. */
+                        if (PyErr_CheckSignals()) {
+                            goto error;
+                        }
                         continue;
                     } else {
                         Py_ssize_t write_bytes = PyLong_AsSsize_t(temp);
