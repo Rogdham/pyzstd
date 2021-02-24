@@ -103,6 +103,7 @@ typedef struct {
     PyTypeObject *EndlessZstdDecompressor_type;
     PyObject *ZstdError;
     PyObject *empty_bytes;
+    PyObject *empty_readonly_memoryview;
     PyObject *str_readinto;
     PyObject *str_write;
 } _zstd_state;
@@ -532,7 +533,7 @@ add_parameters(PyObject *module)
 #elif defined(_MSC_VER)
 #  define FORCE_INLINE static inline __forceinline
 #else
-#  define FORCE_INLINE static
+#  define FORCE_INLINE static inline
 #endif
 
 /* Force no inlining */
@@ -2806,7 +2807,7 @@ success:
 }
 
 /* Write all output data to output_stream */
-static inline int
+FORCE_INLINE int
 write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
 {
     PyObject *memoryview;
@@ -2852,6 +2853,87 @@ write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
             }
             write_pos += (size_t) write_bytes;
         }
+    }
+
+    return 0;
+error:
+    return -1;
+}
+
+/* Invoke callback function */
+FORCE_INLINE int
+invoke_callback(PyObject *callback,
+                ZSTD_inBuffer *in, size_t *callback_read_pos,
+                ZSTD_outBuffer *out,
+                const uint64_t total_input_size,
+                const uint64_t total_output_size)
+{
+    PyObject *in_memoryview;
+    PyObject *out_memoryview;
+    PyObject *cb_args;
+    PyObject *cb_ret;
+    PyObject * const empty_memoryview = static_state.empty_readonly_memoryview;
+    char cb_referenced;
+
+    /* Input memoryview */
+    const size_t in_size = in->size - *callback_read_pos;
+    /* Only yield read data once */
+    *callback_read_pos = in->size;
+
+    if (in_size != 0) {
+        in_memoryview = PyMemoryView_FromMemory((char*) in->src, in_size, PyBUF_READ);
+        if (in_memoryview == NULL) {
+            goto error;
+        }
+    } else {
+        in_memoryview = empty_memoryview;
+        Py_INCREF(in_memoryview);
+    }
+
+    /* Output memoryview */
+    if (out->pos != 0) {
+        out_memoryview = PyMemoryView_FromMemory(out->dst, out->pos, PyBUF_READ);
+        if (out_memoryview == NULL) {
+            Py_DECREF(in_memoryview);
+            goto error;
+        }
+    } else {
+        out_memoryview = empty_memoryview;
+        Py_INCREF(out_memoryview);
+    }
+
+    /* callback function arguments */
+    cb_args = Py_BuildValue("(KKOO)",
+                            total_input_size, total_output_size,
+                            in_memoryview, out_memoryview);
+    if (cb_args == NULL) {
+        Py_DECREF(in_memoryview);
+        Py_DECREF(out_memoryview);
+        goto error;
+    }
+
+    /* Callback */
+    cb_ret = PyObject_CallObject(callback, cb_args);
+
+    cb_referenced = (in_memoryview != empty_memoryview && Py_REFCNT(in_memoryview) > 2) ||
+                    (out_memoryview != empty_memoryview && Py_REFCNT(out_memoryview) > 2);
+    Py_DECREF(cb_args);
+    Py_DECREF(in_memoryview);
+    Py_DECREF(out_memoryview);
+
+    if (cb_ret == NULL) {
+        goto error;
+    }
+    Py_DECREF(cb_ret);
+
+    /* memoryview object was referenced in callback function */
+    if (cb_referenced) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "The third and fourth parameters of callback function "
+                        "are memoryview objects. If want to reference them "
+                        "outside the callback function, convert them to bytes "
+                        "object using bytes() function.");
+        goto error;
     }
 
     return 0;
@@ -3074,69 +3156,11 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Invoke callback */
             if (callback != Py_None) {
-                PyObject *cb_in_memoryview;
-                PyObject *cb_out_memoryview;
-                PyObject *cb_args;
-                PyObject *cb_ret;
-                char cb_referenced;
-
-                /* Input memoryview */
-                cb_in_memoryview = PyMemoryView_FromMemory(
-                                      (char*) in.src,
-                                      in.size - callback_read_pos,
-                                      PyBUF_READ);
-                /* Only yield read data once */
-                callback_read_pos = in.size;
-
-                if (cb_in_memoryview == NULL) {
+                if (invoke_callback(callback, &in, &callback_read_pos,
+                                    &out, total_input_size, total_output_size) < 0) {
                     goto error;
                 }
-
-                /* Output memoryview */
-                cb_out_memoryview = PyMemoryView_FromMemory(
-                                        out.dst,
-                                        out.pos,
-                                        PyBUF_READ);
-                if (cb_out_memoryview == NULL) {
-                    Py_DECREF(cb_in_memoryview);
-                    goto error;
-                }
-
-                /* callback function arguments */
-                cb_args = Py_BuildValue("(KKOO)",
-                                        total_input_size, total_output_size,
-                                        cb_in_memoryview, cb_out_memoryview);
-                if (cb_args == NULL) {
-                    Py_DECREF(cb_in_memoryview);
-                    Py_DECREF(cb_out_memoryview);
-                    goto error;
-                }
-
-                /* Callback */
-                cb_ret = PyObject_CallObject(callback, cb_args);
-
-                cb_referenced = Py_REFCNT(cb_in_memoryview) > 2 ||
-                                Py_REFCNT(cb_out_memoryview) > 2;
-                Py_DECREF(cb_args);
-                Py_DECREF(cb_in_memoryview);
-                Py_DECREF(cb_out_memoryview);
-
-                if (cb_ret == NULL) {
-                    goto error;
-                }
-                Py_DECREF(cb_ret);
-
-                /* memoryview object was referenced in callback function */
-                if (cb_referenced) {
-                    PyErr_SetString(
-                        PyExc_RuntimeError,
-                        "The third and fourth parameters of callback function "
-                        "are memoryview objects. If want to reference them "
-                        "outside the callback function, convert them to bytes "
-                        "object using bytes() function.");
-                    goto error;
-                }
-            } /* Invoke callback */
+            }
 
             /* Finished */
             if (end_directive == ZSTD_e_continue) {
@@ -3385,69 +3409,11 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Invoke callback */
             if (callback != Py_None) {
-                PyObject *cb_in_memoryview;
-                PyObject *cb_out_memoryview;
-                PyObject *cb_args;
-                PyObject *cb_ret;
-                char cb_referenced;
-
-                /* Input memoryview */
-                cb_in_memoryview = PyMemoryView_FromMemory(
-                                      (char*) in.src,
-                                      in.size - callback_read_pos,
-                                      PyBUF_READ);
-                /* Only yield read data once */
-                callback_read_pos = in.size;
-
-                if (cb_in_memoryview == NULL) {
+                if (invoke_callback(callback, &in, &callback_read_pos,
+                                    &out, total_input_size, total_output_size) < 0) {
                     goto error;
                 }
-
-                /* Output memoryview */
-                cb_out_memoryview = PyMemoryView_FromMemory(
-                                        out.dst,
-                                        out.pos,
-                                        PyBUF_READ);
-                if (cb_out_memoryview == NULL) {
-                    Py_DECREF(cb_in_memoryview);
-                    goto error;
-                }
-
-                /* callback function arguments */
-                cb_args = Py_BuildValue("(KKOO)",
-                                        total_input_size, total_output_size,
-                                        cb_in_memoryview, cb_out_memoryview);
-                if (cb_args == NULL) {
-                    Py_DECREF(cb_in_memoryview);
-                    Py_DECREF(cb_out_memoryview);
-                    goto error;
-                }
-
-                /* Callback */
-                cb_ret = PyObject_CallObject(callback, cb_args);
-
-                cb_referenced = Py_REFCNT(cb_in_memoryview) > 2 ||
-                                Py_REFCNT(cb_out_memoryview) > 2;
-                Py_DECREF(cb_args);
-                Py_DECREF(cb_in_memoryview);
-                Py_DECREF(cb_out_memoryview);
-
-                if (cb_ret == NULL) {
-                    goto error;
-                }
-                Py_DECREF(cb_ret);
-
-                /* memoryview object was referenced in callback function */
-                if (cb_referenced) {
-                    PyErr_SetString(
-                        PyExc_RuntimeError,
-                        "The third and fourth parameters of callback function "
-                        "are memoryview objects. If want to reference them "
-                        "outside the callback function, convert them to bytes "
-                        "object using bytes() function.");
-                    goto error;
-                }
-            } /* Invoke callback */
+            }
 
             /* Finished. When a frame is fully decoded, but not fully flushed,
                the last byte is kept as hostage, it will be released when all
@@ -3536,6 +3502,7 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
     Py_VISIT(static_state.ZstdDecompressor_type);
     Py_VISIT(static_state.EndlessZstdDecompressor_type);
     Py_VISIT(static_state.empty_bytes);
+    Py_VISIT(static_state.empty_readonly_memoryview);
     Py_VISIT(static_state.str_readinto);
     Py_VISIT(static_state.str_write);
     return 0;
@@ -3551,6 +3518,7 @@ _zstd_clear(PyObject *module)
     Py_CLEAR(static_state.ZstdDecompressor_type);
     Py_CLEAR(static_state.EndlessZstdDecompressor_type);
     Py_CLEAR(static_state.empty_bytes);
+    Py_CLEAR(static_state.empty_readonly_memoryview);
     Py_CLEAR(static_state.str_readinto);
     Py_CLEAR(static_state.str_write);
     return 0;
@@ -3666,15 +3634,23 @@ PyInit__zstd(void)
         goto error;
     }
 
-    /* Empty bytes object */
+    /* Reusable objects */
     static_state.empty_bytes = PyBytes_FromStringAndSize(NULL, 0);
     if (static_state.empty_bytes == NULL) {
         goto error;
     }
+
+    static_state.empty_readonly_memoryview =
+                PyMemoryView_FromMemory((char*) &static_state, 0, PyBUF_READ);
+    if (static_state.empty_readonly_memoryview == NULL) {
+        goto error;
+    }
+
     static_state.str_readinto = PyUnicode_FromString("readinto");
     if (static_state.str_readinto == NULL) {
         goto error;
     }
+
     static_state.str_write = PyUnicode_FromString("write");
     if (static_state.str_write == NULL) {
         goto error;
