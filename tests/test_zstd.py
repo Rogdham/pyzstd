@@ -180,10 +180,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # doesn't support subclass
-        with self.assertRaises(TypeError):
-            class SubClass(ZstdCompressor):
-                pass
+        # supports subclass
+        class SubClass(ZstdCompressor):
+            pass
 
     def test_RichMemZstdCompressor(self):
         # class attributes
@@ -229,10 +228,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # doesn't support subclass
-        with self.assertRaises(TypeError):
-            class SubClass(RichMemZstdCompressor):
-                pass
+        # supports subclass
+        class SubClass(RichMemZstdCompressor):
+            pass
 
     def test_Decompressor(self):
         # method & member
@@ -279,10 +277,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # doesn't support subclass
-        with self.assertRaises(TypeError):
-            class SubClass(ZstdDecompressor):
-                pass
+        # supports subclass
+        class SubClass(ZstdDecompressor):
+            pass
 
     def test_EndlessDecompressor(self):
         # method & member
@@ -329,10 +326,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # doesn't support subclass
-        with self.assertRaises(TypeError):
-            class SubClass(EndlessZstdDecompressor):
-                pass
+        # supports subclass
+        class SubClass(EndlessZstdDecompressor):
+            pass
 
     def test_ZstdDict(self):
         ZstdDict(b'12345678', True)

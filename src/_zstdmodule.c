@@ -1738,11 +1738,7 @@ static PyType_Slot zstdcompressor_slots[] = {
 static PyType_Spec zstdcompressor_type_spec = {
     .name = "_zstd.ZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
-       zstdcompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
-       which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstdcompressor_slots,
 };
 
@@ -1873,11 +1869,7 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
 static PyType_Spec richmem_zstdcompressor_type_spec = {
     .name = "_zstd.RichMemZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
-       zstdcompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
-       which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = richmem_zstdcompressor_slots,
 };
 
@@ -2478,11 +2470,7 @@ static PyType_Slot ZstdDecompressor_slots[] = {
 static PyType_Spec ZstdDecompressor_type_spec = {
     .name = "_zstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
-       ZstdDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
-       which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = ZstdDecompressor_slots,
 };
 
@@ -2552,11 +2540,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
 static PyType_Spec EndlessZstdDecompressor_type_spec = {
     .name = "_zstd.EndlessZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
-    /* Calling PyType_GetModuleState() on a subclass is not safe.
-       EndlessZstdDecompressor_type_spec does not have Py_TPFLAGS_BASETYPE flag
-       which prevents to create a subclass.
-       So calling PyType_GetModuleState() in this file is always safe. */
-    .flags = Py_TPFLAGS_DEFAULT,
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = EndlessZstdDecompressor_slots,
 };
 
