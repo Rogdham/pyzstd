@@ -2805,6 +2805,60 @@ success:
     return ret;
 }
 
+/* Write all output data to output_stream */
+static inline int
+write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
+{
+    PyObject *memoryview;
+    PyObject *write_ret;
+    size_t write_pos = 0;
+
+    while (write_pos < out->pos) {
+        const Py_ssize_t left_bytes = out->pos - write_pos;
+
+        /* Invoke .write() method */
+        memoryview = PyMemoryView_FromMemory((char*) out->dst + write_pos,
+                                             left_bytes, PyBUF_READ);
+        if (memoryview == NULL) {
+            goto error;
+        }
+
+        write_ret = PyObject_CallMethodObjArgs(output_stream,
+                                               static_state.str_write,
+                                               memoryview, NULL);
+        Py_DECREF(memoryview);
+
+        if (write_ret == NULL) {
+            goto error;
+        } else if (write_ret == Py_None) {
+            /* The raw stream is set not to block and no single
+               byte could be readily written to it */
+            Py_DECREF(write_ret);
+
+            /* Check signal, prevent loop infinitely. */
+            if (PyErr_CheckSignals()) {
+                goto error;
+            }
+            continue;
+        } else {
+            Py_ssize_t write_bytes = PyLong_AsSsize_t(write_ret);
+            Py_DECREF(write_ret);
+
+            if (write_bytes < 0 || write_bytes > left_bytes) {
+                PyErr_SetString(PyExc_ValueError,
+                                "output_stream.write(b) method "
+                                "returned wrong value.");
+                goto error;
+            }
+            write_pos += (size_t) write_bytes;
+        }
+    }
+
+    return 0;
+error:
+    return -1;
+}
+
 PyDoc_STRVAR(compress_stream_doc,
 "compress_stream(input_stream, output_stream, *,\n"
 "                level_or_option=None, zstd_dict=None,\n"
@@ -2893,7 +2947,6 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     ZSTD_inBuffer in = {.src = NULL};
     ZSTD_outBuffer out = {.dst = NULL};
     PyObject *in_memoryview = NULL;
-    PyObject *out_memoryview;
     uint64_t total_input_size = 0;
     uint64_t total_output_size = 0;
     PyObject *ret = NULL;
@@ -3014,49 +3067,10 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Write all output to output_stream */
             if (output_stream != Py_None) {
-                size_t write_pos = 0;
-
-                while (write_pos < out.pos) {
-                    const Py_ssize_t left_bytes = out.pos - write_pos;
-
-                    /* Invoke .write() method */
-                    out_memoryview = PyMemoryView_FromMemory(
-                                        (char*) out.dst + write_pos,
-                                        left_bytes, PyBUF_READ);
-                    if (out_memoryview == NULL) {
-                        goto error;
-                    }
-
-                    temp = PyObject_CallMethodObjArgs(output_stream,
-                                                      static_state.str_write,
-                                                      out_memoryview, NULL);
-                    Py_DECREF(out_memoryview);
-
-                    if (temp == NULL) {
-                        goto error;
-                    } else if (temp == Py_None) {
-                        /* The raw stream is set not to block and no single
-                           byte could be readily written to it */
-                        Py_DECREF(temp);
-
-                        /* Check signal, prevent loop infinitely. */
-                        if (PyErr_CheckSignals()) {
-                            goto error;
-                        }
-                        continue;
-                    } else {
-                        Py_ssize_t write_bytes = PyLong_AsSsize_t(temp);
-                        Py_DECREF(temp);
-                        if (write_bytes < 0 || write_bytes > left_bytes) {
-                            PyErr_SetString(PyExc_ValueError,
-                                            "output_stream.write(b) method "
-                                            "returned wrong value.");
-                            goto error;
-                        }
-                        write_pos += (size_t) write_bytes;
-                    }
+                if (write_to_output(output_stream, &out) < 0) {
+                    goto error;
                 }
-            } /* Write all output to output_stream */
+            }
 
             /* Invoke callback */
             if (callback != Py_None) {
@@ -3255,7 +3269,6 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     ZSTD_inBuffer in = {.src = NULL};
     ZSTD_outBuffer out = {.dst = NULL};
     PyObject *in_memoryview = NULL;
-    PyObject *out_memoryview;
     uint64_t total_input_size = 0;
     uint64_t total_output_size = 0;
     PyObject *ret = NULL;
@@ -3365,49 +3378,10 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Write all output to output_stream */
             if (output_stream != Py_None) {
-                size_t write_pos = 0;
-
-                while (write_pos < out.pos) {
-                    const Py_ssize_t left_bytes = out.pos - write_pos;
-
-                    /* Invoke .write() method */
-                    out_memoryview = PyMemoryView_FromMemory(
-                                        (char*) out.dst + write_pos,
-                                        left_bytes, PyBUF_READ);
-                    if (out_memoryview == NULL) {
-                        goto error;
-                    }
-
-                    temp = PyObject_CallMethodObjArgs(output_stream,
-                                                      static_state.str_write,
-                                                      out_memoryview, NULL);
-                    Py_DECREF(out_memoryview);
-
-                    if (temp == NULL) {
-                        goto error;
-                    } else if (temp == Py_None) {
-                        /* The raw stream is set not to block and no single
-                           byte could be readily written to it */
-                        Py_DECREF(temp);
-
-                        /* Check signal, prevent loop infinitely. */
-                        if (PyErr_CheckSignals()) {
-                            goto error;
-                        }
-                        continue;
-                    } else {
-                        Py_ssize_t write_bytes = PyLong_AsSsize_t(temp);
-                        Py_DECREF(temp);
-                        if (write_bytes < 0 || write_bytes > left_bytes) {
-                            PyErr_SetString(PyExc_ValueError,
-                                            "output_stream.write(b) method "
-                                            "returned wrong value.");
-                            goto error;
-                        }
-                        write_pos += (size_t) write_bytes;
-                    }
+                if (write_to_output(output_stream, &out) < 0) {
+                    goto error;
                 }
-            } /* Write all output to output_stream */
+            }
 
             /* Invoke callback */
             if (callback != Py_None) {
