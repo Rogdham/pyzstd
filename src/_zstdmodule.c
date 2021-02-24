@@ -417,6 +417,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     char const *name;
     char *type;
     ZSTD_bounds bounds;
+    int i;
 
     assert(buf_size >= 200);
 
@@ -432,7 +433,7 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
 
     /* Find parameter's name */
     name = NULL;
-    for (int i = 0; i < list_size; i++) {
+    for (i = 0; i < list_size; i++) {
         if (key_v == (list+i)->parameter) {
             name = (list+i)->parameter_name;
             break;
@@ -1152,6 +1153,7 @@ _train_dict(PyObject *module, PyObject *args)
     size_t *chunk_sizes = NULL;
     PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
+    Py_ssize_t i;
 
     if (!PyArg_ParseTuple(args, "SOn:_train_dict",
                           &samples_bytes, &samples_size_list, &dict_size)) {
@@ -1184,7 +1186,7 @@ _train_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
-    for (Py_ssize_t i = 0; i < chunks_number; i++) {
+    for (i = 0; i < chunks_number; i++) {
         PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
@@ -1254,6 +1256,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
     ZDICT_params_t params;
+    Py_ssize_t i;
 
     if (!PyArg_ParseTuple(args, "SSOni:_finalize_dict",
                           &custom_dict_bytes, &samples_bytes, &samples_size_list,
@@ -1287,7 +1290,7 @@ _finalize_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
-    for (Py_ssize_t i = 0; i < chunks_number; i++) {
+    for (i = 0; i < chunks_number; i++) {
         PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
