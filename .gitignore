@@ -3,3 +3,4 @@
 /build
 /.vscode
 /test/__pycache__
+/*.pdb

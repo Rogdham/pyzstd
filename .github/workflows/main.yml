@@ -1,0 +1,90 @@
+# Automatically build binary wheels and source packages.
+name: cibuildwheel
+
+# Build on every branch push, tag push, and pull request change.
+on: [push, pull_request]
+
+jobs:
+  build_wheels:
+    env:
+      CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-*"
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_ARCHS_LINUX: "auto aarch64"
+      CIBW_ARCHS_MACOS: "x86_64 arm64"
+
+    strategy:
+      matrix:
+        platform: [ubuntu-20.04, macos-latest, windows-latest]
+
+    name: Build wheels on ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
+      - name: Run test
+        run: |
+          python setup.py install
+          python tests/test_zstd.py
+
+      - name: Set up QEMU
+        if: runner.os == 'Linux' && github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+        uses: docker/setup-qemu-action@v1
+        with:
+          platforms: arm64
+
+      - name: Install cibuildwheel & build wheels
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+        run: |
+          python -m pip install -U cibuildwheel
+          python -m cibuildwheel --output-dir wheelhouse
+
+      # Don't upload manylinux2014_i686 wheels, manylinux1_i686 is the same as
+      # it, and compatible with more versions.
+      - name: Upload artifact
+        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+        uses: actions/upload-artifact@v2
+        with:
+          name: pyzstd-artifact
+          path: |
+            ./wheelhouse/*.whl
+            !./wheelhouse/*manylinux2014_i686*
+
+  build_sdist:
+    name: Build source distribution
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Build sdist
+        run: |
+          python setup.py sdist --formats=gztar
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v2
+        with:
+          name: pyzstd-artifact
+          path: dist/*.tar.gz
+
+  upload_pypi:
+    name: Publish to PyPI
+    needs: [build_wheels, build_sdist]
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/download-artifact@v2
+        with:
+          name: pyzstd-artifact
+          path: dist
+
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_TOKEN }}
+          skip_existing: true
+          verbose: true
