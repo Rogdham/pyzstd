@@ -2944,6 +2944,34 @@ error:
     return -1;
 }
 
+/* Return NULL on failure */
+FORCE_INLINE PyObject *
+build_return_tuple(uint64_t total_input_size, uint64_t total_output_size)
+{
+    PyObject *ret, *temp;
+
+    ret = PyTuple_New(2);
+    if (ret == NULL) {
+        return NULL;
+    }
+
+    temp = PyLong_FromUnsignedLongLong(total_input_size);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 0, temp);
+
+    temp = PyLong_FromUnsignedLongLong(total_output_size);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 1, temp);
+
+    return ret;
+}
+
 PyDoc_STRVAR(compress_stream_doc,
 "compress_stream(input_stream, output_stream, *,\n"
 "                level_or_option=None, zstd_dict=None,\n"
@@ -3183,23 +3211,11 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     } /* Read loop */
 
-    /* Return tuple */
-    ret = PyTuple_New(2);
+    /* Return value */
+    ret = build_return_tuple(total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
 
     goto success;
 
@@ -3447,23 +3463,11 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     } /* Read loop */
 
-    /* Return tuple */
-    ret = PyTuple_New(2);
+    /* Return value */
+    ret = build_return_tuple(total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
 
     goto success;
 
