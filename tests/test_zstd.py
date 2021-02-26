@@ -2589,17 +2589,20 @@ class StreamFunctionsTestCase(unittest.TestCase):
     def test_compress_stream(self):
         bi = BytesIO(THIS_FILE_BYTES)
         bo = BytesIO()
-        compress_stream(bi, bo,
-                        level_or_option=1, zstd_dict=TRAINED_DICT,
-                        read_size=200_000, write_size=200_000)
-        self.assertEqual(decompress(bo.getvalue(), TRAINED_DICT), THIS_FILE_BYTES)
+        ret = compress_stream(bi, bo,
+                              level_or_option=1, zstd_dict=TRAINED_DICT,
+                              read_size=200_000, write_size=200_000)
+        output = bo.getvalue()
+        self.assertEqual(ret, (len(THIS_FILE_BYTES), len(output)))
+        self.assertEqual(decompress(output, TRAINED_DICT), THIS_FILE_BYTES)
         bi.close()
         bo.close()
 
         # empty input
         bi = BytesIO()
         bo = BytesIO()
-        compress_stream(bi, bo)
+        ret = compress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
@@ -2636,15 +2639,16 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         option = {CParameter.compressionLevel : 1,
                   CParameter.checksumFlag : 1}
-        compress_stream(bi, bo, level_or_option=option,
-                        read_size=701, write_size=101,
-                        callback=func)
+        ret = compress_stream(bi, bo, level_or_option=option,
+                              read_size=701, write_size=101,
+                              callback=func)
         bi.close()
         bo.close()
 
         in_dat = b''.join(in_lst)
         out_dat = b''.join(out_lst)
 
+        self.assertEqual(ret, (len(in_dat), len(out_dat)))
         self.assertEqual(in_dat, THIS_FILE_BYTES)
         self.assertEqual(decompress(out_dat), THIS_FILE_BYTES)
 
@@ -2657,17 +2661,20 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         bi = BytesIO(b)
         bo = BytesIO()
-        compress_stream(bi, bo, level_or_option=option)
-        self.assertEqual(decompress(bo.getvalue()), b)
+        ret = compress_stream(bi, bo, level_or_option=option)
+        output = bo.getvalue()
+        self.assertEqual(ret, (len(b), len(output)))
+        self.assertEqual(decompress(output), b)
         bi.close()
         bo.close()
 
     def test_decompress_stream(self):
         bi = BytesIO(COMPRESSED_THIS_FILE)
         bo = BytesIO()
-        decompress_stream(bi, bo,
-                          option={DParameter.windowLogMax:26},
-                          read_size=200_000, write_size=200_000)
+        ret = decompress_stream(bi, bo,
+                                option={DParameter.windowLogMax:26},
+                                read_size=200_000, write_size=200_000)
+        self.assertEqual(ret, (len(COMPRESSED_THIS_FILE), len(THIS_FILE_BYTES)))
         self.assertEqual(bo.getvalue(), THIS_FILE_BYTES)
         bi.close()
         bo.close()
@@ -2675,7 +2682,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # empty input
         bi = BytesIO()
         bo = BytesIO()
-        decompress_stream(bi, bo)
+        ret = decompress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
@@ -2711,24 +2719,27 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bo = BytesIO()
 
         option = {DParameter.windowLogMax : 26}
-        decompress_stream(bi, bo, option=option,
-                          read_size=701, write_size=401,
-                          callback=func)
+        ret = decompress_stream(bi, bo, option=option,
+                                read_size=701, write_size=401,
+                                callback=func)
         bi.close()
         bo.close()
 
         in_dat = b''.join(in_lst)
         out_dat = b''.join(out_lst)
 
+        self.assertEqual(ret, (len(in_dat), len(out_dat)))
         self.assertEqual(in_dat, COMPRESSED_THIS_FILE)
         self.assertEqual(out_dat, THIS_FILE_BYTES)
 
     def test_decompress_stream_multi_frames(self):
-        dat = COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME + COMPRESSED_100_PLUS_32KB
+        dat = (COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME) * 2
         bi = BytesIO(dat)
         bo = BytesIO()
-        decompress_stream(bi, bo, read_size=200_000, write_size=50_000)
-        self.assertEqual(bo.getvalue(), DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_100_PLUS_32KB)
+        ret = decompress_stream(bi, bo, read_size=200_000, write_size=50_000)
+        output = bo.getvalue()
+        self.assertEqual(ret, (len(dat), len(output)))
+        self.assertEqual(output, DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_100_PLUS_32KB)
         bi.close()
         bo.close()
 
