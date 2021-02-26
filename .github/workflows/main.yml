@@ -43,19 +43,22 @@ jobs:
           python -m pip install -U cibuildwheel
           python -m cibuildwheel --output-dir wheelhouse
 
+      # Should upload manylinux2014_x86_64, manylinux1_i686
       - name: Upload artifact
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
         uses: actions/upload-artifact@v2
         with:
           name: pyzstd-files
-          path: ./wheelhouse/*.whl
+          path: |
+            ./wheelhouse/*.whl
+            !./wheelhouse/*manylinux2014_i686*
 
-  build_manylinux2010_wheels:
+  build_in_manylinux2010:
     env:
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
-      CIBW_MANYLINUX_I686_IMAGE: manylinux2010
+      CIBW_ARCHS_LINUX: x86_64
 
-    name: Build manylinux2010 wheels
+    name: Build in manylinux2010 environment
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
     runs-on: ubuntu-latest
 
@@ -68,11 +71,14 @@ jobs:
           python -m pip install -U cibuildwheel
           python -m cibuildwheel --output-dir wheelhouse
 
+      # Should upload manylinux1_x86_64
       - name: Upload artifact
         uses: actions/upload-artifact@v2
         with:
           name: pyzstd-files
-          path: ./wheelhouse/*.whl
+          path: |
+            ./wheelhouse/*.whl
+            !./wheelhouse/*manylinux2010_x86_64*
 
   build_sdist:
     name: Build source distribution
@@ -94,7 +100,7 @@ jobs:
 
   upload_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_manylinux2010_wheels, build_sdist]
+    needs: [build_wheels, build_in_manylinux2010, build_sdist]
     runs-on: ubuntu-latest
 
     steps:
