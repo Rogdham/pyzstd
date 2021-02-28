@@ -9,18 +9,18 @@ env:
 
 jobs:
   build_wheels:
-    env:
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
-      CIBW_ARCHS_LINUX: "auto aarch64"
-      CIBW_ARCHS_MACOS: "x86_64 arm64"
+    name: Build wheels on ${{ matrix.platform }}
+    runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
 
-    name: Build wheels on ${{ matrix.platform }}
-    runs-on: ${{ matrix.platform }}
+    env:
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_ARCHS_LINUX: "auto aarch64"
+      CIBW_ARCHS_MACOS: "x86_64 arm64"
 
     steps:
       - uses: actions/checkout@v2
@@ -44,63 +44,84 @@ jobs:
           python -m cibuildwheel --output-dir wheelhouse
 
       # Should upload manylinux2014_x86_64, manylinux1_i686
-      - name: Upload artifact
+      - name: Upload wheels
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
         uses: actions/upload-artifact@v2
         with:
           name: pyzstd-files
           path: |
-            ./wheelhouse/*.whl
-            !./wheelhouse/*manylinux2014_i686*
+            wheelhouse/*.whl
+            !wheelhouse/*manylinux2014_i686*
 
+  # Build source distribution & manylinux1_x86_64
   build_in_manylinux2010:
-    env:
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
-      CIBW_ARCHS_LINUX: x86_64
-
     name: Build in manylinux2010 environment
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
     runs-on: ubuntu-latest
+
+    env:
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
+      CIBW_ARCHS_LINUX: x86_64
 
     steps:
       - uses: actions/checkout@v2
       - uses: actions/setup-python@v2
 
-      - name: Install cibuildwheel & build wheels
+      - name: Build source distribution & wheels
         run: |
+          python setup.py sdist --formats=gztar
           python -m pip install -U cibuildwheel
           python -m cibuildwheel --output-dir wheelhouse
 
-      # Should upload manylinux1_x86_64
-      - name: Upload artifact
-        uses: actions/upload-artifact@v2
-        with:
-          name: pyzstd-files
-          path: |
-            ./wheelhouse/*.whl
-            !./wheelhouse/*manylinux2010_x86_64*
-
-  build_sdist:
-    name: Build source distribution
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: Build sdist
-        run: |
-          python setup.py sdist --formats=gztar
-
-      - name: Upload artifact
+      - name: Upload source distribution
         uses: actions/upload-artifact@v2
         with:
           name: pyzstd-files
           path: dist/*.tar.gz
 
+      - name: Upload manylinux1_x86_64
+        uses: actions/upload-artifact@v2
+        with:
+          name: pyzstd-files
+          path: |
+            wheelhouse/*.whl
+            !wheelhouse/*manylinux2010_x86_64*
+
+  # Run test on armv7/aarch64/ppc64le/s390x
+  test_on_arches:
+    name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+    # The host should always be Linux
+    runs-on: ubuntu-20.04
+
+    strategy:
+      matrix:
+        arch: [armv7, aarch64, ppc64le, s390x]
+        distro: [ubuntu20.04]
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - uses: uraimo/run-on-arch-action@v2.0.5
+        name: Build & run test
+        with:
+          arch: ${{ matrix.arch }}
+          distro: ${{ matrix.distro }}
+
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y python3 python3-pip build-essential gcc
+
+          run: |
+            python3 -c "import platform;print('Machine type:', platform.machine())"
+            python3 -m pip install -U setuptools
+            python3 setup.py install
+            python3 tests/test_zstd.py
+
+  # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_in_manylinux2010, build_sdist]
+    needs: [build_wheels, build_in_manylinux2010, test_on_arches]
     runs-on: ubuntu-latest
 
     steps:
