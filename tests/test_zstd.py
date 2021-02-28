@@ -2591,6 +2591,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bo = BytesIO()
         ret = compress_stream(bi, bo,
                               level_or_option=1, zstd_dict=TRAINED_DICT,
+                              pledged_input_size=len(THIS_FILE_BYTES),
                               read_size=200_000, write_size=200_000)
         output = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(output)))
@@ -2604,6 +2605,21 @@ class StreamFunctionsTestCase(unittest.TestCase):
         ret = compress_stream(bi, bo)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
+        bi.close()
+        bo.close()
+
+        # wrong pledged_input_size size
+        bi = BytesIO(THIS_FILE_BYTES)
+        bo = BytesIO()
+        with self.assertRaises(ZstdError):
+            compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)-1)
+        bi.close()
+        bo.close()
+
+        bi = BytesIO(THIS_FILE_BYTES)
+        bo = BytesIO()
+        with self.assertRaises(ZstdError):
+            compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)+1)
         bi.close()
         bo.close()
 
