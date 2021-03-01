@@ -1174,7 +1174,7 @@ _train_dict(PyObject *module, PyObject *args)
     }
 
     chunks_number = Py_SIZE(samples_size_list);
-    if (chunks_number > UINT32_MAX) {
+    if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
         goto error;
@@ -1278,7 +1278,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     }
 
     chunks_number = Py_SIZE(samples_size_list);
-    if (chunks_number > UINT32_MAX) {
+    if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
         goto error;
