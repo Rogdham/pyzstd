@@ -2705,7 +2705,8 @@ _get_param_bounds(PyObject *module, PyObject *args)
 PyDoc_STRVAR(get_frame_size_doc,
 "get_frame_size(frame_buffer)\n"
 "----\n"
-"Get the size of a zstd frame, including frame header and epilogue.\n\n"
+"Get the size of a zstd frame, including frame header and 4-byte checksum if it\n"
+"has.\n\n"
 "It will iterate all blocks' header within a frame, to accumulate the frame\n"
 "size.\n\n"
 "Arguments\n"
@@ -2979,28 +2980,28 @@ build_return_tuple(uint64_t total_input_size, uint64_t total_output_size)
 PyDoc_STRVAR(compress_stream_doc,
 "compress_stream(input_stream, output_stream, *,\n"
 "                level_or_option=None, zstd_dict=None,\n"
-"                pledged_input_size=(2**64-1),\n"
-"                read_size=131_072, write_size=131_591,\n"
+"                pledged_input_size=None,\n"
+"                read_size=131072, write_size=131591,\n"
 "                callback=None)\n"
 "----\n"
 "Compress from input_stream to output_stream.\n\n"
-"Return a tuple, (total_read, total_write), the items are int objects.\n\n"
+"Return a tuple, (total_input, total_output), the items are int objects.\n\n"
 "Arguments\n\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
-"output_stream: Output stream that has a .write(b) method. If it's None,\n"
-"    the callback argument must be non-None.\n"
+"output_stream: Output stream that has a .write(b) method. If use callback\n"
+"    function, this argument can be None.\n"
 "level_or_option: When it's an int object, it represents the compression\n"
 "    level. When it's a dict object, it contains advanced compression\n"
 "    parameters.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "pledged_input_size: If set this argument to the size of input data, the size\n"
-"    will be written into frame header. If the actual input data does not match\n"
-"    it, an error will be raised.\n"
+"    will be written into frame header. If the actual input data doesn't match\n"
+"    it, a ZstdError will be raised.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"
-"    (total_read, total_write, read_data, write_data), the first two are int\n"
-"    objects, the last two are readonly memoryview objects."
+"    (total_input, total_output, read_data, write_data), the first two are\n"
+"    int objects, the last two are readonly memoryview objects."
 );
 
 static PyObject *
@@ -3014,13 +3015,25 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     PyObject *output_stream;
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
-    uint64_t pledged_input_size = ZSTD_CONTENTSIZE_UNKNOWN;
+    PyObject *pledged_input_size = Py_None;
     Py_ssize_t read_size = ZSTD_CStreamInSize();
     Py_ssize_t write_size = ZSTD_CStreamOutSize();
     PyObject *callback = Py_None;
 
+    size_t zstd_ret;
+    PyObject *temp;
+    ZstdCompressor self = {0};
+    int compress_level = 0; /* 0 means use zstd's default compression level */
+    uint64_t pledged_size_value = ZSTD_CONTENTSIZE_UNKNOWN;
+    ZSTD_inBuffer in = {.src = NULL};
+    ZSTD_outBuffer out = {.dst = NULL};
+    PyObject *in_memoryview = NULL;
+    uint64_t total_input_size = 0;
+    uint64_t total_output_size = 0;
+    PyObject *ret = NULL;
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "OO|$OOKnnO:compress_stream", kwlist,
+                                     "OO|$OOOnnO:compress_stream", kwlist,
                                      &input_stream, &output_stream,
                                      &level_or_option, &zstd_dict,
                                      &pledged_input_size, &read_size, &write_size,
@@ -3050,23 +3063,22 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     }
 
+    if (pledged_input_size != Py_None) {
+        pledged_size_value = PyLong_AsUnsignedLongLong(pledged_input_size);
+        if (pledged_size_value == (uint64_t)-1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                            "pledged_input_size argument should be 64-bit "
+                            "unsigned integer value.");
+            return NULL;
+        }
+    }
+
     if (read_size <= 0 || write_size <= 0) {
         PyErr_SetString(PyExc_ValueError,
                         "read_size argument and write_size argument should "
                         "be positive numbers.");
         return NULL;
     }
-
-    size_t zstd_ret;
-    PyObject *temp;
-    ZstdCompressor self = {0};
-    int compress_level = 0;
-    ZSTD_inBuffer in = {.src = NULL};
-    ZSTD_outBuffer out = {.dst = NULL};
-    PyObject *in_memoryview = NULL;
-    uint64_t total_input_size = 0;
-    uint64_t total_output_size = 0;
-    PyObject *ret = NULL;
 
     /* Initialize & set ZstdCompressor */
     self.cctx = ZSTD_createCCtx();
@@ -3088,8 +3100,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     }
 
-    if (pledged_input_size != ZSTD_CONTENTSIZE_UNKNOWN) {
-        zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self.cctx, pledged_input_size);
+    if (pledged_size_value != ZSTD_CONTENTSIZE_UNKNOWN) {
+        zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self.cctx, pledged_size_value);
         if (ZSTD_isError(zstd_ret)) {
             set_zstd_error(ERR_COMPRESS, zstd_ret);
             goto error;
@@ -3239,22 +3251,22 @@ success:
 PyDoc_STRVAR(decompress_stream_doc,
 "decompress_stream(input_stream, output_stream, *,\n"
 "                  zstd_dict=None, option=None,\n"
-"                  read_size=131_075, write_size=131_072,\n"
+"                  read_size=131075, write_size=131072,\n"
 "                  callback=None)\n"
 "----\n"
 "Decompress from input_stream to output_stream.\n\n"
-"Return a tuple, (total_read, total_write), the items are int objects.\n\n"
+"Return a tuple, (total_input, total_output), the items are int objects.\n\n"
 "Arguments\n\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
-"output_stream: Output stream that has a .write(b) method. If it's None,\n"
-"    the callback argument must be non-None.\n"
+"output_stream: Output stream that has a .write(b) method. If use callback\n"
+"    function, this argument can be None.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option: A dict object, contains advanced decompression parameters.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"
-"    (total_read, total_write, read_data, write_data), the first two are int\n"
-"    objects, the last two are readonly memoryview objects."
+"    (total_input, total_output, read_data, write_data), the first two are\n"
+"    int objects, the last two are readonly memoryview objects."
 );
 
 static PyObject *

@@ -154,7 +154,7 @@ Streaming compression
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data does not match it, an error will be raised.
+    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -170,7 +170,7 @@ Streaming compression
     # compress an input file, and write to an output file.
     with io.open(input_file_path, 'rb') as ifh:
         with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh)
+            compress_stream(ifh, ofh, level_or_option=5)
 
     # compress a bytes object, and write to a file.
     with io.BytesIO(raw_dat) as bi:
@@ -636,6 +636,7 @@ Module-level functions
     :type frame_buffer: bytes-like object
     :return: Information about a frame.
     :rtype: namedtuple
+    :raises ZstdError: When parsing the frame header fails.
 
 .. sourcecode:: python
 
@@ -645,7 +646,7 @@ Module-level functions
 
 .. py:function:: get_frame_size(frame_buffer)
 
-    Get the size of a zstd frame, including frame header and epilogue.
+    Get the size of a zstd frame, including frame header and 4-byte checksum if it has.
 
     It will iterate all blocks' header within a frame, to accumulate the frame's size.
 
@@ -653,6 +654,7 @@ Module-level functions
     :type frame_buffer: bytes-like object
     :return: The size of a zstd frame.
     :rtype: int
+    :raises ZstdError: When it fails.
 
 .. sourcecode:: python
 
@@ -950,7 +952,7 @@ Advanced parameters
             * :py:func:`compress_stream` function setting *pledged_input_size* argument
             * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
 
-        The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer.
+        The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
     .. py:attribute:: checksumFlag
 

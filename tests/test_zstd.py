@@ -812,8 +812,11 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         point = len(THIS_FILE_BYTES) // 2
 
         c = ZstdCompressor()
+        self.assertEqual(c.last_mode, c.FLUSH_FRAME)
         dat1 = c.compress(THIS_FILE_BYTES[:point])
+        self.assertEqual(c.last_mode, c.CONTINUE)
         dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_BLOCK)
+        self.assertEqual(c.last_mode, c.FLUSH_BLOCK)
 
         d = EndlessZstdDecompressor()
         dat2 = d.decompress(dat1)
@@ -823,11 +826,19 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertTrue(d.needs_input)
 
     def test_compress_flushframe(self):
+        # test compress & decompress
         point = len(THIS_FILE_BYTES) // 2
 
         c = ZstdCompressor()
+
         dat1 = c.compress(THIS_FILE_BYTES[:point])
+        self.assertEqual(c.last_mode, c.CONTINUE)
+
         dat1 += c.compress(THIS_FILE_BYTES[point:], c.FLUSH_FRAME)
+        self.assertEqual(c.last_mode, c.FLUSH_FRAME)
+
+        nt = get_frame_info(dat1)
+        self.assertEqual(nt.decompressed_size, None) # no content size
 
         d = EndlessZstdDecompressor()
         dat2 = d.decompress(dat1)
@@ -835,6 +846,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertEqual(dat2, THIS_FILE_BYTES)
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
+
+        # single .FLUSH_FRAME mode has content size
+        c = ZstdCompressor()
+        dat = c.compress(THIS_FILE_BYTES, mode=c.FLUSH_FRAME)
+        self.assertEqual(c.last_mode, c.FLUSH_FRAME)
+
+        nt = get_frame_info(dat)
+        self.assertEqual(nt.decompressed_size, len(THIS_FILE_BYTES))
 
     def test_decompressor_arg(self):
         zd = ZstdDict(b'12345678', True)
@@ -2591,7 +2610,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bo = BytesIO()
         ret = compress_stream(bi, bo,
                               level_or_option=1, zstd_dict=TRAINED_DICT,
-                              pledged_input_size=len(THIS_FILE_BYTES),
+                              pledged_input_size=2**64-1, # backward compatible
                               read_size=200_000, write_size=200_000)
         output = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(output)))
@@ -2602,7 +2621,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # empty input
         bi = BytesIO()
         bo = BytesIO()
-        ret = compress_stream(bi, bo)
+        ret = compress_stream(bi, bo, pledged_input_size=None)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
@@ -2634,6 +2653,10 @@ class StreamFunctionsTestCase(unittest.TestCase):
             compress_stream(b1, b2, level_or_option='3')
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
             compress_stream(b1, b2, zstd_dict={})
+        with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
+            compress_stream(b1, b2, pledged_input_size=-1)
+        with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
+            compress_stream(b1, b2, pledged_input_size=2**64+1)
         with self.assertRaisesRegex(ValueError, r'read_size'):
             compress_stream(b1, b2, read_size=-1)
         with self.assertRaises(OverflowError):
@@ -2677,7 +2700,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         bi = BytesIO(b)
         bo = BytesIO()
-        ret = compress_stream(bi, bo, level_or_option=option)
+        ret = compress_stream(bi, bo, level_or_option=option,
+                              pledged_input_size=len(b))
         output = bo.getvalue()
         self.assertEqual(ret, (len(b), len(output)))
         self.assertEqual(decompress(output), b)
