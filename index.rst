@@ -142,7 +142,7 @@ Streaming compression
 
     It would be nice to know some knowledge about zstd data, see :ref:`frame and block<frame_block>`.
 
-.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=131_072, write_size=131_591, callback=None)
+.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
     A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It's zero memory copy.
 
