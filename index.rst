@@ -3,7 +3,7 @@
 Introduction
 ------------
 
-``pyzstd`` module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm. The API is similar to Python's bz2/lzma/zlib module.
+pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm. The API is similar to Python's bz2/lzma/zlib module.
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -37,10 +37,10 @@ Common functions
         * function :py:func:`decompress`
 
     .. hint::
-        If there is a big number of same type individual data, reuse a stream object may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+        If there is a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
-        * Compression: See :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
-        * Decompression: If decompressed size is known, :py:func:`decompress` function may be faster. Otherwise see :py:class:`EndlessZstdDecompressor` class.
+        * compression: :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
+        * decompression: :py:class:`EndlessZstdDecompressor`.
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -95,7 +95,6 @@ Rich memory compression
         * function :py:func:`richmem_compress`
         * class :py:class:`RichMemZstdCompressor`, a reusable compressor.
 
-
 .. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
 
     Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
@@ -107,7 +106,7 @@ Rich memory compression
 
     A reusable compressor using :ref:`rich memory mode<rich_mem>`. It can be reused for big number of same type individual data.
 
-    Since it can only generates individual :ref:`frames<frame_block>`, it's not suitable for streaming compression, otherwise the compression ratio will be reduced. For streaming compression, see :py:func:`compress_stream` function, :py:class:`ZstdCompressor` class.
+    Since it can only generates individual :ref:`frames<frame_block>`, it's not suitable for streaming compression, otherwise the compression ratio will be reduced, and some programs can't decompress multiple frames data. For streaming compression, see :ref:`this section<stream_compression>`.
 
     Thread-safe at method level.
 
@@ -131,8 +130,10 @@ Rich memory compression
         frame2 = c.compress(raw_dat2)
 
 
-Stream compression
-------------------
+.. _stream_compression:
+
+Streaming compression
+---------------------
 
     This section contains:
 
@@ -141,8 +142,7 @@ Stream compression
 
     It would be nice to know some knowledge about zstd data, see :ref:`frame and block<frame_block>`.
 
-
-.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=(2**64-1), read_size=131_072, write_size=131_591, callback=None)
+.. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
     A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It's zero memory copy.
 
@@ -154,7 +154,7 @@ Stream compression
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the size will be written into frame header. If the actual input data does not match it, an error will be raised.
+    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -170,7 +170,7 @@ Stream compression
     # compress an input file, and write to an output file.
     with io.open(input_file_path, 'rb') as ifh:
         with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh)
+            compress_stream(ifh, ofh, level_or_option=5)
 
     # compress a bytes object, and write to a file.
     with io.BytesIO(raw_dat) as bi:
@@ -178,11 +178,10 @@ Stream compression
             compress_stream(bi, ofh)
 
     # compress an input file, obtain a bytes object.
+    # compared to reading a file and compressing it in memory,
+    # it's faster on Linux, slower on Windows.
     with io.open(input_file_path, 'rb') as ifh:
         with io.BytesIO() as bo:
-            # note, on different platforms, the performance of
-            # writing to BytesIO object is different. on Windows
-            # it's slower.
             compress_stream(ifh, bo)
             compressed_dat = bo.getvalue()
 
@@ -198,7 +197,7 @@ Stream compression
 
 .. py:class:: ZstdCompressor
 
-    A stream compressor. It's thread-safe at method level.
+    A streaming compressor. It's thread-safe at method level.
 
     .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
 
@@ -225,6 +224,8 @@ Stream compression
 
         Since zstd data consists of one or more independent frames, the compressor object can still be used after this method is called.
 
+        **Note**: Abuse of this method will reduce compression ratio, and some programs can only decompress single frame data. Use it only when necessary.
+
         :param mode: Can be these 2 values: :py:attr:`ZstdCompressor.FLUSH_FRAME`, :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
         :return: Flushed data.
         :rtype: bytes
@@ -245,7 +246,7 @@ Stream compression
 
         Used for *mode* argument in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
-        Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenes.
+        Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
         If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception.
 
@@ -265,7 +266,7 @@ Stream compression
 
         c = ZstdCompressor()
 
-        # traditional stream compression
+        # traditional streaming compression
         dat1 = c.compress(b'123456')
         dat2 = c.compress(b'abcdef')
         dat3 = c.flush()
@@ -276,20 +277,18 @@ Stream compression
 
     .. hint:: Why :py:meth:`ZstdCompressor.compress` method has a *mode* parameter?
 
-        #. When reuse :py:class:`ZstdCompressor` object for big number of same type individual data, make operate conveniently. (the object is thread-safe at method level)
+        #. When reuse :py:class:`ZstdCompressor` object for big number of same type individual data, make operation more convenient. The object is thread-safe at method level.
         #. If data is generated by a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode, the size of uncompressed data will be recorded in frame header.
-        #. More convenient than compress() followed by a flush().
 
 
-Stream decompression
---------------------
+Streaming decompression
+-----------------------
 
     This section contains:
 
         * function :py:func:`decompress_stream`, a fast and convenient function.
         * class :py:class:`ZstdDecompressor`, similar to decompressors in Python standard library.
         * class :py:class:`EndlessZstdDecompressor`, a decompressor accepts multiple concatenated :ref:`frames<frame_block>`.
-
 
 .. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
@@ -301,7 +300,7 @@ Stream decompression
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
-    :param zstd_dict: Pre-trained dictionary for compression.
+    :param zstd_dict: Pre-trained dictionary for decompression.
     :type zstd_dict: ZstdDict
     :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
     :type option: dict
@@ -328,11 +327,10 @@ Stream decompression
             decompress_stream(bi, ofh)
 
     # decompress an input file, obtain a bytes object.
+    # compared to reading a file and decompressing it in memory,
+    # it's faster on Linux, slower on Windows.
     with io.open(input_file_path, 'rb') as ifh:
         with io.BytesIO() as bo:
-            # note, on different platforms, the performance of
-            # writing to BytesIO object is different. on Windows
-            # it's slower.
             decompress_stream(ifh, bo)
             decompressed_dat = bo.getvalue()
 
@@ -348,9 +346,11 @@ Stream decompression
 
 .. py:class:: ZstdDecompressor
 
-    A stream decompressor.
+    A streaming decompressor.
 
-    It stops after a :ref:`frame<frame_block>` is decompressed. For multiple frames data, use :py:class:`EndlessZstdDecompressor`.
+    After a :ref:`frame<frame_block>` is decompressed, it stops and sets :py:attr:`~ZstdDecompressor.eof` flag to ``True``.
+
+    For multiple frames data, use :py:class:`EndlessZstdDecompressor`.
 
     Thread-safe at method level.
 
@@ -366,7 +366,7 @@ Stream decompression
 
         Decompress *data*, returning decompressed data as a ``bytes`` object.
 
-        It stops after a :ref:`frame<frame_block>` is decompressed.
+        After a :ref:`frame<frame_block>` is decompressed, it stops and sets :py:attr:`~ZstdDecompressor.eof` flag to ``True``.
 
         :param data: Data to be decompressed.
         :type data: bytes-like object
@@ -418,7 +418,10 @@ Stream decompression
 
 .. py:class:: EndlessZstdDecompressor
 
-    Stream decompressor, accepts multiple concatenated :ref:`frames<frame_block>`.
+    It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used in these scenarios:
+
+        * Streaming decompression for multiple concatenated frames
+        * Reuse for big number of same type individual data
 
     Thread-safe at method level.
 
@@ -444,7 +447,7 @@ Stream decompression
 
     .. sourcecode:: python
 
-        # --- unlimited output ---
+        # --- streaming decomression, unlimited output ---
         d1 = EndlessZstdDecompressor()
 
         decompressed_dat1 = d1.decompress(dat1)
@@ -453,7 +456,7 @@ Stream decompression
 
         assert d1.at_frame_edge, 'data ends in an incomplete frame.'
 
-        # --- limited output ---
+        # --- streaming decomression, limited output ---
         d2 = EndlessZstdDecompressor()
 
         while True:
@@ -469,8 +472,20 @@ Stream decompression
             chunk = d2.decompress(dat, 10*1024*1024) # limit output buffer to 10 MiB
             write_output(chunk)
 
+        # --- reuse for same type individual data ---
 
-    .. hint:: Why :py:class:`EndlessZstdDecompressor` doesn't stop at frame edge?
+        # reuse an object may eliminate the small overhead of creating
+        # context / setting parameters / loading dictionary.
+        d3 = EndlessZstdDecompressor()
+        for compressed_data in data_source():
+            decompressed_data = d3.decompress(compressed_data)
+
+            # check data integrity
+            if not d3.at_frame_edge:
+                decompressed_data = None  # decompressed data is incomplete
+                d3 = EndlessZstdDecompressor() # reset decompressor
+
+    .. hint:: Why :py:class:`EndlessZstdDecompressor` doesn't stop at frame edges?
 
         If so, unused input data after an edge will be copied to an internal buffer, this may be a performance overhead.
 
@@ -482,7 +497,11 @@ Stream decompression
 Dictionary
 ----------
 
-    This section contains class :py:class:`ZstdDict`, function :py:func:`train_dict`, :py:func:`finalize_dict`.
+    This section contains:
+
+        * class :py:class:`ZstdDict`
+        * function :py:func:`train_dict`
+        * function :py:func:`finalize_dict`
 
 .. note::
     If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically, has best effect on data that smaller than 1 KiB.
@@ -521,13 +540,11 @@ Dictionary
 
     .. py:attribute:: dict_id
 
-        ID of zstd dictionary, a 32-bit unsigned integer value.
+        ID of zstd dictionary, a 32-bit unsigned integer value. See :ref:`this note<dict_id>` for details.
 
         Non-zero means ordinary dictionary, was created by zstd functions, follow a specified format.
 
         ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user. (Note that the meaning of ``0`` is different from ``dictionary_id`` in :py:func:`get_frame_info` function.)
-
-        I personally don't recommend using dictionary ID to identify dictionaries, there may be collision and confusion. Consider using a more reliable way to manage dictionaries, such as by file name.
 
     .. sourcecode:: python
 
@@ -575,6 +592,7 @@ Dictionary
    3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
    4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
    5. You may compose a more efficient dictionary by hand, and use :py:func:`finalize_dict` function to finalize a dictionary. For example, use the general parts of some files to compose a more efficient dictionary.
+   6. It would be nice to know some knowledge about dictionary ID, see :ref:`this note<dict_id>`.
 
 .. py:function:: finalize_dict(zstd_dict, samples, dict_size, level)
 
@@ -597,8 +615,10 @@ Dictionary
 Module-level functions
 ----------------------
 
-    This section contains function :py:func:`get_frame_info`, :py:func:`get_frame_size`.
+    This section contains:
 
+        * function :py:func:`get_frame_info`, get frame infomation from frame header.
+        * function :py:func:`get_frame_size`, get a frame's size.
 
 .. py:function:: get_frame_info(frame_buffer)
 
@@ -616,6 +636,7 @@ Module-level functions
     :type frame_buffer: bytes-like object
     :return: Information about a frame.
     :rtype: namedtuple
+    :raises ZstdError: When parsing the frame header fails.
 
 .. sourcecode:: python
 
@@ -625,7 +646,7 @@ Module-level functions
 
 .. py:function:: get_frame_size(frame_buffer)
 
-    Get the size of a zstd frame, including frame header and epilogue.
+    Get the size of a zstd frame, including frame header and 4-byte checksum if it has.
 
     It will iterate all blocks' header within a frame, to accumulate the frame's size.
 
@@ -633,6 +654,7 @@ Module-level functions
     :type frame_buffer: bytes-like object
     :return: The size of a zstd frame.
     :rtype: int
+    :raises ZstdError: When it fails.
 
 .. sourcecode:: python
 
@@ -643,7 +665,11 @@ Module-level functions
 Module-level variables
 ----------------------
 
-    This section contains :py:data:`zstd_version`, :py:data:`zstd_version_info`, :py:data:`compressionLevel_values`.
+    This section contains:
+
+        * :py:data:`zstd_version`, a ``str``.
+        * :py:data:`zstd_version_info`, a ``tuple``.
+        * :py:data:`compressionLevel_values`, some values defined by underlying zstd library.
 
 .. py:data:: zstd_version
 
@@ -916,25 +942,27 @@ Advanced parameters
 
         Default value is ``1``.
 
+        In traditional streaming compression, content size is unknown.
+
         In these compressions, the content size is known:
 
             * :py:func:`compress` function
             * :py:func:`richmem_compress` function
             * :py:class:`RichMemZstdCompressor` class
-            * :py:func:`compress_stream` function setting *pledged_input_size* argument.
+            * :py:func:`compress_stream` function setting *pledged_input_size* argument
             * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
 
-        In traditional streaming compression, content size is unknown.
+        The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
     .. py:attribute:: checksumFlag
 
-        A 4-byte checksum of uncompressed content is written at end of frame. If decompression verification fails, an error will be raised.
+        A 4-byte checksum of uncompressed content is written at the end of frame. If decompression verification fails, a :py:class:`ZstdError` will be raised.
 
         Default value is ``0``.
 
     .. py:attribute:: dictIDFlag
 
-        When applicable, dictionary's ID is written into frame header.
+        When applicable, dictionary's ID is written into frame header. See :ref:`this note<dict_id>` for details.
 
         Default value is ``1``.
 
@@ -1100,7 +1128,7 @@ Frame and block
 
     A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (3 bytes block header + 128 KiB), the actual maximum size depends on frame parameters.
 
-    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need later blocks. So flushing block may be used in communication scenes, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
+    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need later blocks. So flushing block may be used in communication scenarios, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
 
     .. attention::
 
@@ -1145,9 +1173,9 @@ Rich memory mode
     Effects:
 
     * The output buffer is larger than input data a little.
-    * If input data is larger than ~31.8KB, 4 ~ 22% faster.
+    * If input data is larger than ~31.8KB, 4 ~ 15% faster.
 
-    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/dbf717d48cf0cdb218665b5ee276c8d8c2138ae2/src/_zstdmodule.c#L146-L171>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
     When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
 
@@ -1205,3 +1233,30 @@ Use with tarfile module
         # read .tar.zst file (decompression)
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
+
+
+Zstd dictionary ID
+>>>>>>>>>>>>>>>>>>
+
+.. _dict_id:
+
+.. note:: Zstd dictionary ID
+
+    Dictionary ID is a 32-bit unsigned integer value. Decoder uses it to check if the correct dictionary is used.
+
+    According to zstd dictionary format `specification <https://github.com/facebook/zstd/blob/release/doc/zstd_compression_format.md#dictionary-format>`_, if a dictionary is going to be distributed in public, the following ranges are reserved for future registrar and shall not be used:
+
+        - low range: <= 32767
+        - high range: >= 2^31
+
+    Outside of these ranges, any value in (32767 < v < 2^31) can be used freely, even in public environment.
+
+    In zstd frame header, the `Dictionary_ID <https://github.com/facebook/zstd/blob/release/doc/zstd_compression_format.md#dictionary_id>`_ field can be 0/1/2/4 bytes. If the value is small, this can save 2~3 bytes. Or don't write the ID by setting :py:attr:`CParameter.dictIDFlag` parameter.
+
+    pyzstd module doesn't support specifying ID when training dictionary currently. If want to specify the ID, modify the dictionary content according to format specification, and take the corresponding risks.
+
+    **Attention**
+
+    In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
+
+    In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.

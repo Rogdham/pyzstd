@@ -134,7 +134,7 @@ def decompress(data: ByteString,
 def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
                     level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                     zstd_dict: Optional[ZstdDict] = None,
-                    pledged_input_size: int = (2**64-1),
+                    pledged_input_size: Optional[int] = None,
                     read_size: int = 131_072, write_size: int = 131_591,
                     callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 

@@ -1174,7 +1174,7 @@ _train_dict(PyObject *module, PyObject *args)
     }
 
     chunks_number = Py_SIZE(samples_size_list);
-    if (chunks_number > UINT32_MAX) {
+    if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
         goto error;
@@ -1278,7 +1278,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     }
 
     chunks_number = Py_SIZE(samples_size_list);
-    if (chunks_number > UINT32_MAX) {
+    if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
         goto error;
@@ -1958,19 +1958,13 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     }
 
     /* Initialize output buffer before any `goto error` statement */
-    if (type == TYPE_FUNCTION) {
-        if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
-            /* These two zstd constants always > PY_SSIZE_T_MAX:
-                 ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
-                 ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
-            if (OutputBuffer_InitWithSize(&buffer, &out,
-                                          (Py_ssize_t) decompressed_size) < 0) {
-                goto error;
-            }
-        } else {
-            if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
-                goto error;
-            }
+    if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
+        /* These two zstd constants always > PY_SSIZE_T_MAX:
+            ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
+            ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
+        if (OutputBuffer_InitWithSize(&buffer, &out,
+                                      (Py_ssize_t) decompressed_size) < 0) {
+            goto error;
         }
     } else {
         if (OutputBuffer_InitAndGrow(&buffer, &out, max_length) < 0) {
@@ -2053,6 +2047,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     Py_buffer data;
     Py_ssize_t max_length = -1;
 
+    uint64_t decompressed_size = ZSTD_CONTENTSIZE_UNKNOWN;
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
     char use_input_buffer;
@@ -2066,12 +2061,20 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
 
-    /* ZstdDecompressor: check .eof flag */
     if (type == TYPE_DECOMPRESSOR) {
+        /* Check .eof flag */
         if (self->eof) {
             PyErr_SetString(PyExc_EOFError, "Already at the end of a zstd frame.");
             assert(ret == NULL);
             goto success;
+        }
+    } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
+        /* Fast path for these conditions */
+        if (self->at_frame_edge &&
+            max_length < 0 &&
+            self->in_begin == self->in_end) {
+            /* Get decompressed size */
+            decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
         }
     }
 
@@ -2151,7 +2154,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_impl(self, &in, max_length, 0, type);
+    ret = decompress_impl(self, &in, max_length, decompressed_size, type);
     if (ret == NULL) {
         goto error;
     }
@@ -2576,7 +2579,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    unsigned long long decompressed_size;
+    uint64_t decompressed_size;
     ZstdDecompressor self = {0};
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
@@ -2621,12 +2624,13 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     /* Check data integrity. at_frame_edge flag is 1 when both input and output
        streams are at a frame edge. */
     if (self.at_frame_edge == 0) {
-        char *extra_msg = (Py_SIZE(ret) == 0) ? "" :
-                          " If you want to output these decompressed data, "
-                          "use an EndlessZstdDecompressor object to decompress.";
+        char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
+                          ", if want to output these decompressed data, use "
+                          "an EndlessZstdDecompressor object to decompress.";
         PyErr_Format(static_state.ZstdError,
-                     "Decompression failed: Zstd data ends in an incomplete "
-                     "frame, decompressed data is %zd bytes.%s",
+                     "Decompression failed: zstd data ends in an incomplete "
+                     "frame, maybe the input data was truncated. Decompressed "
+                     "data is %zd bytes%s",
                      Py_SIZE(ret), extra_msg);
         goto error;
     }
@@ -2701,7 +2705,8 @@ _get_param_bounds(PyObject *module, PyObject *args)
 PyDoc_STRVAR(get_frame_size_doc,
 "get_frame_size(frame_buffer)\n"
 "----\n"
-"Get the size of a zstd frame, including frame header and epilogue.\n\n"
+"Get the size of a zstd frame, including frame header and 4-byte checksum if it\n"
+"has.\n\n"
 "It will iterate all blocks' header within a frame, to accumulate the frame\n"
 "size.\n\n"
 "Arguments\n"
@@ -2747,7 +2752,7 @@ _get_frame_info(PyObject *module, PyObject *args)
 {
     Py_buffer frame_buffer;
 
-    unsigned long long content_size;
+    uint64_t content_size;
     char unknown_content_size;
     uint32_t dict_id;
     PyObject *temp;
@@ -2944,31 +2949,59 @@ error:
     return -1;
 }
 
+/* Return NULL on failure */
+FORCE_INLINE PyObject *
+build_return_tuple(uint64_t total_input_size, uint64_t total_output_size)
+{
+    PyObject *ret, *temp;
+
+    ret = PyTuple_New(2);
+    if (ret == NULL) {
+        return NULL;
+    }
+
+    temp = PyLong_FromUnsignedLongLong(total_input_size);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 0, temp);
+
+    temp = PyLong_FromUnsignedLongLong(total_output_size);
+    if (temp == NULL) {
+        Py_DECREF(ret);
+        return NULL;
+    }
+    PyTuple_SET_ITEM(ret, 1, temp);
+
+    return ret;
+}
+
 PyDoc_STRVAR(compress_stream_doc,
 "compress_stream(input_stream, output_stream, *,\n"
 "                level_or_option=None, zstd_dict=None,\n"
-"                pledged_input_size=(2**64-1),\n"
-"                read_size=131_072, write_size=131_591,\n"
+"                pledged_input_size=None,\n"
+"                read_size=131072, write_size=131591,\n"
 "                callback=None)\n"
 "----\n"
 "Compress from input_stream to output_stream.\n\n"
-"Return a tuple, (total_read, total_write), the items are int objects.\n\n"
+"Return a tuple, (total_input, total_output), the items are int objects.\n\n"
 "Arguments\n\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
-"output_stream: Output stream that has a .write(b) method. If it's None,\n"
-"    the callback argument must be non-None.\n"
+"output_stream: Output stream that has a .write(b) method. If use callback\n"
+"    function, this argument can be None.\n"
 "level_or_option: When it's an int object, it represents the compression\n"
 "    level. When it's a dict object, it contains advanced compression\n"
 "    parameters.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "pledged_input_size: If set this argument to the size of input data, the size\n"
-"    will be written into frame header. If the actual input data does not match\n"
-"    it, an error will be raised.\n"
+"    will be written into frame header. If the actual input data doesn't match\n"
+"    it, a ZstdError will be raised.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"
-"    (total_read, total_write, read_data, write_data), the first two are int\n"
-"    objects, the last two are readonly memoryview objects."
+"    (total_input, total_output, read_data, write_data), the first two are\n"
+"    int objects, the last two are readonly memoryview objects."
 );
 
 static PyObject *
@@ -2982,13 +3015,25 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     PyObject *output_stream;
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
-    uint64_t pledged_input_size = ZSTD_CONTENTSIZE_UNKNOWN;
+    PyObject *pledged_input_size = Py_None;
     Py_ssize_t read_size = ZSTD_CStreamInSize();
     Py_ssize_t write_size = ZSTD_CStreamOutSize();
     PyObject *callback = Py_None;
 
+    size_t zstd_ret;
+    PyObject *temp;
+    ZstdCompressor self = {0};
+    int compress_level = 0; /* 0 means use zstd's default compression level */
+    uint64_t pledged_size_value = ZSTD_CONTENTSIZE_UNKNOWN;
+    ZSTD_inBuffer in = {.src = NULL};
+    ZSTD_outBuffer out = {.dst = NULL};
+    PyObject *in_memoryview = NULL;
+    uint64_t total_input_size = 0;
+    uint64_t total_output_size = 0;
+    PyObject *ret = NULL;
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "OO|$OOKnnO:compress_stream", kwlist,
+                                     "OO|$OOOnnO:compress_stream", kwlist,
                                      &input_stream, &output_stream,
                                      &level_or_option, &zstd_dict,
                                      &pledged_input_size, &read_size, &write_size,
@@ -3018,23 +3063,22 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     }
 
+    if (pledged_input_size != Py_None) {
+        pledged_size_value = PyLong_AsUnsignedLongLong(pledged_input_size);
+        if (pledged_size_value == (uint64_t)-1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                            "pledged_input_size argument should be 64-bit "
+                            "unsigned integer value.");
+            return NULL;
+        }
+    }
+
     if (read_size <= 0 || write_size <= 0) {
         PyErr_SetString(PyExc_ValueError,
                         "read_size argument and write_size argument should "
                         "be positive numbers.");
         return NULL;
     }
-
-    size_t zstd_ret;
-    PyObject *temp;
-    ZstdCompressor self = {0};
-    int compress_level = 0;
-    ZSTD_inBuffer in = {.src = NULL};
-    ZSTD_outBuffer out = {.dst = NULL};
-    PyObject *in_memoryview = NULL;
-    uint64_t total_input_size = 0;
-    uint64_t total_output_size = 0;
-    PyObject *ret = NULL;
 
     /* Initialize & set ZstdCompressor */
     self.cctx = ZSTD_createCCtx();
@@ -3056,8 +3100,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     }
 
-    if (pledged_input_size != ZSTD_CONTENTSIZE_UNKNOWN) {
-        zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self.cctx, pledged_input_size);
+    if (pledged_size_value != ZSTD_CONTENTSIZE_UNKNOWN) {
+        zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self.cctx, pledged_size_value);
         if (ZSTD_isError(zstd_ret)) {
             set_zstd_error(ERR_COMPRESS, zstd_ret);
             goto error;
@@ -3183,23 +3227,11 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     } /* Read loop */
 
-    /* Return tuple */
-    ret = PyTuple_New(2);
+    /* Return value */
+    ret = build_return_tuple(total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
 
     goto success;
 
@@ -3219,22 +3251,22 @@ success:
 PyDoc_STRVAR(decompress_stream_doc,
 "decompress_stream(input_stream, output_stream, *,\n"
 "                  zstd_dict=None, option=None,\n"
-"                  read_size=131_075, write_size=131_072,\n"
+"                  read_size=131075, write_size=131072,\n"
 "                  callback=None)\n"
 "----\n"
 "Decompress from input_stream to output_stream.\n\n"
-"Return a tuple, (total_read, total_write), the items are int objects.\n\n"
+"Return a tuple, (total_input, total_output), the items are int objects.\n\n"
 "Arguments\n\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
-"output_stream: Output stream that has a .write(b) method. If it's None,\n"
-"    the callback argument must be non-None.\n"
+"output_stream: Output stream that has a .write(b) method. If use callback\n"
+"    function, this argument can be None.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option: A dict object, contains advanced decompression parameters.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"
-"    (total_read, total_write, read_data, write_data), the first two are int\n"
-"    objects, the last two are readonly memoryview objects."
+"    (total_input, total_output, read_data, write_data), the first two are\n"
+"    int objects, the last two are readonly memoryview objects."
 );
 
 static PyObject *
@@ -3431,15 +3463,12 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
             /* Check data integrity. at_frame_edge flag is 1 when both input
                and output streams are at a frame edge. */
             if (self.at_frame_edge == 0) {
-                char *extra_msg = (total_output_size == 0) ? "" :
-                                  " If you want to output these decompressed "
-                                  "data, use an EndlessZstdDecompressor "
-                                  "object to decompress.";
                 PyErr_Format(static_state.ZstdError,
-                             "Decompression failed: Zstd data ends in an "
-                             "incomplete frame, decompressed data is %zd "
-                             "bytes.%s",
-                             total_output_size, extra_msg);
+                             "Decompression failed: zstd data ends in an "
+                             "incomplete frame, maybe the input data was "
+                             "truncated. Total input %llu bytes, total output "
+                             "%llu bytes.",
+                             total_input_size, total_output_size);
                 goto error;
             }
 
@@ -3447,23 +3476,11 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         }
     } /* Read loop */
 
-    /* Return tuple */
-    ret = PyTuple_New(2);
+    /* Return value */
+    ret = build_return_tuple(total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
 
     goto success;
 

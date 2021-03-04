@@ -27,6 +27,7 @@ zstd_files = [
     'common/error_private.c',
     'common/pool.c',
     'common/threading.c',
+    'common/zstd_trace.c',
 
     'compress/zstd_compress.c',
     'compress/zstd_compress_literals.c',
@@ -79,7 +80,7 @@ class build_ext_compiler_check(build_ext):
 setup(
     name='pyzstd',
     version=module_version,
-    description="Python bindings for Zstandard (zstd) compression algorithm, the API is similar to Python's bz2/lzma/zlib module.",
+    description="Python bindings to Zstandard (zstd) compression library, the API is similar to Python's bz2/lzma/zlib module.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',
