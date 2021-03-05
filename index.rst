@@ -144,7 +144,7 @@ Streaming compression
 
 .. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
-    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It's zero memory copy.
+    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It doesn't close the streams.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
 
@@ -154,7 +154,7 @@ Streaming compression
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
+    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -175,7 +175,7 @@ Streaming compression
     # compress a bytes object, and write to a file.
     with io.BytesIO(raw_dat) as bi:
         with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(bi, ofh)
+            compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
 
     # compress an input file, obtain a bytes object.
     # compared to reading a file and compressing it in memory,
@@ -292,7 +292,7 @@ Streaming decompression
 
 .. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
-    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It's zero memory copy.
+    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It doesn't close the streams.
 
     Supports multiple concatenated frames.
 
@@ -380,7 +380,7 @@ Streaming decompression
 
     .. py:attribute:: eof
 
-        ``True`` means the end of the first frame has been reached. If decompress data after that, ``EOFError`` exception will be raised.
+        ``True`` means the end of the first frame has been reached. If decompress data after that, an ``EOFError`` exception will be raised.
 
     .. py:attribute:: unused_data
 
@@ -888,7 +888,9 @@ Advanced parameters
 
         It increases memory usage and window size.
 
-        Note: enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MiB except when expressly set to a different value.
+        Note:
+            * Enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MiB except when expressly set to a different value.
+            * This will be enabled by default if :py:attr:`~CParameter.windowLog` >= 128 MiB and compression strategy >= :py:attr:`~Strategy.btopt` (compression level 16+).
 
     .. py:attribute:: ldmHashLog
 
@@ -956,7 +958,7 @@ Advanced parameters
 
     .. py:attribute:: checksumFlag
 
-        A 4-byte checksum of uncompressed content is written at the end of frame. If decompression verification fails, a :py:class:`ZstdError` will be raised.
+        A 4-byte checksum of uncompressed content is written at the end of frame. If decompression verification fails, a :py:class:`ZstdError` exception will be raised.
 
         Default value is ``0``.
 

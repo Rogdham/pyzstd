@@ -138,6 +138,31 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     return comp.compress(data)
 
 
+def decompress(data, zstd_dict=None, option=None):
+    """Decompress a zstd data, return a bytes object.
+
+    Support multiple concatenated frames.
+
+    Arguments
+    data:      A bytes-like object, compressed zstd data.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option:    A dict object, contains advanced decompression parameters.
+    """
+    decomp = EndlessZstdDecompressor(zstd_dict, option)
+    ret = decomp.decompress(data)
+
+    if not decomp.at_frame_edge:
+        extra_msg = '.' if len(ret) == 0 else \
+                    (', if want to output these decompressed data, use '
+                     'an EndlessZstdDecompressor object to decompress.')
+        msg = ('Decompression failed: zstd data ends in an incomplete '
+               'frame, maybe the input data was truncated. Decompressed '
+               'data is %s bytes%s') % (format(len(ret), ','), extra_msg)
+        raise ZstdError(msg)
+
+    return ret
+
+
 def train_dict(samples, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 

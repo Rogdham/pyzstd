@@ -323,7 +323,8 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 
     /* Fast path for single block */
     if ((list_len == 1 && ob->pos == ob->size) ||
-        (list_len == 2 && ob->pos == 0)) {
+        (list_len == 2 && ob->pos == 0))
+    {
         block = PyList_GET_ITEM(buffer->list, 0);
         Py_INCREF(block);
 
@@ -1884,18 +1885,17 @@ static PyType_Spec richmem_zstdcompressor_type_spec = {
 typedef enum {
     TYPE_DECOMPRESSOR,          /* <D>, ZstdDecompressor class */
     TYPE_ENDLESS_DECOMPRESSOR,  /* <E>, EndlessZstdDecompressor class */
-    TYPE_FUNCTION               /* <F>, decompress() function */
 } decompress_type;
 
-/* Decompress implementation for <D>, <E>, <F>, pseudo code:
+/* Decompress implementation for <D>, <E>, pseudo code:
 
         initialize_output_buffer
         while True:
             decompress_data
-            set_object_flag   # .eof for <D>, .at_frame_edge for <E>, <F>.
+            set_object_flag   # .eof for <D>, .at_frame_edge for <E>.
 
             if output_buffer_exhausted:
-                if output_buffer_reached_max_length:   # only for <D>, <E>.
+                if output_buffer_reached_max_length:
                     finish
                 grow_output_buffer
             elif input_buffer_exhausted:
@@ -1910,9 +1910,9 @@ typedef enum {
 
       Note, decompressing "an empty input" in any case will make it > 0.
 
-    <E>, <F> support multiple frames, they have a .at_frame_edge flag, which
-    means both the input and output streams are at a frame edge. It can be set
-    by this statement:
+    <E> supports multiple frames, has an .at_frame_edge flag, it means both the
+    input and output streams are at a frame edge. The flag can be set by this
+    statement:
 
         .at_frame_edge = (zstd_ret == 0) ? 1 : 0
 
@@ -1949,7 +1949,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
     PyObject *ret;
 
     /* The first AFE check for setting .at_frame_edge flag */
-    if (type != TYPE_DECOMPRESSOR) {
+    if (type == TYPE_ENDLESS_DECOMPRESSOR) {
         if (self->at_frame_edge && in->pos == in->size) {
             ret = static_state.empty_bytes;
             Py_INCREF(ret);
@@ -1992,7 +1992,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 self->eof = 1;
                 break;
             }
-        } else {
+        } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
             /* EndlessZstdDecompressor class and decompress() function support
                multiple frames */
             self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
@@ -2008,11 +2008,9 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
         if (out.pos == out.size) {
             /* Output buffer exhausted */
 
-            if (type != TYPE_FUNCTION) {
-                /* Output buffer reached max_length */
-                if (OutputBuffer_ReachedMaxLength(&buffer, &out)) {
-                    break;
-                }
+            /* Output buffer reached max_length */
+            if (OutputBuffer_ReachedMaxLength(&buffer, &out)) {
+                break;
             }
 
             /* Grow output buffer */
@@ -2069,11 +2067,11 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             goto success;
         }
     } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
-        /* Fast path for these conditions */
-        if (self->at_frame_edge &&
-            max_length < 0 &&
-            self->in_begin == self->in_end) {
-            /* Get decompressed size */
+        /* Fast path for one-shot decompression */
+        if (self->at_frame_edge && max_length < 0 &&
+            self->in_begin == self->in_end)
+        {
+            /* Read decompressed size */
             decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
         }
     }
@@ -2239,8 +2237,11 @@ error:
     self->in_end = 0;
 
     self->needs_input = 1;
-    self->at_frame_edge = 1;
-    self->eof = 0;
+    if (type == TYPE_DECOMPRESSOR) {
+        self->eof = 0;
+    } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
+        self->at_frame_edge = 1;
+    }
 
     /* Resetting session never fail */
     ZSTD_DCtx_reset(self->dctx, ZSTD_reset_session_only);
@@ -2434,13 +2435,12 @@ static PyMethodDef _ZstdDecompressor_methods[] = {
 
 PyDoc_STRVAR(ZstdDecompressor_eof_doc,
 "True means the end of the first frame has been reached. If decompress data\n"
-"after that, EOFError exception will be raised.");
+"after that, an EOFError exception will be raised.");
 
 PyDoc_STRVAR(ZstdDecompressor_needs_input_doc,
-"If max_length argument in .decompress() method is nonnegative, and the\n"
-"decompressor has (or may has) unconsumed input data, this flag will be set to\n"
-"False. In this case, pass empty bytes b'' to .decompress() method can output\n"
-"unconsumed data.");
+"If the max_length output limit in .decompress() method has been reached, and\n"
+"the decompressor has (or may has) unconsumed input data, it will be set to\n"
+"False. In this case, pass b'' to .decompress() method may output further data.");
 
 PyDoc_STRVAR(ZstdDecompressor_unused_data_doc,
 "A bytes object. When ZstdDecompressor object stops after a frame is\n"
@@ -2554,100 +2554,6 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
 /* --------------------------
      Module level functions
    -------------------------- */
-
-PyDoc_STRVAR(decompress_doc,
-"decompress(data, zstd_dict=None, option=None)\n"
-"----\n"
-"Decompress a zstd data, return a bytes object.\n\n"
-"Support multiple concatenated frames.\n\n"
-"Arguments\n"
-"data:      A bytes-like object, compressed zstd data.\n"
-"zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
-"option:    A dict object, contains advanced decompression parameters.");
-
-static PyObject *
-decompress(PyObject *module, PyObject *args, PyObject *kwargs)
-{
-    static char *kwlist[] = {"data", "zstd_dict", "option", NULL};
-    Py_buffer data;
-    PyObject *zstd_dict = Py_None;
-    PyObject *option = Py_None;
-
-    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "y*|OO:decompress", kwlist,
-                                     &data, &zstd_dict, &option)) {
-        return NULL;
-    }
-
-    uint64_t decompressed_size;
-    ZstdDecompressor self = {0};
-    ZSTD_inBuffer in;
-    PyObject *ret = NULL;
-
-    /* Initialize & set ZstdDecompressor */
-    self.dctx = ZSTD_createDCtx();
-    if (self.dctx == NULL) {
-        PyErr_SetString(static_state.ZstdError,
-                        "Unable to create ZSTD_DCtx instance.");
-        goto error;
-    }
-    self.at_frame_edge = 1;
-
-    /* Load dictionary to decompression context */
-    if (zstd_dict != Py_None) {
-        if (load_d_dict(self.dctx, zstd_dict) < 0) {
-            goto error;
-        }
-    }
-
-    /* Set option to decompression context */
-    if (option != Py_None) {
-        if (set_d_parameters(self.dctx, option) < 0) {
-            goto error;
-        }
-    }
-
-    /* Prepare input data */
-    in.src = data.buf;
-    in.size = data.len;
-    in.pos = 0;
-
-    /* Get decompressed size */
-    decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
-
-    /* Decompress */
-    ret = decompress_impl(&self, &in, -1, decompressed_size, TYPE_FUNCTION);
-    if (ret == NULL) {
-        goto error;
-    }
-
-    /* Check data integrity. at_frame_edge flag is 1 when both input and output
-       streams are at a frame edge. */
-    if (self.at_frame_edge == 0) {
-        char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
-                          ", if want to output these decompressed data, use "
-                          "an EndlessZstdDecompressor object to decompress.";
-        PyErr_Format(static_state.ZstdError,
-                     "Decompression failed: zstd data ends in an incomplete "
-                     "frame, maybe the input data was truncated. Decompressed "
-                     "data is %zd bytes%s",
-                     Py_SIZE(ret), extra_msg);
-        goto error;
-    }
-
-    goto success;
-
-error:
-    Py_CLEAR(ret);
-success:
-    /* Release data */
-    PyBuffer_Release(&data);
-
-    /* Free decompression context */
-    ZSTD_freeDCtx(self.dctx);
-
-    return ret;
-}
 
 PyDoc_STRVAR(_get_param_bounds_doc,
 "Internal funciton, get CParameter/DParameter bounds.");
@@ -3284,6 +3190,16 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     Py_ssize_t write_size = ZSTD_DStreamOutSize();
     PyObject *callback = Py_None;
 
+    size_t zstd_ret;
+    PyObject *temp;
+    ZstdDecompressor self = {0};
+    ZSTD_inBuffer in = {.src = NULL};
+    ZSTD_outBuffer out = {.dst = NULL};
+    PyObject *in_memoryview = NULL;
+    uint64_t total_input_size = 0;
+    uint64_t total_output_size = 0;
+    PyObject *ret = NULL;
+
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "OO|$OOnnO:decompress_stream", kwlist,
                                      &input_stream, &output_stream,
@@ -3321,16 +3237,6 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                         "be positive numbers.");
         return NULL;
     }
-
-    size_t zstd_ret;
-    PyObject *temp;
-    ZstdDecompressor self = {0};
-    ZSTD_inBuffer in = {.src = NULL};
-    ZSTD_outBuffer out = {.dst = NULL};
-    PyObject *in_memoryview = NULL;
-    uint64_t total_input_size = 0;
-    uint64_t total_output_size = 0;
-    PyObject *ret = NULL;
 
     /* Initialize & set ZstdDecompressor */
     self.dctx = ZSTD_createDCtx();
@@ -3498,7 +3404,6 @@ success:
 }
 
 static PyMethodDef _zstd_methods[] = {
-    {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
     {"_finalize_dict", (PyCFunction)_finalize_dict, METH_VARARGS, _finalize_dict_doc},
     {"_get_param_bounds", (PyCFunction)_get_param_bounds, METH_VARARGS, _get_param_bounds_doc},
