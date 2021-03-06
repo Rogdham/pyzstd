@@ -714,12 +714,12 @@ _get_DDict(ZstdDict *self)
 static inline void
 clamp_compression_level(int *compressionLevel)
 {
-#if ZSTD_VERSION_NUMBER < 10407
     /* In zstd v1.4.6-, lower bound is not clamped. */
-    if (*compressionLevel < ZSTD_minCLevel()) {
-        *compressionLevel = ZSTD_minCLevel();
+    if (ZSTD_versionNumber() < 10407) {
+        if (*compressionLevel < ZSTD_minCLevel()) {
+            *compressionLevel = ZSTD_minCLevel();
+        }
     }
-#endif
 }
 
 /* Set compressLevel or compression parameters to compression context. */
@@ -1238,14 +1238,15 @@ PyDoc_STRVAR(_finalize_dict_doc,
 static PyObject *
 _finalize_dict(PyObject *module, PyObject *args)
 {
-#if ZSTD_VERSION_NUMBER < 10405
-    PyErr_Format(PyExc_NotImplementedError,
-                 "_finalize_dict function only available when the underlying "
-                 "zstd library's version is greater than or equal to v1.4.5, "
-                 "the current underlying zstd library's version is v%s.",
-                 ZSTD_versionString());
-    return NULL;
-#else
+    if (ZSTD_versionNumber() < 10405) {
+        PyErr_Format(PyExc_NotImplementedError,
+                "_finalize_dict function only available when the underlying "
+                "zstd library's version is greater than or equal to v1.4.5, "
+                "the current underlying zstd library's version is v%s.",
+                ZSTD_versionString());
+        return NULL;
+    }
+
     PyBytesObject *custom_dict_bytes;
     PyBytesObject *samples_bytes;
     PyObject *samples_size_list;
@@ -1345,7 +1346,6 @@ error:
 success:
     PyMem_Free(chunk_sizes);
     return dst_dict_bytes;
-#endif
 }
 
 /* -----------------------
@@ -3547,6 +3547,28 @@ add_constant_to_type(PyTypeObject *type, const char *name, const long value)
     return 0;
 }
 
+static PyObject *
+get_zstd_version_info(void)
+{
+    const uint32_t ver = ZSTD_versionNumber();
+    uint32_t major, minor, release;
+    PyObject *ret;
+
+    major = ver / 10000;
+    minor = (ver / 100) % 100;
+    release = ver % 100;
+
+    ret = PyTuple_New(3);
+    if (ret == NULL) {
+        return NULL;
+    }
+
+    PyTuple_SET_ITEM(ret, 0, PyLong_FromUnsignedLong(major));
+    PyTuple_SET_ITEM(ret, 1, PyLong_FromUnsignedLong(minor));
+    PyTuple_SET_ITEM(ret, 2, PyLong_FromUnsignedLong(release));
+    return ret;
+}
+
 PyMODINIT_FUNC
 PyInit__zstd(void)
 {
@@ -3667,15 +3689,10 @@ PyInit__zstd(void)
         goto error;
     }
 
-    /* zstd_version_info */
-    if (!(temp = PyTuple_New(3))) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(temp, 0, PyLong_FromLong(ZSTD_VERSION_MAJOR));
-    PyTuple_SET_ITEM(temp, 1, PyLong_FromLong(ZSTD_VERSION_MINOR));
-    PyTuple_SET_ITEM(temp, 2, PyLong_FromLong(ZSTD_VERSION_RELEASE));
+    /* zstd_version_info, a tuple. */
+    temp = get_zstd_version_info();
     if (PyModule_AddObject(module, "zstd_version_info", temp) < 0) {
-        Py_DECREF(temp);
+        Py_XDECREF(temp);
         goto error;
     }
 
