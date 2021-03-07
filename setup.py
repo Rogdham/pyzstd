@@ -2,9 +2,11 @@
 import io
 import os
 import re
+import sys
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
+# -------- read stuff --------
 ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 
 # read README.rst
@@ -18,6 +20,13 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     file_content = file.read()
     m = re.search(r'''__version__\s*=\s*(['"])(.*?)\1''', file_content)
     module_version = m.group(2)
+
+# -------- C extension --------
+if '--dynamic-link-zstd' in sys.argv:
+    DYNAMIC_LINK = True
+    sys.argv = [s for s in sys.argv if s != '--dynamic-link-zstd']
+else:
+    DYNAMIC_LINK = False
 
 zstd_files = [
     'common/fse_decompress.c',
@@ -54,14 +63,25 @@ zstd_files = [
     'dictBuilder/cover.c',
     ]
 
-c_files = []
-for f in zstd_files:
-    c_files.append('lib/'+f)
+if DYNAMIC_LINK:
+    include_dirs = []     # .h directory
+    library_dirs = []     # .lib directory
+    libraries = ['zstd']  # lib name, not filename.
+    c_files = []
+else:
+    include_dirs = ['lib', 'lib/dictBuilder']
+    library_dirs = []
+    libraries = []
+    c_files = ['lib/' + f for f in zstd_files]
+
 c_files.append('src/_zstdmodule.c')
 
 _zstd_extension = Extension('pyzstd._zstd',
-                            c_files,
-                            extra_compile_args=['-DZSTD_MULTITHREAD'])
+                            sources=c_files,
+                            include_dirs=include_dirs,
+                            define_macros=[('ZSTD_MULTITHREAD', None)],
+                            library_dirs=library_dirs,
+                            libraries=libraries)
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
@@ -110,6 +130,6 @@ setup(
 
     ext_modules=[_zstd_extension],
     cmdclass={'build_ext': build_ext_compiler_check},
-    
+
     test_suite='tests'
 )

@@ -37,7 +37,7 @@ Common functions
         * function :py:func:`decompress`
 
     .. hint::
-        If there is a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+        If there are a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
         * compression: :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
         * decompression: :py:class:`EndlessZstdDecompressor`.
@@ -148,6 +148,8 @@ Streaming compression
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
 
+    .. versionadded:: 0.14.2
+
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
     :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
@@ -162,37 +164,36 @@ Streaming compression
     :type write_size: int
     :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
     :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
+    :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
-.. sourcecode:: python
+    .. sourcecode:: python
 
-    # compress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh, level_or_option=5)
+        # compress an input file, and write to an output file.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(ifh, ofh, level_or_option=5)
 
-    # compress a bytes object, and write to a file.
-    with io.BytesIO(raw_dat) as bi:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
+        # compress a bytes object, and write to a file.
+        with io.BytesIO(raw_dat) as bi:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
 
-    # compress an input file, obtain a bytes object.
-    # compared to reading a file and compressing it in memory,
-    # it's faster on Linux, slower on Windows.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.BytesIO() as bo:
-            compress_stream(ifh, bo)
-            compressed_dat = bo.getvalue()
+        # compress an input file, obtain a bytes object.
+        # compared to reading a file and compressing it in memory,
+        # it's faster on Linux, slower on Windows.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.BytesIO() as bo:
+                compress_stream(ifh, bo)
+                compressed_dat = bo.getvalue()
 
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
+        # with callback function
+        def func(total_input, total_output, read_data, write_data):
+            percent = 100 * total_input / input_file_size
+            print(f'Progress: {percent:.1f}%')
 
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh, callback=func)
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdCompressor
@@ -298,6 +299,8 @@ Streaming decompression
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
 
+    .. versionadded:: 0.14.2
+
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
     :param zstd_dict: Pre-trained dictionary for decompression.
@@ -310,38 +313,37 @@ Streaming decompression
     :type write_size: int
     :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
     :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
+    :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.
 
-.. sourcecode:: python
+    .. sourcecode:: python
 
-    # decompress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(ifh, ofh)
+        # decompress an input file, and write to an output file.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(ifh, ofh)
 
-    # decompress a bytes object, and write to a file.
-    with io.BytesIO(compressed_dat) as bi:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(bi, ofh)
+        # decompress a bytes object, and write to a file.
+        with io.BytesIO(compressed_dat) as bi:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(bi, ofh)
 
-    # decompress an input file, obtain a bytes object.
-    # compared to reading a file and decompressing it in memory,
-    # it's faster on Linux, slower on Windows.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.BytesIO() as bo:
-            decompress_stream(ifh, bo)
-            decompressed_dat = bo.getvalue()
+        # decompress an input file, obtain a bytes object.
+        # compared to reading a file and decompressing it in memory,
+        # it's faster on Linux, slower on Windows.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.BytesIO() as bo:
+                decompress_stream(ifh, bo)
+                decompressed_dat = bo.getvalue()
 
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
+        # with callback function
+        def func(total_input, total_output, read_data, write_data):
+            percent = 100 * total_input / input_file_size
+            print(f'Progress: {percent:.1f}%')
 
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(ifh, ofh, callback=func)
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdDecompressor
@@ -1262,3 +1264,46 @@ Zstd dictionary ID
     In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
 
     In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
+
+
+Dynamically link to zstd library
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+.. _dynamic_link:
+
+.. note:: Dynamically link to zstd library
+
+    .. attention::
+
+        This feature will be available in next release, pyzstd verion > 0.14.3.
+
+    Pyzstd module supports dynamically linking to zstd library, the zstd source code in ``lib`` folder will be ignored.
+
+        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
+        * Before zstd v1.5.0, ZSTD_MULTITHREAD macro is not defined by default. So :ref:`multi-threaded compression<mt_compression>` may not be used in system provided zstd library, using this feature may raise a :py:class:`ZstdError` exception.
+
+    On Linux, dynamically link to zstd library provided by system:
+
+    .. sourcecode:: shell
+
+        # build pyzstd module and install
+        python3 setup.py --dynamic-link-zstd install
+
+    On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
+
+    .. sourcecode:: python
+
+        if DYNAMIC_LINK:
+            # E:\zstd_dll folder has zstd.h / zdict.h / libzstd.lib that
+            # along with libzstd.dll
+            include_dirs = ['E:\zstd_dll']  # .h directory
+            library_dirs = ['E:\zstd_dll']  # .lib directory
+            libraries = ['libzstd']         # lib name, not filename.
+
+    And put ``libzstd.dll`` into one of these directories:
+
+        * Python's root directory that has python.exe.
+        * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function.
+        * %SystemRoot%\System32
+
+    Note that the above list doesn't include the current working directory and %PATH% directories.
