@@ -410,8 +410,7 @@ static const ParameterInfo dp_list[] =
 
 /* Format an user friendly error message. */
 static void
-get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
-                        int key_v, int value_v, char is_compress)
+set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
 {
     ParameterInfo const *list;
     int list_size;
@@ -419,8 +418,6 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
     char *type;
     ZSTD_bounds bounds;
     int i;
-
-    assert(buf_size >= 200);
 
     if (is_compress) {
         list = cp_list;
@@ -443,9 +440,9 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
 
     /* Not a valid parameter */
     if (name == NULL) {
-        PyOS_snprintf(buf, buf_size,
-                      "The %zdth zstd %s parameter is invalid.",
-                      pos, type);
+        PyErr_Format(static_state.ZstdError,
+                     "The %zdth zstd %s parameter is invalid.",
+                     pos, type);
         return;
     }
 
@@ -456,20 +453,20 @@ get_parameter_error_msg(char *buf, int buf_size, Py_ssize_t pos,
         bounds = ZSTD_dParam_getBounds(key_v);
     }
     if (ZSTD_isError(bounds.error)) {
-        PyOS_snprintf(buf, buf_size,
-                      "Error when getting bounds of zstd %s parameter \"%s\".",
-                      type, name);
+        PyErr_Format(static_state.ZstdError,
+                     "Error when getting bounds of zstd %s parameter \"%s\".",
+                     type, name);
         return;
     }
 
     /* Error message */
-    PyOS_snprintf(buf, buf_size,
-                  "Error when setting zstd %s parameter \"%s\", it "
-                  "should %d <= value <= %d, provided value is %d. "
-                  "(zstd v%s, %d-bit build)",
-                  type, name,
-                  bounds.lowerBound, bounds.upperBound, value_v,
-                  ZSTD_versionString(), 8*(int)sizeof(Py_ssize_t));
+    PyErr_Format(static_state.ZstdError,
+                 "Error when setting zstd %s parameter \"%s\", it "
+                 "should %d <= value <= %d, provided value is %d. "
+                 "(zstd v%s, %d-bit build)",
+                 type, name,
+                 bounds.lowerBound, bounds.upperBound, value_v,
+                 ZSTD_versionString(), 8*(int)sizeof(Py_ssize_t));
 }
 
 #define ADD_INT_PREFIX_MACRO(module, macro)                  \
@@ -729,7 +726,6 @@ set_c_parameters(ZstdCompressor *self,
                  int *compress_level)
 {
     size_t zstd_ret;
-    char msg_buf[200];
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
@@ -804,9 +800,7 @@ set_c_parameters(ZstdCompressor *self,
             /* Set parameter to compression context */
             zstd_ret = ZSTD_CCtx_setParameter(self->cctx, key_v, value_v);
             if (ZSTD_isError(zstd_ret)) {
-                get_parameter_error_msg(msg_buf, sizeof(msg_buf),
-                                        pos, key_v, value_v, 1);
-                PyErr_SetString(static_state.ZstdError, msg_buf);
+                set_parameter_error(1, pos, key_v, value_v);
                 return -1;
             }
         }
@@ -860,7 +854,6 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
     size_t zstd_ret;
     PyObject *key, *value;
     Py_ssize_t pos;
-    char msg_buf[200];
 
     if (!PyDict_Check(option)) {
         PyErr_SetString(PyExc_TypeError,
@@ -890,9 +883,7 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            get_parameter_error_msg(msg_buf, sizeof(msg_buf),
-                                    pos, key_v, value_v, 0);
-            PyErr_SetString(static_state.ZstdError, msg_buf);
+            set_parameter_error(0, pos, key_v, value_v);
             return -1;
         }
     }
@@ -1204,14 +1195,14 @@ _train_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
-    /* Train the dictionary. */
+    /* Train the dictionary */
     Py_BEGIN_ALLOW_THREADS
     zstd_ret = ZDICT_trainFromBuffer(PyBytes_AS_STRING(dst_dict_bytes), dict_size,
                                      PyBytes_AS_STRING(samples_bytes),
                                      chunk_sizes, (uint32_t)chunks_number);
     Py_END_ALLOW_THREADS
 
-    /* Check zstd dict error. */
+    /* Check zstd dict error */
     if (ZDICT_isError(zstd_ret)) {
         set_zstd_error(ERR_TRAIN_DICT, zstd_ret);
         goto error;
@@ -1318,7 +1309,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     /* Force dictID value, 0 means auto mode (32-bits random value). */
     params.dictID = 0;
 
-    /* Finalize the dictionary. */
+    /* Finalize the dictionary */
     Py_BEGIN_ALLOW_THREADS
     zstd_ret = ZDICT_finalizeDictionary(
                         PyBytes_AS_STRING(dst_dict_bytes), dict_size,
@@ -1327,7 +1318,7 @@ _finalize_dict(PyObject *module, PyObject *args)
                         (uint32_t)chunks_number, params);
     Py_END_ALLOW_THREADS
 
-    /* Check zstd dict error. */
+    /* Check zstd dict error */
     if (ZDICT_isError(zstd_ret)) {
         set_zstd_error(ERR_FINALIZE_DICT, zstd_ret);
         goto error;
