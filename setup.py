@@ -109,5 +109,7 @@ setup(
     package_data={'pyzstd': ['__init__.pyi', 'py.typed']},
 
     ext_modules=[_zstd_extension],
-    cmdclass={'build_ext': build_ext_compiler_check}
+    cmdclass={'build_ext': build_ext_compiler_check},
+    
+    test_suite='tests'
 )

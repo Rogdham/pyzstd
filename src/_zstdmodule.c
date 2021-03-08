@@ -1984,8 +1984,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
                 break;
             }
         } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
-            /* EndlessZstdDecompressor class and decompress() function support
-               multiple frames */
+            /* EndlessZstdDecompressor class supports multiple frames */
             self->at_frame_edge = (zstd_ret == 0) ? 1 : 0;
 
             /* The second AFE check for setting .at_frame_edge flag */
