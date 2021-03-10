@@ -47,6 +47,8 @@ Common functions
 
     Compress *data*, return the compressed data.
 
+    Compressing ``b''`` will get an empty content frame (9 bytes or more).
+
     :param data: Data to be compressed.
     :type data: bytes-like object
     :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
@@ -101,6 +103,8 @@ Rich memory compression
 
     The parameters are the same as :py:func:`compress` function.
 
+    Compressing ``b''`` will get an empty content frame (9 bytes or more).
+
 
 .. py:class:: RichMemZstdCompressor
 
@@ -117,6 +121,8 @@ Rich memory compression
     .. py:method:: compress(self, data)
 
         Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+
+        Compressing ``b''`` will get an empty content frame (9 bytes or more).
 
         :param data: Data to be compressed.
         :type data: bytes-like object
@@ -146,7 +152,9 @@ Streaming compression
 
     A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It doesn't close the streams.
 
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+    If input stream is ``b''``, nothing will be written to output stream.
+
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
     .. versionadded:: 0.14.2
 
@@ -179,8 +187,8 @@ Streaming compression
                 compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
 
         # compress an input file, obtain a bytes object.
-        # compared to reading a file and compressing it in memory,
-        # it's faster on Linux, slower on Windows.
+        # it's faster than reading a file and compressing it in
+        # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
         with io.open(input_file_path, 'rb') as ifh:
             with io.BytesIO() as bo:
                 compress_stream(ifh, bo)
@@ -297,7 +305,7 @@ Streaming decompression
 
     Supports multiple concatenated frames.
 
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
     .. versionadded:: 0.14.2
 
@@ -329,8 +337,8 @@ Streaming decompression
                 decompress_stream(bi, ofh)
 
         # decompress an input file, obtain a bytes object.
-        # compared to reading a file and decompressing it in memory,
-        # it's faster on Linux, slower on Windows.
+        # it's faster than reading a file and decompressing it in
+        # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
         with io.open(input_file_path, 'rb') as ifh:
             with io.BytesIO() as bo:
                 decompress_stream(ifh, bo)
@@ -1136,7 +1144,7 @@ Frame and block
 
     .. attention::
 
-        In some `language bindings <https://facebook.github.io/zstd/#other-languages>`_, decompress() function doesn't support multiple frames, or/and doesn't support a frame with unknown :ref:`content size<content_size>`, pay attention when compressing data for other languages/modules.
+        In some `language bindings <https://facebook.github.io/zstd/#other-languages>`_, decompress() function doesn't support multiple frames, or/and doesn't support a frame with unknown :ref:`content size<content_size>`, pay attention when compressing data for other language bindings.
 
 
 Multi-threaded compression
@@ -1277,17 +1285,20 @@ Dynamically link to zstd library
 
         This feature will be available in next release, pyzstd verion > 0.14.3.
 
-    Pyzstd module supports dynamically linking to zstd library, the zstd source code in ``lib`` folder will be ignored.
+    Pyzstd module supports dynamically linking to zstd library, then the zstd source code in ``lib`` folder will be ignored.
 
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
+        * Support zstd library downgrade, for example v1.4.9 at compile-time, v1.4.0 at run-time. (Tested on Windows 10)
         * Before zstd v1.5.0, ZSTD_MULTITHREAD macro is not defined by default. So :ref:`multi-threaded compression<mt_compression>` may not be used in system provided zstd library, in this case pyzstd module will perform single-threaded compression and issue a ``RuntimeWarning``.
 
     On Linux, dynamically link to zstd library provided by system:
 
     .. sourcecode:: shell
 
-        # build pyzstd module and install
-        python3 setup.py --dynamic-link-zstd install
+        # build and install
+        sudo python3 setup.py --dynamic-link-zstd install
+        # build a redistributable wheel
+        python3 setup.py --dynamic-link-zstd bdist_wheel
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
 

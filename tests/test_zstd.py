@@ -993,6 +993,43 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.needs_input)
         self.assertEqual(d.unused_data + bi.read(), TRAIL)
 
+    def test_compress_empty(self):
+        # output empty content frame
+        self.assertNotEqual(compress(b''), b'')
+        self.assertNotEqual(richmem_compress(b''), b'')
+
+        c = ZstdCompressor()
+        self.assertNotEqual(c.compress(b'', c.FLUSH_FRAME), b'')
+
+        c = RichMemZstdCompressor()
+        self.assertNotEqual(c.compress(b''), b'')
+
+        # output b''
+        bi = BytesIO(b'')
+        bo = BytesIO()
+        compress_stream(bi, bo)
+        self.assertEqual(bo.getvalue(), b'')
+        bi.close()
+        bo.close()
+
+    def test_decompress_empty(self):
+        self.assertEqual(decompress(b''), b'')
+
+        d = ZstdDecompressor()
+        self.assertEqual(d.decompress(b''), b'')
+        self.assertFalse(d.eof)
+
+        d = EndlessZstdDecompressor()
+        self.assertEqual(d.decompress(b''), b'')
+        self.assertTrue(d.at_frame_edge)
+
+        bi = BytesIO(b'')
+        bo = BytesIO()
+        decompress_stream(bi, bo)
+        self.assertEqual(bo.getvalue(), b'')
+        bi.close()
+        bo.close()
+
 class DecompressorFlagsTestCase(unittest.TestCase):
 
     def setUp(self):
@@ -1634,8 +1671,12 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             train_dict(SAMPLES, 0)
 
-    @skipIf(zstd_version_info < (1, 4, 5), 'finalize_dict avaliable in zstd v1.4.5+')
     def test_finalize_dict_arguments(self):
+        if zstd_version_info < (1, 4, 5):
+            with self.assertRaises(NotImplementedError):
+                finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
+            return
+
         with self.assertRaises(TypeError):
             finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
 
@@ -1665,8 +1706,12 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
-    @skipIf(zstd_version_info < (1, 4, 5), 'finalize_dict avaliable in zstd v1.4.5+')
     def test_finalize_dict_c(self):
+        if zstd_version_info < (1, 4, 5):
+            with self.assertRaises(NotImplementedError):
+                _zstd._finalize_dict(1, 2, 3, 4, 5)
+            return
+
         # argument wrong type
         with self.assertRaises(TypeError):
             _zstd._finalize_dict({}, b'', [], 100, 5)
