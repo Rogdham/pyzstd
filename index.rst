@@ -1280,7 +1280,7 @@ Dynamically link to zstd library
     Pyzstd module supports dynamically linking to zstd library, the zstd source code in ``lib`` folder will be ignored.
 
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Before zstd v1.5.0, ZSTD_MULTITHREAD macro is not defined by default. So :ref:`multi-threaded compression<mt_compression>` may not be used in system provided zstd library, using this feature may raise a :py:class:`ZstdError` exception.
+        * Before zstd v1.5.0, ZSTD_MULTITHREAD macro is not defined by default. So :ref:`multi-threaded compression<mt_compression>` may not be used in system provided zstd library, in this case pyzstd module will perform single-threaded compression and issue a ``RuntimeWarning``.
 
     On Linux, dynamically link to zstd library provided by system:
 

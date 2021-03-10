@@ -56,7 +56,7 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* Enabled zstd multi-threaded compression, 0 or 1. */
-    char zstd_multi_threaded;
+    char use_multithreaded;
 
     /* __init__ has been called, 0 or 1. */
     char inited;
@@ -110,6 +110,7 @@ typedef struct {
     PyObject *empty_readonly_memoryview;
     PyObject *str_readinto;
     PyObject *str_write;
+    int support_multithreaded;
 } _zstd_state;
 
 static _zstd_state static_state;
@@ -463,21 +464,6 @@ set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
         return;
     }
 
-    /* Check whether multi-threaded compression is supported  */
-    if ( (key_v == ZSTD_c_nbWorkers ||
-          key_v == ZSTD_c_jobSize ||
-          key_v == ZSTD_c_overlapLog) &&
-         (bounds.lowerBound == 0 && bounds.upperBound == 0) )
-    {
-        PyErr_Format(static_state.ZstdError,
-                "Error when setting zstd compression parameter \"%s\". "
-                "The underlying zstd library doesn't support multi-threaded "
-                "compression, it was built without this feature. To eliminate "
-                "this error, remove the parameter or set its value to 0.",
-                name);
-        return;
-    }
-
     /* Error message */
     PyErr_Format(static_state.ZstdError,
                  "Error when setting zstd %s parameter \"%s\", it "
@@ -809,10 +795,31 @@ set_c_parameters(ZstdCompressor *self,
                       worker is spawned, compression is performed inside
                       caller's thread, all invocations are blocking*/
                 if (value_v > 1) {
-                    self->zstd_multi_threaded = 1;
+                    self->use_multithreaded = 1;
                 } else if (value_v == 1) {
                     /* Use single-threaded mode */
                     value_v = 0;
+                }
+            }
+
+            /* Zstd lib doesn't support MT compression */
+            if (!static_state.support_multithreaded &&
+                (key_v == ZSTD_c_nbWorkers ||
+                 key_v == ZSTD_c_jobSize ||
+                 key_v == ZSTD_c_overlapLog) &&
+                value_v > 0)
+            {
+                value_v = 0;
+
+                if (key_v == ZSTD_c_nbWorkers) {
+                    self->use_multithreaded = 0;
+                    char *msg = "The underlying zstd library doesn't support "
+                                "multi-threaded compression, it was built "
+                                "without this feature. Pyzstd module will "
+                                "perform single-threaded compression instead.";
+                    if (PyErr_WarnEx(PyExc_RuntimeWarning, msg, 1) < 0) {
+                        return -1;
+                    }
                 }
             }
 
@@ -1383,7 +1390,7 @@ ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     }
 
     assert(self->dict == NULL);
-    assert(self->zstd_multi_threaded == 0);
+    assert(self->use_multithreaded == 0);
     assert(self->inited == 0);
 
     /* Compression context */
@@ -1658,7 +1665,7 @@ ZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     ACQUIRE_LOCK(self);
 
     /* Compress */
-    if (self->zstd_multi_threaded && mode == ZSTD_e_continue) {
+    if (self->use_multithreaded && mode == ZSTD_e_continue) {
         ret = compress_mt_continue_impl(self, &data);
     } else {
         ret = compress_impl(self, &data, mode, 0);
@@ -1802,7 +1809,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
     }
 
     /* Check effective condition */
-    if (self->zstd_multi_threaded) {
+    if (self->use_multithreaded) {
         char *msg = "Currently \"rich memory mode\" has no effect on "
                     "zstd multi-threaded compression (set "
                     "\"CParameter.nbWorkers\" > 1), it will allocate "
@@ -3104,7 +3111,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Compress */
             Py_BEGIN_ALLOW_THREADS
-            if (self.zstd_multi_threaded && end_directive == ZSTD_e_continue) {
+            if (self.use_multithreaded && end_directive == ZSTD_e_continue) {
                 do {
                     zstd_ret = ZSTD_compressStream2(self.cctx, &out, &in, ZSTD_e_continue);
                 } while (out.pos != out.size && in.pos != in.size && !ZSTD_isError(zstd_ret));
@@ -3595,6 +3602,7 @@ PyInit__zstd(void)
 {
     PyObject *module;
     PyObject *temp;
+    ZSTD_bounds param_bounds;
 
     /* Keep this first, for error label. */
     module = PyModule_Create(&_zstdmodule);
@@ -3602,7 +3610,7 @@ PyInit__zstd(void)
         goto error;
     }
 
-    /* Reusable objects */
+    /* Reusable objects & variables */
     static_state.empty_bytes = PyBytes_FromStringAndSize(NULL, 0);
     if (static_state.empty_bytes == NULL) {
         goto error;
@@ -3623,6 +3631,13 @@ PyInit__zstd(void)
     if (static_state.str_write == NULL) {
         goto error;
     }
+
+    param_bounds = ZSTD_cParam_getBounds(ZSTD_c_nbWorkers);
+    if (ZSTD_isError(param_bounds.error)) {
+        goto error;
+    }
+    static_state.support_multithreaded = (param_bounds.upperBound != 0 ||
+                                          param_bounds.lowerBound != 0);
 
     /* Constants */
     if (add_constants(module) < 0) {

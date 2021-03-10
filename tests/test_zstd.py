@@ -519,8 +519,10 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         # zstd lib doesn't support MT compression
         if not MULTITHREADED:
-            with self.assertRaises(ZstdError):
-                compress(b'', {CParameter.nbWorkers:4})
+            with self.assertWarnsRegex(RuntimeWarning, r'multi-threaded'):
+                ZstdCompressor({CParameter.nbWorkers:4})
+            ZstdCompressor({CParameter.jobSize:4})
+            ZstdCompressor({CParameter.overlapLog:4})
 
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
