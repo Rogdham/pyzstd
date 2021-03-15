@@ -20,10 +20,11 @@ compressionLevel_values = _nt_values(m.ZSTD_CLEVEL_DEFAULT,
                                      m.ZSTD_maxCLevel())
 
 _new_nonzero = ffi.new_allocator(should_clear_after_alloc=False)
+_int_zstd_ver = m.ZSTD_versionNumber()
+_min_level = m.ZSTD_minCLevel()
 _EMPTY_BYTES = b''
 
 class ZstdError(Exception):
-    'Call to the underlying zstd library failed.'
     pass
 
 def _get_param_bounds(is_compress, key):
@@ -114,7 +115,7 @@ class _BlocksOutputBuffer:
             raise MemoryError(self.MEM_ERR_MSG)
 
         # Create the list
-        self.list = [(block_size, block)]
+        self.list = [block]
 
         # Set variables
         self.allocated = block_size
@@ -129,7 +130,7 @@ class _BlocksOutputBuffer:
             raise MemoryError(self.MEM_ERR_MSG)
 
         # Create the list
-        self.list = [(init_size, block)]
+        self.list = [block]
 
         # Set variables
         self.allocated = init_size
@@ -163,7 +164,7 @@ class _BlocksOutputBuffer:
         b = _new_nonzero('char[]', block_size)
         if b == ffi.NULL:
             raise MemoryError(self.MEM_ERR_MSG)
-        self.list.append((block_size, b))
+        self.list.append(b)
 
         # Set variables
         self.allocated += block_size
@@ -179,10 +180,9 @@ class _BlocksOutputBuffer:
 
     def finish(self, out):
         # Fast path for single block
-        list_len = len(self.list)
-        if (list_len == 1 and out.pos == out.size) or \
-           (list_len == 2 and out.pos == 0):
-            return bytes(ffi.buffer(self.list[0][1]))
+        if (len(self.list) == 1 and out.pos == out.size) or \
+           (len(self.list) == 2 and out.pos == 0):
+            return bytes(ffi.buffer(self.list[0]))
 
         # Final bytes object
         data_size = self.allocated - (out.size-out.pos)
@@ -193,12 +193,11 @@ class _BlocksOutputBuffer:
         # Memory copy
         # Blocks except the last one
         posi = 0
-        for size, block in self.list[:-1]:
-            ffi.memmove(final+posi, block, size)
-            posi += size
+        for block in self.list[:-1]:
+            ffi.memmove(final+posi, block, len(block))
+            posi += len(block)
         # The last block
-        size, block = self.list[-1]
-        ffi.memmove(final+posi, block, out.pos)
+        ffi.memmove(final+posi, self.list[-1], out.pos)
 
         return bytes(ffi.buffer(final))
 
@@ -240,7 +239,7 @@ class ZstdDict:
 
     def __str__(self):
         return '<ZstdDict dict_id=%d dict_size=%d>' % \
-               (self.dict_id, len(self.dict_content))
+               (self.__dict_id, len(self.__dict_content))
 
     def __reduce__(self):
         msg = ("Intentionally not supporting pickle. If need to save zstd "
@@ -259,7 +258,7 @@ class ZstdDict:
             else:
                 # Create ZSTD_CDict instance
                 cdict = m.ZSTD_createCDict(ffi.from_buffer(self.__dict_content),
-                                        len(self.__dict_content), level)
+                                           len(self.__dict_content), level)
                 if cdict == ffi.NULL:
                     msg = ("Failed to get ZSTD_CDict instance from zstd "
                            "dictionary content.")
@@ -274,14 +273,13 @@ class ZstdDict:
         try:
             self.__lock.acquire()
 
-            # Already cached
             if self.__ddict == ffi.NULL:
                 # Create ZSTD_DDict instance
                 self.__ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
-                                                len(self.__dict_content))
+                                                  len(self.__dict_content))
                 if self.__ddict == ffi.NULL:
                     msg = ("Failed to get ZSTD_DDict instance from zstd "
-                        "dictionary content.")
+                           "dictionary content.")
                     raise ZstdError(msg)
             return self.__ddict
         finally:
@@ -308,7 +306,7 @@ class _ErrorType:
     ERR_TRAIN_DICT=8
     ERR_FINALIZE_DICT=9
 
-    _TYPE_MSG = [
+    _TYPE_MSG = (
         "decompress zstd data",
         "compress zstd data",
 
@@ -321,8 +319,7 @@ class _ErrorType:
         "set zstd compression level",
 
         "train zstd dictionary",
-        "finalize zstd dictionary"
-    ]
+        "finalize zstd dictionary")
 
     @staticmethod
     def get_type_msg(type):
@@ -391,35 +388,38 @@ def _set_parameter_error(is_compress, pos, key, value):
            "(zstd v%s, %s-bit build)") % \
           (type_msg, name,
            bounds.lowerBound, bounds.upperBound, value,
-           ffi.string(m.ZSTD_versionString()).decode('ascii'),
-           '64' if maxsize > 2**32 else '32')
+           zstd_version, '64' if maxsize > 2**32 else '32')
     raise ZstdError(msg)
 
 def _check_int32_value(value, name):
-    if not isinstance(value, int) or value > 2147483647 or value < -2147483648:
+    try:
+        if not (-2147483648 <= value <= 2147483647):
+            raise Exception
+    except:
         raise ValueError("%s should be 32-bit signed int value." % name)
 
 def _set_c_parameters(cctx, level_or_option):
     def clamp_compression_level(level):
         # In zstd v1.4.6-, lower bound is not clamped.
-        if m.ZSTD_versionNumber() < 10407:
-            if level < m.ZSTD_minCLevel():
-                return m.ZSTD_minCLevel()
+        if _int_zstd_ver < 10407:
+            if level < _min_level:
+                return _min_level
         return level
 
     level = 0  # 0 means use zstd's default compression level
     use_multithread = False
 
     if isinstance(level_or_option, int):
+        _check_int32_value(level_or_option, "Compression level")
         level = clamp_compression_level(level_or_option)
-        _check_int32_value(level, "Compression level")
 
         zstd_ret = m.ZSTD_CCtx_setParameter(cctx, m.ZSTD_c_compressionLevel, level)
         if m.ZSTD_isError(zstd_ret):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
         return level, use_multithread
-    elif isinstance(level_or_option, dict):
+    
+    if isinstance(level_or_option, dict):
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             _check_int32_value(key, "Key of option dict")
             _check_int32_value(value, "Value of option dict")
@@ -490,7 +490,7 @@ def _load_d_dict(dctx, zstd_dict):
     # Reference a prepared dictionary
     zstd_ret = m.ZSTD_DCtx_refDDict(dctx, d_dict)
     if m.ZSTD_isError(zstd_ret):
-        _set_zstd_error(_ErrorType.ERR_LOAD_C_DICT, zstd_ret)
+        _set_zstd_error(_ErrorType.ERR_LOAD_D_DICT, zstd_ret)
 
 class _Compressor:
     def __init__(self, level_or_option=None, zstd_dict=None):
@@ -599,9 +599,6 @@ class ZstdCompressor(_Compressor):
         self.__last_mode = m.ZSTD_e_end
 
     def compress(self, data, mode=CONTINUE):
-        if not isinstance(mode, int):
-            raise TypeError("mode argument should be integer.")
-
         if mode not in (ZstdCompressor.CONTINUE,
                         ZstdCompressor.FLUSH_BLOCK,
                         ZstdCompressor.FLUSH_FRAME):
@@ -636,7 +633,7 @@ class ZstdCompressor(_Compressor):
         try:
             self._lock.acquire()
 
-            ret = self._compress_impl(_EMPTY_BYTES, mode, 0)
+            ret = self._compress_impl(_EMPTY_BYTES, mode, False)
             self.__last_mode = mode
             return ret
         except:
@@ -676,9 +673,8 @@ class RichMemZstdCompressor(_Compressor):
             self._lock.release()
 
 class _Decompressor_type(IntEnum):
-    NONE = 0
-    DECOMPRESSOR = 1
-    ENDLESS_DECOMPRESSOR = 2
+    DECOMPRESSOR = 0
+    ENDLESS_DECOMPRESSOR = 1
 
 class _Decompressor:
     def __init__(self, zstd_dict=None, option=None):
@@ -688,7 +684,6 @@ class _Decompressor:
         self._input_buffer_size = 0
         self._in_begin = 0
         self._in_end = 0
-        self._type = _Decompressor_type.NONE
 
         # Decompression context
         self._dctx = m.ZSTD_createDCtx()
@@ -816,6 +811,8 @@ class _Decompressor:
                 # Number of bytes we can append if we move existing
                 # contents to beginning of buffer
                 avail_total = self._input_buffer_size - used_now
+                
+                assert (used_now > 0 and avail_now >= 0 and avail_total >= 0)
 
                 if avail_total < len(data):
                     new_size = used_now + len(data)
@@ -884,11 +881,11 @@ class _Decompressor:
 
                 if not use_input_buffer:
                     # Discard buffer if it's too small
-                    if self._input_buffer == ffi.NULL or \
-                       self._input_buffer_size < data_size:
+                    if self._input_buffer == ffi.NULL or self._input_buffer_size < data_size:
                         self._input_buffer = _new_nonzero('char[]', data_size)
                         if self._input_buffer == ffi.NULL:
                             raise MemoryError
+                        self._input_buffer_size = data_size
 
                     # Copy unconsumed data
                     ffi.memmove(self._input_buffer, in_buf.src+in_buf.pos, data_size)
@@ -900,10 +897,11 @@ class _Decompressor:
 
             return ret
         except:
+            # Reset variables
             self._in_begin = 0
             self._in_end = 0
-            self._needs_input = True
 
+            self._needs_input = True
             if self._type == _Decompressor_type.DECOMPRESSOR:
                 self._eof = False
             else:
@@ -941,7 +939,7 @@ class ZstdDecompressor(_Decompressor):
                     if self._input_buffer == ffi.NULL:
                         self._unused_data = _EMPTY_BYTES
                     else:
-                        tmp = ffi.buffer(self._input_buffer[self._in_begin:self._in_end])
+                        tmp = ffi.buffer(self._input_buffer)[self._in_begin:self._in_end]
                         self._unused_data = bytes(tmp)
                 return self._unused_data
         finally:
@@ -1032,33 +1030,37 @@ def compress_stream(input_stream, output_stream, *,
                     read_size = 131_072, write_size = 131_591, callback = None):
     level = 0  # 0 means use zstd's default compression level
     use_multithreaded = False
+    total_input_size = 0
+    total_output_size = 0
 
     # Check parameters
     if not hasattr(input_stream, "readinto"):
-        raise TypeError("input_stream argument must have a .readinto(b) method.")
+        raise TypeError("input_stream argument should have a .readinto(b) method.")
     if output_stream is not None:
         if not hasattr(output_stream, "write"):
-            raise TypeError("output_stream argument must have a .write(b) method.")
+            raise TypeError("output_stream argument should have a .write(b) method.")
     else:
         if callback is None:
             msg = ("At least one of output_stream argument and "
                    "callback argument should be non-None.")
             raise TypeError(msg)
 
-    read_size = int(read_size)
-    write_size = int(write_size)
-    if read_size <= 0 or write_size <= 0:
+    try:
+        if read_size <= 0 or write_size <= 0:
+            raise Exception
+    except:
         msg = ("read_size argument and write_size argument should "
                "be positive numbers.")
         raise ValueError(msg)
 
     if pledged_input_size is not None:
         try:
-            pledged_input_size = int(pledged_input_size)
-            if pledged_input_size < 0 or pledged_input_size > 2**64-1:
-                raise Exception()
+            if not (0 <= pledged_input_size <= 2**64-1):
+                raise Exception
         except:
-            raise ValueError("pledged_input_size argument wrong value.")
+            msg = ("pledged_input_size argument should be 64-bit "
+                   "unsigned integer value.")
+            raise ValueError(msg)
 
     try:
         # Initialize & set ZstdCompressor
@@ -1072,7 +1074,7 @@ def compress_stream(input_stream, output_stream, *,
             _load_c_dict(cctx, zstd_dict, level)
 
         if pledged_input_size is not None:
-            zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(cctx, int(pledged_input_size))
+            zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(cctx, pledged_input_size)
             if m.ZSTD_isError(zstd_ret):
                 _set_zstd_error(_ErrorType.ERR_COMPRESS, zstd_ret)
 
@@ -1092,9 +1094,6 @@ def compress_stream(input_stream, output_stream, *,
         out_buf.dst = ffi.from_buffer(output_block)
         out_buf.size = write_size
         out_mv = memoryview(output_block).toreadonly()
-
-        total_input_size = 0
-        total_output_size = 0
 
         # Read
         while True:
@@ -1131,8 +1130,8 @@ def compress_stream(input_stream, output_stream, *,
                     while True:
                         zstd_ret = m.ZSTD_compressStream2(cctx, out_buf, in_buf, m.ZSTD_e_continue)
                         if out_buf.pos == out_buf.size or \
-                        in_buf.pos == in_buf.size or \
-                        m.ZSTD_isError(zstd_ret):
+                           in_buf.pos == in_buf.size or \
+                           m.ZSTD_isError(zstd_ret):
                             break
                 else:
                     zstd_ret = m.ZSTD_compressStream2(cctx, out_buf, in_buf, end_directive)
@@ -1174,22 +1173,25 @@ def decompress_stream(input_stream, output_stream, *,
                       read_size = 131_075, write_size = 131_072,
                       callback = None):
     at_frame_edge = True
+    total_input_size = 0
+    total_output_size = 0
 
     # Check parameters
     if not hasattr(input_stream, "readinto"):
-        raise TypeError("input_stream argument must have a .readinto(b) method.")
+        raise TypeError("input_stream argument should have a .readinto(b) method.")
     if output_stream is not None:
         if not hasattr(output_stream, "write"):
-            raise TypeError("output_stream argument must have a .write(b) method.")
+            raise TypeError("output_stream argument should have a .write(b) method.")
     else:
         if callback is None:
             msg = ("At least one of output_stream argument and "
                    "callback argument should be non-None.")
             raise TypeError(msg)
 
-    read_size = int(read_size)
-    write_size = int(write_size)
-    if read_size <= 0 or write_size <= 0:
+    try:
+        if read_size <= 0 or write_size <= 0:
+            raise Exception
+    except:
         msg = ("read_size argument and write_size argument should "
                "be positive numbers.")
         raise ValueError(msg)
@@ -1222,9 +1224,6 @@ def decompress_stream(input_stream, output_stream, *,
         out_buf.size = write_size
         out_mv = memoryview(output_block).toreadonly()
 
-        total_input_size = 0
-        total_output_size = 0
-
         # Read
         while True:
             # Invoke .readinto() method
@@ -1238,9 +1237,6 @@ def decompress_stream(input_stream, output_stream, *,
                            "wrong value.")
                     raise ValueError(msg)
 
-                # Don't generate empty frame
-                if read_bytes == 0 and total_input_size == 0:
-                    break
                 total_input_size += read_bytes
 
             in_buf.size = read_bytes
@@ -1260,7 +1256,7 @@ def decompress_stream(input_stream, output_stream, *,
                 # Decompress
                 zstd_ret = m.ZSTD_decompressStream(dctx, out_buf, in_buf)
                 if m.ZSTD_isError(zstd_ret):
-                    _set_zstd_error(_ErrorType.ERR_DECOMPRESS, zstd_code)
+                    _set_zstd_error(_ErrorType.ERR_DECOMPRESS, zstd_ret)
 
                 # Set .af_frame_edge flag
                 at_frame_edge = True if (zstd_ret == 0) else False
@@ -1318,33 +1314,33 @@ def train_dict(samples, dict_size):
         raise ValueError("dict_size argument should be positive number.")
 
     # Prepare chunk_sizes
-    chunks_number = len(chunk_sizes)
-    sizes = _new_nonzero("size_t[]", chunks_number)
-    if sizes == ffi.NULL:
+    _chunks_number = len(chunk_sizes)
+    _sizes = _new_nonzero("size_t[]", _chunks_number)
+    if _sizes == ffi.NULL:
         raise MemoryError
 
     for i, size in enumerate(chunk_sizes):
-        sizes[i] = size
+        _sizes[i] = size
 
     # Allocate dict buffer
-    dst_dict_bytes = _new_nonzero("char[]", dict_size)
-    if dst_dict_bytes == ffi.NULL:
+    _dst_dict_bytes = _new_nonzero("char[]", dict_size)
+    if _dst_dict_bytes == ffi.NULL:
         raise MemoryError
 
     # Train
-    zstd_ret = m.ZDICT_trainFromBuffer(dst_dict_bytes, dict_size,
+    zstd_ret = m.ZDICT_trainFromBuffer(_dst_dict_bytes, dict_size,
                                        ffi.from_buffer(chunks),
-                                       chunk_sizes, chunks_number)
+                                       _sizes, _chunks_number)
     if m.ZDICT_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_TRAIN_DICT, zstd_ret)
 
     # Resize dict_buffer
-    b = bytes(ffi.buffer(dst_dict_bytes[0:zstd_ret]))
+    b = bytes(ffi.buffer(_dst_dict_bytes)[0:zstd_ret])
 
     return ZstdDict(b)
 
 def finalize_dict(zstd_dict, samples, dict_size, level):
-    if zstd_version_info < (1, 4, 5):
+    if _int_zstd_ver < 10405:
         msg = ("This function only available when the underlying zstd "
                "library's version is greater than or equal to v1.4.5, "
                "the current underlying zstd library's version is v%s.") % zstd_version
@@ -1370,17 +1366,17 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
         raise ValueError("dict_size argument should be positive number.")
 
     # Prepare chunk_sizes
-    chunks_number = len(chunk_sizes)
-    sizes = _new_nonzero("size_t[]", chunks_number)
-    if sizes == ffi.NULL:
+    _chunks_number = len(chunk_sizes)
+    _sizes = _new_nonzero("size_t[]", _chunks_number)
+    if _sizes == ffi.NULL:
         raise MemoryError
 
     for i, size in enumerate(chunk_sizes):
-        sizes[i] = size
+        _sizes[i] = size
 
     # Allocate dict buffer
-    dst_dict_bytes = _new_nonzero("char[]", dict_size)
-    if dst_dict_bytes == ffi.NULL:
+    _dst_dict_bytes = _new_nonzero("char[]", dict_size)
+    if _dst_dict_bytes == ffi.NULL:
         raise MemoryError
 
     # Parameters
@@ -1395,15 +1391,16 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     params.dictID = 0
 
     # Finalize
-    zstd_ret = m.ZDICT_finalizeDictionary(dst_dict_bytes, dict_size,
-                ffi.from_buffer(zstd_dict.dict_content), len(zstd_dict.dict_content),
-                ffi.from_buffer(chunks), chunk_sizes, chunks_number,
-                params[0])
+    zstd_ret = m.ZDICT_finalizeDictionary(
+                   _dst_dict_bytes, dict_size,
+                   ffi.from_buffer(zstd_dict.dict_content), len(zstd_dict.dict_content),
+                   ffi.from_buffer(chunks), _sizes, _chunks_number,
+                   params[0])
     if m.ZDICT_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_FINALIZE_DICT, zstd_ret)
 
     # Resize dict_buffer
-    b = bytes(ffi.buffer(dst_dict_bytes[0:zstd_ret]))
+    b = bytes(ffi.buffer(_dst_dict_bytes)[0:zstd_ret])
 
     return ZstdDict(b)
 

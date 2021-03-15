@@ -452,8 +452,9 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         # Method bad arguments
         zc = ZstdCompressor()
         self.assertRaises(TypeError, zc.compress)
-        self.assertRaises(TypeError, zc.compress, b"foo", b"bar")
+        self.assertRaises((TypeError, ValueError), zc.compress, b"foo", b"bar")
         self.assertRaises(TypeError, zc.compress, "str")
+        self.assertRaises((TypeError, ValueError), zc.flush, b"foo")
         self.assertRaises(TypeError, zc.flush, b"blah", 1)
 
         self.assertRaises(ValueError, zc.compress, b'', -1)

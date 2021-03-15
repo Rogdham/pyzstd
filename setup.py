@@ -1,4 +1,5 @@
 ﻿#!/usr/bin/env python3
+import fnmatch
 import io
 import os
 import re
@@ -36,13 +37,10 @@ else:
 
 def get_zstd_c_files_list():
     lst = []
-    sub_dirs = ('common', 'compress', 'decompress', 'dictBuilder')
-    for sub_dir in sub_dirs:
-        for parent, dirnames, filenames in os.walk('lib/' + sub_dir):
-            for fn in filenames:
-                if fn.lower().endswith('.c'):
-                    path = parent + '/' + fn
-                    lst.append(path)
+    for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
+        directory = 'lib/' + sub_dir + '/'
+        l = [directory + fn for fn in os.listdir(directory) if fnmatch.fnmatch(fn, '*.[cC]')]
+        lst.extend(l)
     return lst
 
 if DYNAMIC_LINK:
@@ -63,15 +61,17 @@ else:
     }
 
 if CFFI:
+    # binary extension
     import build_cffi
     build_cffi.set_args(**kwargs)
     ext_module = build_cffi.ffibuilder.distutils_extension()
-
+    # packages
     packages=['pyzstd', 'pyzstd.cffi']
 else:
+    # binary extension
     kwargs['sources'].append('src/_zstdmodule.c')
     ext_module = Extension('pyzstd.c._zstd', **kwargs)
-
+    # packages
     packages=['pyzstd', 'pyzstd.c']
 
 class build_ext_compiler_check(build_ext):

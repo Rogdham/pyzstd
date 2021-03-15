@@ -2127,11 +2127,16 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
 
         /* Unconsumed data size in input_buffer */
         const size_t used_now = self->in_end - self->in_begin;
+        assert(self->in_end > self->in_begin);
+
         /* Number of bytes we can append to input buffer */
         const size_t avail_now = self->input_buffer_size - self->in_end;
+        assert(self->input_buffer_size >= self->in_end);
+
         /* Number of bytes we can append if we move existing contents to
            beginning of buffer */
         const size_t avail_total = self->input_buffer_size - used_now;
+        assert(self->input_buffer_size >= used_now);
 
         if (avail_total < (size_t) data.len) {
             char *tmp;
@@ -2978,14 +2983,14 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     /* Check parameters */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
         PyErr_SetString(PyExc_TypeError,
-                        "input_stream argument must have a .readinto(b) method.");
+                        "input_stream argument should have a .readinto(b) method.");
         return NULL;
     }
 
     if (output_stream != Py_None) {
         if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
             PyErr_SetString(PyExc_TypeError,
-                            "output_stream argument must have a .write(b) method.");
+                            "output_stream argument should have a .write(b) method.");
             return NULL;
         }
     } else {
@@ -3240,14 +3245,14 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     /* Check parameters */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
         PyErr_SetString(PyExc_TypeError,
-                        "input_stream argument must have a .readinto(b) method.");
+                        "input_stream argument should have a .readinto(b) method.");
         return NULL;
     }
 
     if (output_stream != Py_None) {
         if (!PyObject_HasAttr(output_stream, static_state.str_write)) {
             PyErr_SetString(PyExc_TypeError,
-                            "output_stream argument must have a .write(b) method.");
+                            "output_stream argument should have a .write(b) method.");
             return NULL;
         }
     } else {
