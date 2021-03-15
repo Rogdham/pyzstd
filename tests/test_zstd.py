@@ -16,7 +16,7 @@ from test.support import (  # type: ignore
     _1G, bigmemtest, run_unittest
 )
 
-import pyzstd as zstd
+import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDecompressor, EndlessZstdDecompressor, ZstdError, \
                    CParameter, DParameter, Strategy, \
@@ -26,7 +26,9 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    zstd_version, zstd_version_info, compressionLevel_values, \
                    get_frame_info, get_frame_size, \
                    ZstdFile, open
-from pyzstd import _zstd
+
+if not hasattr(pyzstd, 'CFFI_PYZSTD'):
+    from pyzstd.c import _zstd
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
@@ -176,7 +178,7 @@ class ClassShapeTestCase(unittest.TestCase):
             c.needs_input
 
         # read only attribute
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             c.last_mode = ZstdCompressor.FLUSH_BLOCK
 
         # name
@@ -269,11 +271,11 @@ class ClassShapeTestCase(unittest.TestCase):
             d.at_frame_edge
 
         # read only attributes
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             d.eof = True
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             d.needs_input = True
-        with self.assertRaisesRegex(AttributeError, 'not writable'):
+        with self.assertRaises(AttributeError):
             d.unused_data = b''
 
         # name
@@ -319,10 +321,10 @@ class ClassShapeTestCase(unittest.TestCase):
             d.unused_data
 
         # read only attributes
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             d.needs_input = True
 
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             d.at_frame_edge = True
 
         # name
@@ -1577,10 +1579,10 @@ class ZstdDictTestCase(unittest.TestCase):
             ZstdDict(b)
 
         # read only attributes
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             zd.dict_content = b
 
-        with self.assertRaisesRegex(AttributeError, 'readonly attribute'):
+        with self.assertRaises(AttributeError):
             zd.dict_id = 10000
 
         # ZstdDict arguments
@@ -1610,7 +1612,7 @@ class ZstdDictTestCase(unittest.TestCase):
         DICT_SIZE1 = 200*1024
 
         global TRAINED_DICT
-        TRAINED_DICT = zstd.train_dict(SAMPLES, DICT_SIZE1)
+        TRAINED_DICT = pyzstd.train_dict(SAMPLES, DICT_SIZE1)
         ZstdDict(TRAINED_DICT.dict_content, False)
 
         self.assertNotEqual(TRAINED_DICT.dict_id, 0)
@@ -1689,6 +1691,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
+    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_train_dict_c(self):
         # argument wrong type
         with self.assertRaises(TypeError):
@@ -1706,6 +1709,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
+    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_finalize_dict_c(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):

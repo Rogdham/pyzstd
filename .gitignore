@@ -5,3 +5,5 @@
 /src/__pycache__
 /tests/__pycache__
 /*.pdb
+/__pycache__
+/src/pyzstd.egg-info

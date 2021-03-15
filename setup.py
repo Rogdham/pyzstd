@@ -28,73 +28,63 @@ if '--dynamic-link-zstd' in sys.argv:
 else:
     DYNAMIC_LINK = False
 
-zstd_files = [
-    'common/fse_decompress.c',
-    'common/entropy_common.c',
-    'common/zstd_common.c',
-    'common/xxhash.c',
-    'common/error_private.c',
-    'common/pool.c',
-    'common/threading.c',
-    'common/zstd_trace.c',
+if '--cffi' in sys.argv:
+    CFFI = True
+    sys.argv = [s for s in sys.argv if s != '--cffi']
+else:
+    CFFI = False
 
-    'compress/zstd_compress.c',
-    'compress/zstd_compress_literals.c',
-    'compress/zstd_compress_sequences.c',
-    'compress/zstd_compress_superblock.c',
-    'compress/zstdmt_compress.c',
-    'compress/zstd_fast.c',
-    'compress/zstd_double_fast.c',
-    'compress/zstd_lazy.c',
-    'compress/zstd_opt.c',
-    'compress/zstd_ldm.c',
-    'compress/fse_compress.c',
-    'compress/huf_compress.c',
-    'compress/hist.c',
-
-    'decompress/zstd_decompress.c',
-    'decompress/zstd_decompress_block.c',
-    'decompress/zstd_ddict.c',
-    'decompress/huf_decompress.c',
-
-    'dictBuilder/zdict.c',
-    'dictBuilder/divsufsort.c',
-    'dictBuilder/fastcover.c',
-    'dictBuilder/cover.c',
-    ]
+def get_zstd_c_files_list():
+    lst = []
+    sub_dirs = ('common', 'compress', 'decompress', 'dictBuilder')
+    for sub_dir in sub_dirs:
+        for parent, dirnames, filenames in os.walk('lib/' + sub_dir):
+            for fn in filenames:
+                if fn.lower().endswith('.c'):
+                    path = parent + '/' + fn
+                    lst.append(path)
+    return lst
 
 if DYNAMIC_LINK:
-    include_dirs = []     # .h directory
-    library_dirs = []     # .lib directory
-    libraries = ['zstd']  # lib name, not filename.
-    c_files = []
+    kwargs = {
+        'include_dirs': [],    # .h directory
+        'library_dirs': [],    # .lib directory
+        'libraries': ['zstd'], # lib name, not filename.
+        'sources': [],
+        'define_macros': [('ZSTD_MULTITHREAD', None)]
+    }
 else:
-    include_dirs = ['lib', 'lib/dictBuilder']
-    library_dirs = []
-    libraries = []
-    c_files = ['lib/' + f for f in zstd_files]
+    kwargs = {
+        'include_dirs': ['lib', 'lib/dictBuilder'],
+        'library_dirs': [],
+        'libraries': [],
+        'sources': get_zstd_c_files_list(),
+        'define_macros': [('ZSTD_MULTITHREAD', None)]
+    }
 
-c_files.append('src/_zstdmodule.c')
+if CFFI:
+    import build_cffi
+    build_cffi.set_args(**kwargs)
+    ext_module = build_cffi.ffibuilder.distutils_extension()
 
-_zstd_extension = Extension('pyzstd._zstd',
-                            sources=c_files,
-                            include_dirs=include_dirs,
-                            define_macros=[('ZSTD_MULTITHREAD', None)],
-                            library_dirs=library_dirs,
-                            libraries=libraries)
+    packages=['pyzstd', 'pyzstd.cffi']
+else:
+    kwargs['sources'].append('src/_zstdmodule.c')
+    ext_module = Extension('pyzstd.c._zstd', **kwargs)
+
+    packages=['pyzstd', 'pyzstd.c']
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
         if 'msvc' in self.compiler.compiler_type.lower():
             for extension in self.extensions:
-                if extension == _zstd_extension:
-                    # The default is /Ox optimization
-                    # /Ob3 is more aggressive inlining than /Ob2:
-                    # https://github.com/facebook/zstd/issues/2314
-                    # /GF eliminates duplicate strings
-                    # /Gy does function level linking
-                    more_options = ['/Ob3', '/GF', '/Gy']
-                    extension.extra_compile_args.extend(more_options)
+                # The default is /Ox optimization
+                # /Ob3 is more aggressive inlining than /Ob2:
+                # https://github.com/facebook/zstd/issues/2314
+                # /GF eliminates duplicate strings
+                # /Gy does function level linking
+                more_options = ['/Ob3', '/GF', '/Gy']
+                extension.extra_compile_args.extend(more_options)
         super().build_extensions()
 
 setup(
@@ -123,12 +113,10 @@ setup(
     keywords='zstandard zstd compression decompression compress decompress',
 
     package_dir={'pyzstd': 'src'},
-    py_modules=['pyzstd.__init__', 'pyzstd.pyzstd'],
-
-    packages=['pyzstd'],
+    packages=packages,
     package_data={'pyzstd': ['__init__.pyi', 'py.typed']},
 
-    ext_modules=[_zstd_extension],
+    ext_modules=[ext_module],
     cmdclass={'build_ext': build_ext_compiler_check},
 
     test_suite='tests'

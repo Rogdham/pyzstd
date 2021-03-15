@@ -1,5 +1,7 @@
+include build_cffi.py
 include README.rst
 include LICENSE
+
 recursive-include lib *
 recursive-include src *
 recursive-include tests *

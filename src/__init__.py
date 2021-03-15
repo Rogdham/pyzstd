@@ -1,4 +1,11 @@
-from .pyzstd import *
+
+try:
+    from .c.c_pyzstd import *
+except ImportError:
+    try:
+        from .cffi.cffi_pyzstd import *
+    except ImportError:
+        raise ImportError('Neither C version nor cffi version can be imported.')
 
 __version__ = '0.14.3'
 
