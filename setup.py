@@ -2,6 +2,7 @@
 import fnmatch
 import io
 import os
+import platform
 import re
 import sys
 from setuptools import setup, Extension
@@ -39,7 +40,8 @@ def has_option(option):
         return False
 
 DYNAMIC_LINK = has_option('--dynamic-link-zstd')
-CFFI = has_option('--cffi')
+CFFI = has_option('--cffi') or \
+       platform.python_implementation() == 'PyPy'
 
 if DYNAMIC_LINK:
     kwargs = {
@@ -59,24 +61,26 @@ else:  # statically link to zstd lib
     }
 
 if CFFI:
-    # binary extension
+    # packages
+    packages=['pyzstd', 'pyzstd.cffi']
+
+    # kwargs
     kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
+    # binary extension
     import build_cffi
     build_cffi.set_args(**kwargs)
     ext_module = build_cffi.ffibuilder.distutils_extension()
-
-    # packages
-    packages=['pyzstd', 'pyzstd.cffi']
 else:  # C implementation
-    # binary extension
+    # packages
+    packages=['pyzstd', 'pyzstd.c']
+
+    # kwargs
     kwargs['name'] = 'pyzstd.c._zstd'
     kwargs['sources'].append('src/_zstdmodule.c')
 
+    # binary extension
     ext_module = Extension(**kwargs)
-
-    # packages
-    packages=['pyzstd', 'pyzstd.c']
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):

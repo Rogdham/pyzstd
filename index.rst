@@ -1290,19 +1290,20 @@ Build pyzstd module with options
         * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
 
-    Add these options to setup.py:
+    On CPython, add these options to setup.py:
 
         #. no option: C implementation, statically link to zstd library.
         #. ``--dynamic-link-zstd``: C implementation, dynamically link to zstd library.
-        #. ``--cffi``: CFFI implementation, statically link to zstd library.
-        #. ``--cffi --dynamic-link-zstd``: CFFI implementation, dynamically link to zstd library.
+        #. ``--cffi``: CFFI implementation (slower), statically link to zstd library.
+        #. ``--cffi --dynamic-link-zstd``: CFFI implementation (slower), dynamically link to zstd library.
+
+    On PyPy, only CFFI implementation can be used, so ``--cffi`` is added implicitly. ``--dynamic-link-zstd`` is optional.
 
     Some notes:
 
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Support zstd library downgrade, for example v1.4.9 at compile-time, v1.4.0 at run-time. (Tested on Windows 10, w/wo --cffi.)
-        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when performing multi-threaded compression, pyzstd module will switch to single-threaded compression and issue a ``RuntimeWarning``.
-        * On CPython, CFFI implementation is slower than C implementation (run unit tests: 8.2 sec vs 3.0 sec), only use CFFI implementation for PyPy.
+        * Support downgrade zstd library. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows 10, w/wo \-\-cffi.)
+        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when using multi-threaded compression, pyzstd module will use single-threaded compression instead and issue a ``RuntimeWarning``.
 
     On Linux, dynamically link to zstd library provided by system:
 
@@ -1317,9 +1318,9 @@ Build pyzstd module with options
 
     .. sourcecode:: python
 
+        # E:\zstd_dll folder has zstd.h / zdict.h / libzstd.lib that
+        # along with libzstd.dll
         if DYNAMIC_LINK:
-            # E:\zstd_dll folder has zstd.h / zdict.h / libzstd.lib that
-            # along with libzstd.dll
             kwargs = {
             'include_dirs': ['E:\zstd_dll'], # .h directory
             'library_dirs': ['E:\zstd_dll'], # .lib directory

@@ -5,7 +5,7 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
-  CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-*"
+  CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-* pp36-* pp37-*"
 
 jobs:
   build_wheels:
@@ -43,7 +43,10 @@ jobs:
           python -m pip install -U cibuildwheel
           python -m cibuildwheel --output-dir wheelhouse
 
-      # Should upload manylinux2014_x86_64, manylinux1_i686
+      # Should upload:
+      #  cp*manylinux2014_x86_64
+      #  cp*manylinux1_i686
+      #  pp*manylinux1_x86_64
       - name: Upload wheels
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
         uses: actions/upload-artifact@v2
@@ -51,7 +54,8 @@ jobs:
           name: pyzstd-files
           path: |
             wheelhouse/*.whl
-            !wheelhouse/*manylinux2014_i686*
+            !wheelhouse/*-cp*manylinux2014_i686*
+            !wheelhouse/*-pp*manylinux2010_x86_64*
 
   # Build source distribution & manylinux1_x86_64
   build_in_manylinux2010:
@@ -107,7 +111,7 @@ jobs:
           sudo apt-get update -q -y
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
 
-          python setup.py --cffi --dynamic-link-zstd install
+          python setup.py --dynamic-link-zstd install
           python tests/test_zstd.py
 
   # Run test on armv7/aarch64/ppc64le/s390x
