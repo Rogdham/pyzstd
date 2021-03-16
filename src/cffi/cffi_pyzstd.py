@@ -3,7 +3,7 @@ import io
 import os
 from collections import namedtuple
 from enum import IntEnum
-from sys import maxsize, getrefcount
+from sys import maxsize
 from threading import Lock
 from warnings import warn
 
@@ -600,6 +600,10 @@ class _Compressor:
         except:
             pass
 
+    def __reduce__(self):
+        msg = "Cannot pickle %s object." % type(self)
+        raise TypeError(msg)
+
 class ZstdCompressor(_Compressor):
     CONTINUE = m.ZSTD_e_continue
     FLUSH_BLOCK = m.ZSTD_e_flush
@@ -924,6 +928,10 @@ class _Decompressor:
         finally:
             self._lock.release()
 
+    def __reduce__(self):
+        msg = "Cannot pickle %s object." % type(self)
+        raise TypeError(msg)
+
 class ZstdDecompressor(_Decompressor):
     def __init__(self, zstd_dict=None, option=None):
         super().__init__(zstd_dict, option)
@@ -1024,15 +1032,6 @@ def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
     callback(total_input_size, total_output_size,
              in_memoryview, out_memoryview)
 
-    # memoryview object was referenced in callback function
-    if getrefcount(in_memoryview) > 2 or \
-       getrefcount(out_memoryview) > 2:
-        msg = ("The third and fourth parameters of callback function "
-               "are memoryview objects. If want to reference them "
-               "outside the callback function, convert them to bytes "
-               "object using bytes() function.")
-        raise RuntimeError(msg)
-
     return callback_read_pos
 
 def compress_stream(input_stream, output_stream, *,
@@ -1095,7 +1094,7 @@ def compress_stream(input_stream, output_stream, *,
             raise MemoryError
         input_block = bytearray(read_size)
         in_buf.src = ffi.from_buffer(input_block)
-        in_mv = memoryview(input_block).toreadonly()
+        in_mv = memoryview(input_block)
 
         # Output buffer, out.pos will be set later.
         out_buf = _new_nonzero("ZSTD_outBuffer *")
@@ -1104,7 +1103,7 @@ def compress_stream(input_stream, output_stream, *,
         output_block = bytearray(write_size)
         out_buf.dst = ffi.from_buffer(output_block)
         out_buf.size = write_size
-        out_mv = memoryview(output_block).toreadonly()
+        out_mv = memoryview(output_block)
 
         # Read
         while True:
@@ -1224,7 +1223,7 @@ def decompress_stream(input_stream, output_stream, *,
             raise MemoryError
         input_block = bytearray(read_size)
         in_buf.src = ffi.from_buffer(input_block)
-        in_mv = memoryview(input_block).toreadonly()
+        in_mv = memoryview(input_block)
 
         # Output buffer, out.pos will be set later.
         out_buf = _new_nonzero("ZSTD_outBuffer *")
@@ -1233,7 +1232,7 @@ def decompress_stream(input_stream, output_stream, *,
         output_block = bytearray(write_size)
         out_buf.dst = ffi.from_buffer(output_block)
         out_buf.size = write_size
-        out_mv = memoryview(output_block).toreadonly()
+        out_mv = memoryview(output_block)
 
         # Read
         while True:
