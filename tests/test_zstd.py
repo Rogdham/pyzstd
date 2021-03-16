@@ -1639,7 +1639,12 @@ class ZstdDictTestCase(unittest.TestCase):
 
         DICT_SIZE2 = 200*1024
         C_LEVEL = 6
-        dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, C_LEVEL)
+
+        try:
+            dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, C_LEVEL)
+        except NotImplementedError:
+            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
+            return
 
         self.assertNotEqual(dic2.dict_id, 0)
         self.assertGreater(len(dic2.dict_content), 0)
@@ -1680,8 +1685,11 @@ class ZstdDictTestCase(unittest.TestCase):
                 finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
             return
 
-        with self.assertRaises(TypeError):
-            finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
+        try:
+            finalize_dict(TRAINED_DICT, SAMPLES, 1_000_000, 2)
+        except NotImplementedError:
+            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
+            return
 
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, [], 100_000, 2)
@@ -1715,6 +1723,12 @@ class ZstdDictTestCase(unittest.TestCase):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
                 _zstd._finalize_dict(1, 2, 3, 4, 5)
+            return
+
+        try:
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'123', [3,], 1_000_000, 5)
+        except NotImplementedError:
+            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
             return
 
         # argument wrong type

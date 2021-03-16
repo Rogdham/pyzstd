@@ -1,4 +1,3 @@
-import builtins
 import enum
 import io
 import sys
@@ -291,7 +290,7 @@ class ZstdFile(_compression.BaseStream):
         if isinstance(filename, (str, bytes, os.PathLike)):
             if "b" not in mode:
                 mode += "b"
-            self._fp = builtins.open(filename, mode)
+            self._fp = io.open(filename, mode)
             self._closefp = True
             self._mode = mode_code
         elif hasattr(filename, "read") or hasattr(filename, "write"):

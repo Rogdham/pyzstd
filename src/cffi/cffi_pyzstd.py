@@ -9,6 +9,17 @@ from warnings import warn
 
 from ._cffi_zstd import ffi, lib as m
 
+__all__ = ('compress', 'richmem_compress', 'decompress',
+           'train_dict', 'finalize_dict',
+           'ZstdCompressor', 'RichMemZstdCompressor',
+           'ZstdDecompressor', 'EndlessZstdDecompressor',
+           'ZstdDict', 'ZstdError', 'ZstdFile', 'open',
+           'CParameter', 'DParameter', 'Strategy',
+           'get_frame_info', 'get_frame_size',
+           'compress_stream', 'decompress_stream',
+           'zstd_version', 'zstd_version_info', 'compressionLevel_values',
+           'CFFI_PYZSTD')
+
 CFFI_PYZSTD = True
 
 zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
@@ -418,7 +429,7 @@ def _set_c_parameters(cctx, level_or_option):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
         return level, use_multithread
-    
+
     if isinstance(level_or_option, dict):
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             _check_int32_value(key, "Key of option dict")
@@ -811,7 +822,7 @@ class _Decompressor:
                 # Number of bytes we can append if we move existing
                 # contents to beginning of buffer
                 avail_total = self._input_buffer_size - used_now
-                
+
                 assert (used_now > 0 and avail_now >= 0 and avail_total >= 0)
 
                 if avail_total < len(data):

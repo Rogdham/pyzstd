@@ -161,6 +161,10 @@ source = """
 #include "zstd.h"
 #include "zdict.h"
 
+#if ZSTD_VERSION_NUMBER < 10400
+    #error pyzstd module requires zstd v1.4.0+
+#endif
+
 #if ZSTD_VERSION_NUMBER < 10405
 typedef struct {
     int      compressionLevel;

@@ -23,18 +23,6 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     module_version = m.group(2)
 
 # -------- C extension --------
-if '--dynamic-link-zstd' in sys.argv:
-    DYNAMIC_LINK = True
-    sys.argv = [s for s in sys.argv if s != '--dynamic-link-zstd']
-else:
-    DYNAMIC_LINK = False
-
-if '--cffi' in sys.argv:
-    CFFI = True
-    sys.argv = [s for s in sys.argv if s != '--cffi']
-else:
-    CFFI = False
-
 def get_zstd_c_files_list():
     lst = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
@@ -43,15 +31,25 @@ def get_zstd_c_files_list():
         lst.extend(l)
     return lst
 
+def has_option(option):
+    if option in sys.argv:
+        sys.argv = [s for s in sys.argv if s != option]
+        return True
+    else:
+        return False
+
+DYNAMIC_LINK = has_option('--dynamic-link-zstd')
+CFFI = has_option('--cffi')
+
 if DYNAMIC_LINK:
     kwargs = {
         'include_dirs': [],    # .h directory
         'library_dirs': [],    # .lib directory
-        'libraries': ['zstd'], # lib name, not filename.
+        'libraries': ['zstd'], # lib name, not filename, for the linker.
         'sources': [],
         'define_macros': [('ZSTD_MULTITHREAD', None)]
     }
-else:
+else:  # statically link to zstd lib
     kwargs = {
         'include_dirs': ['lib', 'lib/dictBuilder'],
         'library_dirs': [],
@@ -67,7 +65,7 @@ if CFFI:
     ext_module = build_cffi.ffibuilder.distutils_extension()
     # packages
     packages=['pyzstd', 'pyzstd.cffi']
-else:
+else:  # C implementation
     # binary extension
     kwargs['sources'].append('src/_zstdmodule.c')
     ext_module = Extension('pyzstd.c._zstd', **kwargs)
