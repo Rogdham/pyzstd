@@ -1287,7 +1287,7 @@ Build pyzstd module with options
 
     Pyzstd module supports:
 
-        * Dynamically linking to zstd library, then the zstd source code in ``lib`` folder will be ignored.
+        * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
 
     Add these options to setup.py:
@@ -1301,7 +1301,8 @@ Build pyzstd module with options
 
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
         * Support zstd library downgrade, for example v1.4.9 at compile-time, v1.4.0 at run-time. (Tested on Windows 10, w/wo --cffi.)
-        * Before zstd v1.5.0, ZSTD_MULTITHREAD macro is not defined by default. So :ref:`multi-threaded compression<mt_compression>` may not be used in system provided zstd library, in this case pyzstd module will perform single-threaded compression and issue a ``RuntimeWarning``.
+        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when performing multi-threaded compression, pyzstd module will switch to single-threaded compression and issue a ``RuntimeWarning``.
+        * On CPython, CFFI implementation is slower than C implementation (run unit tests: 8.2 sec vs 3.0 sec), only use CFFI implementation for PyPy.
 
     On Linux, dynamically link to zstd library provided by system:
 

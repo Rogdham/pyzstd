@@ -112,6 +112,11 @@ ZSTD_bounds ZSTD_dParam_getBounds(ZSTD_dParameter dParam);
 size_t ZSTD_CCtx_setParameter(ZSTD_CCtx* cctx, ZSTD_cParameter param, int value);
 size_t ZSTD_DCtx_setParameter(ZSTD_DCtx* dctx, ZSTD_dParameter param, int value);
 
+size_t ZSTD_CStreamInSize(void);
+size_t ZSTD_CStreamOutSize(void);
+size_t ZSTD_DStreamInSize(void);
+size_t ZSTD_DStreamOutSize(void);
+
 unsigned ZDICT_getDictID(const void* dictBuffer, size_t dictSize);
 
 ZSTD_CDict* ZSTD_createCDict(const void* dictBuffer, size_t dictSize,

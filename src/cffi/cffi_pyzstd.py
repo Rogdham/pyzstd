@@ -1037,7 +1037,9 @@ def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
 def compress_stream(input_stream, output_stream, *,
                     level_or_option = None, zstd_dict = None,
                     pledged_input_size = None,
-                    read_size = 131_072, write_size = 131_591, callback = None):
+                    read_size = m.ZSTD_CStreamInSize(),
+                    write_size = m.ZSTD_CStreamOutSize(),
+                    callback = None):
     level = 0  # 0 means use zstd's default compression level
     use_multithreaded = False
     total_input_size = 0
@@ -1180,7 +1182,8 @@ def compress_stream(input_stream, output_stream, *,
 
 def decompress_stream(input_stream, output_stream, *,
                       zstd_dict = None, option = None,
-                      read_size = 131_075, write_size = 131_072,
+                      read_size = m.ZSTD_DStreamInSize(),
+                      write_size = m.ZSTD_DStreamOutSize(),
                       callback = None):
     at_frame_edge = True
     total_input_size = 0
