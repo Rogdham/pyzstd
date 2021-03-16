@@ -25,20 +25,20 @@ typedef struct {
 
 typedef enum {
     ZSTD_e_continue,
-    ZSTD_e_flush, 
+    ZSTD_e_flush,
     ZSTD_e_end
 } ZSTD_EndDirective;
 
 typedef struct ZSTD_inBuffer_s {
-  const void* src;    /**< start of input buffer */
-  size_t size;        /**< size of input buffer */
-  size_t pos;         /**< position where reading stopped. Will be updated. Necessarily 0 <= pos <= size */
+  const void* src;
+  size_t size;
+  size_t pos;
 } ZSTD_inBuffer;
 
 typedef struct ZSTD_outBuffer_s {
-  void*  dst;         /**< start of output buffer */
-  size_t size;        /**< size of output buffer */
-  size_t pos;         /**< position where writing stopped. Will be updated. Necessarily 0 <= pos <= size */
+  void*  dst;
+  size_t size;
+  size_t pos;
 } ZSTD_outBuffer;
 
 typedef enum {
@@ -183,4 +183,4 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
 """
 
 def set_args(**kw):
-    ffibuilder.set_source('pyzstd.cffi._cffi_zstd', source=source, **kw)
+    ffibuilder.set_source(source=source, **kw)

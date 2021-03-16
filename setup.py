@@ -60,15 +60,21 @@ else:  # statically link to zstd lib
 
 if CFFI:
     # binary extension
+    kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
+
     import build_cffi
     build_cffi.set_args(**kwargs)
     ext_module = build_cffi.ffibuilder.distutils_extension()
+
     # packages
     packages=['pyzstd', 'pyzstd.cffi']
 else:  # C implementation
     # binary extension
+    kwargs['name'] = 'pyzstd.c._zstd'
     kwargs['sources'].append('src/_zstdmodule.c')
-    ext_module = Extension('pyzstd.c._zstd', **kwargs)
+
+    ext_module = Extension(**kwargs)
+
     # packages
     packages=['pyzstd', 'pyzstd.c']
 

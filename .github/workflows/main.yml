@@ -87,6 +87,29 @@ jobs:
             wheelhouse/*.whl
             !wheelhouse/*manylinux2010_x86_64*
 
+  # Run test on PyPy
+  test_on_pypy:
+    name: Test on ${{ matrix.py }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        py: ['pypy-3.6', 'pypy-3.7']
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Build & test
+        run: |
+          sudo apt-get update -q -y
+          sudo apt-get install -q -y zstd libzstd1 libzstd-dev
+
+          python setup.py --cffi --dynamic-link-zstd install
+          python tests/test_zstd.py
+
   # Run test on armv7/aarch64/ppc64le/s390x
   test_on_arches:
     name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
@@ -121,7 +144,7 @@ jobs:
   # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_in_manylinux2010, test_on_arches]
+    needs: [build_wheels, build_in_manylinux2010, test_on_pypy, test_on_arches]
     runs-on: ubuntu-latest
 
     steps:
