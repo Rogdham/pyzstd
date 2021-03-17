@@ -417,8 +417,6 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict=123)
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict=b'abcd1234')
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict={1:2, 3:4})
-
-        self.assertRaises(TypeError, ZstdCompressor, rich_mem=None)
         self.assertRaises(TypeError, ZstdCompressor, rich_mem=True)
 
         with self.assertRaises(ValueError):
@@ -440,6 +438,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, EndlessZstdDecompressor, option=123)
         self.assertRaises(TypeError, EndlessZstdDecompressor, option='abc')
         self.assertRaises(TypeError, EndlessZstdDecompressor, option=b'abc')
+        self.assertRaises(TypeError, EndlessZstdDecompressor, rich_mem=True)
 
         with self.assertRaises(ValueError):
             EndlessZstdDecompressor(option={2**31 : 100})
@@ -1597,6 +1596,10 @@ class ZstdDictTestCase(unittest.TestCase):
             ZstdDict("12345678abcdef", is_raw=True)
         with self.assertRaises(TypeError):
             ZstdDict(TRAINED_DICT)
+
+        # invalid parameter
+        with self.assertRaises(TypeError):
+            ZstdDict(desk333=345)
 
     def test_invalid_dict(self):
         DICT_MAGIC = 0xEC30A437.to_bytes(4, byteorder='little')

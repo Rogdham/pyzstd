@@ -1,8 +1,8 @@
 import _compression
 import io
-import os
 from collections import namedtuple
 from enum import IntEnum
+from os import PathLike
 from sys import maxsize
 from threading import Lock
 from warnings import warn
@@ -294,10 +294,12 @@ class ZstdDict:
             self.__lock.release()
 
     def __del__(self):
-        for cdict in self.__cdicts.values():
-            m.ZSTD_freeCDict(cdict)
-
-        m.ZSTD_freeDDict(self.__ddict)
+        try:
+            for cdict in self.__cdicts.values():
+                m.ZSTD_freeCDict(cdict)
+            m.ZSTD_freeDDict(self.__ddict)
+        except:
+            pass
 
 class _ErrorType:
     ERR_DECOMPRESS=0
@@ -1509,7 +1511,7 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
-        if isinstance(filename, (str, bytes, os.PathLike)):
+        if isinstance(filename, (str, bytes, PathLike)):
             if "b" not in mode:
                 mode += "b"
             self._fp = io.open(filename, mode)

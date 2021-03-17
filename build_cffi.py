@@ -1,8 +1,11 @@
 try:
     from cffi import FFI
 except ImportError:
-    msg = ("To build the cffi version of pyzstd module, need to install "
-           "\"cffi\" module. Command like this: sudo pip3 install cffi")
+    # PyPy includes cffi by default
+    msg = ("To build the CFFI implementation of pyzstd module, need to "
+           "install cffi module like this: \"sudo python3 -m pip install "
+           "cffi\". On CPython, CFFI implementation is slower than C "
+           "implementation.")
     raise ImportError(msg)
 
 ffibuilder = FFI()

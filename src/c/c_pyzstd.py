@@ -1,9 +1,9 @@
-import enum
-import io
-import sys
-import os
 import _compression
+import io
 from collections import namedtuple
+from enum import IntEnum
+from os import PathLike
+from sys import maxsize
 
 from ._zstd import *
 from . import _zstd
@@ -50,7 +50,7 @@ def get_frame_info(frame_buffer):
     return _nt_frame_info(*ret_tuple)
 
 
-class CParameter(enum.IntEnum):
+class CParameter(IntEnum):
     compressionLevel           = _zstd._ZSTD_c_compressionLevel
     windowLog                  = _zstd._ZSTD_c_windowLog
     hashLog                    = _zstd._ZSTD_c_hashLog
@@ -80,7 +80,7 @@ class CParameter(enum.IntEnum):
         return _zstd._get_param_bounds(1, self.value)
 
 
-class DParameter(enum.IntEnum):
+class DParameter(IntEnum):
     windowLogMax = _zstd._ZSTD_d_windowLogMax
 
     def bounds(self):
@@ -89,7 +89,7 @@ class DParameter(enum.IntEnum):
         return _zstd._get_param_bounds(0, self.value)
 
 
-class Strategy(enum.IntEnum):
+class Strategy(IntEnum):
     """Compression strategies, listed from fastest to strongest.
 
        Note : new strategies _might_ be added in the future, only the order
@@ -247,7 +247,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
             # sys.maxsize means the max length of output buffer is unlimited,
             # so that the whole input buffer can be decompressed within one
             # .decompress() call.
-            data = self.read(sys.maxsize)
+            data = self.read(maxsize)
             if not data:
                 break
             chunks.append(data)
@@ -287,7 +287,7 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
-        if isinstance(filename, (str, bytes, os.PathLike)):
+        if isinstance(filename, (str, bytes, PathLike)):
             if "b" not in mode:
                 mode += "b"
             self._fp = io.open(filename, mode)

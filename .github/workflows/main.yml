@@ -110,7 +110,6 @@ jobs:
         run: |
           sudo apt-get update -q -y
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
-
           python setup.py --dynamic-link-zstd install
           python tests/test_zstd.py
 

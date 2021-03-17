@@ -1302,7 +1302,7 @@ Build pyzstd module with options
     Some notes:
 
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Support downgrade zstd library. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows 10, w/wo \-\-cffi.)
+        * Support zstd library downgrade. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows, w/wo \-\-cffi.)
         * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when using multi-threaded compression, pyzstd module will use single-threaded compression instead and issue a ``RuntimeWarning``.
 
     On Linux, dynamically link to zstd library provided by system:
