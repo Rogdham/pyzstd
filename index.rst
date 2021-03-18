@@ -3,7 +3,11 @@
 Introduction
 ------------
 
-pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm. The API is similar to Python's bz2/lzma/zlib module.
+pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+
+The API is similar to Python's bz2/lzma/zlib module.
+
+Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -186,9 +190,12 @@ Streaming compression
             with io.open(output_file_path, 'wb') as ofh:
                 compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
 
-        # compress an input file, obtain a bytes object.
-        # it's faster than reading a file and compressing it in
+        # Compress an input file, obtain a bytes object.
+        # It's faster than reading a file and compressing it in
         # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
+        # Maybe the OS has prefetching, it can read and compress
+        # data in parallel to some degree, reading file from HDD
+        # is the bottleneck in this case.
         with io.open(input_file_path, 'rb') as ifh:
             with io.BytesIO() as bo:
                 compress_stream(ifh, bo)
@@ -336,9 +343,12 @@ Streaming decompression
             with io.open(output_file_path, 'wb') as ofh:
                 decompress_stream(bi, ofh)
 
-        # decompress an input file, obtain a bytes object.
-        # it's faster than reading a file and decompressing it in
+        # Decompress an input file, obtain a bytes object.
+        # It's faster than reading a file and decompressing it in
         # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
+        # Maybe the OS has prefetching, it can read and decompress
+        # data in parallel to some degree, reading file from HDD
+        # is the bottleneck in this case.
         with io.open(input_file_path, 'rb') as ifh:
             with io.BytesIO() as bo:
                 decompress_stream(ifh, bo)

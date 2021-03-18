@@ -1371,10 +1371,13 @@ def train_dict(samples, dict_size):
     return ZstdDict(b)
 
 def finalize_dict(zstd_dict, samples, dict_size, level):
-    if m.ZSTD_versionNumber() < 10405:
-        msg = ("This function only available when the underlying zstd "
-               "library's version is greater than or equal to v1.4.5, "
-               "the current underlying zstd library's version is v%s.") % zstd_version
+    if (m.ZSTD_VERSION_NUMBER < 10405          # compile-time version
+          or m.ZSTD_versionNumber() < 10405):  # run-time version
+        msg = ("finalize_dict function only available when the underlying "
+               "zstd library's version is greater than or equal to v1.4.5. "
+               "At pyzstd module's compile-time, zstd version is %d. At "
+               "pyzstd module's run-time, zstd version is %d.") % \
+               (m.ZSTD_VERSION_NUMBER, m.ZSTD_versionNumber())
         raise NotImplementedError(msg)
 
     dict_size = int(dict_size)
