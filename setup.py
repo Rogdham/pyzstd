@@ -64,10 +64,9 @@ if CFFI:
     # packages
     packages=['pyzstd', 'pyzstd.cffi']
 
-    # kwargs
+    # binary extension
     kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
-    # binary extension
     import build_cffi
     build_cffi.set_args(**kwargs)
     ext_module = build_cffi.ffibuilder.distutils_extension()
@@ -75,11 +74,10 @@ else:  # C implementation
     # packages
     packages=['pyzstd', 'pyzstd.c']
 
-    # kwargs
+    # binary extension
     kwargs['name'] = 'pyzstd.c._zstd'
     kwargs['sources'].append('src/_zstdmodule.c')
 
-    # binary extension
     ext_module = Extension(**kwargs)
 
 class build_ext_compiler_check(build_ext):
@@ -114,6 +112,7 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
+        "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",

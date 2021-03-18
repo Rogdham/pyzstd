@@ -732,7 +732,8 @@ class _Decompressor:
         return self._needs_input
 
     def _decompress_impl(self, in_buf, max_length, decompressed_size):
-        # The first AFE check for setting .at_frame_edge flag
+        # The first AFE check for setting .at_frame_edge flag, search "AFE" in
+        # _zstdmodule.c to see details.
         if self._type == _Decompressor_type.ENDLESS_DECOMPRESSOR:
             if self._at_frame_edge and in_buf.pos == in_buf.size:
                 return b""
@@ -764,7 +765,8 @@ class _Decompressor:
                 # EndlessZstdDecompressor class supports multiple frames
                 self._at_frame_edge = True if (zstd_ret == 0) else False
 
-                # The second AFE check for setting .at_frame_edge flag
+                # The second AFE check for setting .at_frame_edge flag, search
+                # "AFE" in _zstdmodule.c to see details.
                 if self._at_frame_edge and in_buf.pos == in_buf.size:
                     break
 
@@ -1276,7 +1278,7 @@ def decompress_stream(input_stream, output_stream, *,
 
             # Decompress & write
             while True:
-                # AFE check for setting .at_frame_edge flag, search "AFE check" in
+                # AFE check for setting .at_frame_edge flag, search "AFE" in
                 # _zstdmodule.c to see details.
                 if at_frame_edge and in_buf.pos == in_buf.size:
                     break
@@ -1328,8 +1330,10 @@ def decompress_stream(input_stream, output_stream, *,
         m.ZSTD_freeDCtx(dctx)
 
 def train_dict(samples, dict_size):
+    # Check parameters
     dict_size = int(dict_size)
 
+    # Prepare data
     chunks = []
     chunk_sizes = []
     for chunk in samples:
@@ -1371,6 +1375,10 @@ def train_dict(samples, dict_size):
     return ZstdDict(b)
 
 def finalize_dict(zstd_dict, samples, dict_size, level):
+    # If m.ZSTD_VERSION_NUMBER < 10405, m.ZDICT_finalizeDictionary() is an
+    # empty function defined in build_cffi.py.
+    # If m.ZSTD_versionNumber() < 10405, m.ZDICT_finalizeDictionary() doesn't
+    # exist in run-time zstd library.
     if (m.ZSTD_VERSION_NUMBER < 10405          # compile-time version
           or m.ZSTD_versionNumber() < 10405):  # run-time version
         msg = ("finalize_dict function only available when the underlying "
@@ -1380,11 +1388,13 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
                (m.ZSTD_VERSION_NUMBER, m.ZSTD_versionNumber())
         raise NotImplementedError(msg)
 
+    # Check parameters
     dict_size = int(dict_size)
     level = int(level)
     if not isinstance(zstd_dict, ZstdDict):
         raise TypeError('zstd_dict argument should be a ZstdDict object.')
 
+    # Prepare data
     chunks = []
     chunk_sizes = []
     for chunk in samples:

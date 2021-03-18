@@ -22,7 +22,7 @@ Features of zstd:
     Two other zstd modules on PyPI:
 
     * `zstd <https://pypi.org/project/zstd/>`_, a very simple module.
-    * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API, supports PyPy.
+    * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API.
 
 Exception
 ---------
