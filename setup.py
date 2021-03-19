@@ -23,7 +23,7 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     m = re.search(r'''__version__\s*=\s*(['"])(.*?)\1''', file_content)
     module_version = m.group(2)
 
-# -------- C extension --------
+# -------- binary extension --------
 def get_zstd_c_files_list():
     lst = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):

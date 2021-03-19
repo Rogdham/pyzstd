@@ -124,7 +124,7 @@ Rich memory compression
 
     .. py:method:: compress(self, data)
 
-        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+        Compress *data* using :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
 
         Compressing ``b''`` will get an empty content frame (9 bytes or more).
 
@@ -1339,8 +1339,8 @@ Build pyzstd module with options
 
     And put ``libzstd.dll`` into one of these directories:
 
-        * Python's root directory that has python.exe.
         * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function.
+        * Python's root directory that has python.exe.
         * %SystemRoot%\System32
 
     Note that the above list doesn't include the current working directory and %PATH% directories.

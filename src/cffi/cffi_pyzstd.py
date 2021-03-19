@@ -33,6 +33,7 @@ compressionLevel_values = _nt_values(m.ZSTD_CLEVEL_DEFAULT,
 _new_nonzero = ffi.new_allocator(should_clear_after_alloc=False)
 
 class ZstdError(Exception):
+    "Call to the underlying zstd library failed."
     pass
 
 def _get_param_bounds(is_compress, key):
@@ -88,6 +89,11 @@ class DParameter(IntEnum):
         return _get_param_bounds(0, self.value)
 
 class Strategy(IntEnum):
+    """Compression strategies, listed from fastest to strongest.
+
+    Note : new strategies _might_ be added in the future, only the order
+    (from fast to strong) is guaranteed.
+    """
     fast     = m.ZSTD_fast
     dfast    = m.ZSTD_dfast
     greedy   = m.ZSTD_greedy
@@ -99,8 +105,6 @@ class Strategy(IntEnum):
     btultra2 = m.ZSTD_btultra2
 
 class _BlocksOutputBuffer:
-    'Output buffer manage code.'
-
     KB = 1024
     MB = 1024 * 1024
     BUFFER_BLOCK_SIZE = (
@@ -210,7 +214,19 @@ class _BlocksOutputBuffer:
         return bytes(ffi.buffer(final))
 
 class ZstdDict:
+    """Zstd dictionary, used for compression/decompression."""
+
     def __init__(self, dict_content, is_raw=False) -> None:
+        """Initialize a ZstdDict object.
+
+        Arguments
+        dict_content: A bytes-like object, dictionary's content.
+        is_raw:       This parameter is for advanced user. True means dict_content
+                      argument is a "raw content" dictionary, free of any format
+                      restriction. False means dict_content argument is an ordinary
+                      zstd dictionary, was created by zstd functions, follow a
+                      specified format.
+        """
         self.__cdicts = {}
         self.__ddict = ffi.NULL
         self.__lock = Lock()
@@ -239,10 +255,21 @@ class ZstdDict:
 
     @property
     def dict_content(self):
+        """The content of zstd dictionary, a bytes object, it's the same as dict_content
+        argument in ZstdDict.__init__() method. It can be used with other programs.
+        """
         return self.__dict_content
 
     @property
     def dict_id(self):
+        """ID of zstd dictionary, a 32-bit unsigned int value.
+
+        Non-zero means ordinary dictionary, was created by zstd functions, follow
+        a specified format.
+
+        0 means a "raw content" dictionary, free of any format restriction, used
+        for advanced user.
+        """
         return self.__dict_id
 
     def __str__(self):
@@ -612,15 +639,31 @@ class _Compressor:
         raise TypeError(msg)
 
 class ZstdCompressor(_Compressor):
+    """A streaming compressor. Thread-safe at method level."""
     CONTINUE = m.ZSTD_e_continue
     FLUSH_BLOCK = m.ZSTD_e_flush
     FLUSH_FRAME = m.ZSTD_e_end
 
     def __init__(self, level_or_option=None, zstd_dict=None):
+        """Initialize a ZstdCompressor object.
+
+        Arguments
+        level_or_option: When it's an int object, it represents the compression level.
+                         When it's a dict object, it contains advanced compression
+                         parameters.
+        zstd_dict:       A ZstdDict object, pre-trained zstd dictionary.
+        """
         super().__init__(level_or_option=level_or_option, zstd_dict=zstd_dict)
         self.__last_mode = m.ZSTD_e_end
 
     def compress(self, data, mode=CONTINUE):
+        """Provide data to the compressor object.
+        Return a chunk of compressed data if possible, or b'' otherwise.
+
+        Arguments
+        data: A bytes-like object, data to be compressed.
+        mode: Can be these 3 values: .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.
+        """
         if mode not in (ZstdCompressor.CONTINUE,
                         ZstdCompressor.FLUSH_BLOCK,
                         ZstdCompressor.FLUSH_FRAME):
@@ -647,6 +690,14 @@ class ZstdCompressor(_Compressor):
             self._lock.release()
 
     def flush(self, mode=FLUSH_FRAME):
+        """Flush any remaining data in internal buffer.
+
+        Since zstd data consists of one or more independent frames, the compressor
+        object can still be used after this method is called.
+
+        Arguments
+        mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.
+        """
         if mode not in (ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME):
             msg = ("mode argument wrong value, it should be "
                    "ZstdCompressor.FLUSH_FRAME or ZstdCompressor.FLUSH_BLOCK.")
@@ -668,10 +719,28 @@ class ZstdCompressor(_Compressor):
 
     @property
     def last_mode(self):
+        """The last mode used to this compressor object, its value can be .CONTINUE,
+        .FLUSH_BLOCK, .FLUSH_FRAME. Initialized to .FLUSH_FRAME.
+
+        It can be used to get the current state of a compressor, such as, a block
+        ends, a frame ends.
+        """
         return self.__last_mode
 
 class RichMemZstdCompressor(_Compressor):
+    """A compressor use rich memory mode. It is designed to allocate more memory,
+    but faster in some cases.
+    """
+
     def __init__(self, level_or_option=None, zstd_dict=None):
+        """Initialize a RichMemZstdCompressor object.
+
+        Arguments
+        level_or_option: When it's an int object, it represents the compression level.
+                         When it's a dict object, it contains advanced compression
+                         parameters.
+        zstd_dict:       A ZstdDict object, pre-trained zstd dictionary.
+        """
         super().__init__(level_or_option=level_or_option, zstd_dict=zstd_dict)
 
         if self._use_multithreaded:
@@ -682,6 +751,13 @@ class RichMemZstdCompressor(_Compressor):
             warn(msg, ResourceWarning, 1)
 
     def compress(self, data):
+        """Compress data using rich memory mode, return a single zstd frame.
+
+        Compressing b'' will get an empty content frame (9 bytes or more).
+
+        Arguments
+        data: A bytes-like object, data to be compressed.
+        """
         try:
             self._lock.acquire()
 
@@ -729,6 +805,10 @@ class _Decompressor:
 
     @property
     def needs_input(self):
+        """If the max_length output limit in .decompress() method has been reached, and
+        the decompressor has (or may has) unconsumed input data, it will be set to
+        False. In this case, pass b'' to .decompress() method may output further data.
+        """
         return self._needs_input
 
     def _decompress_impl(self, in_buf, max_length, decompressed_size):
@@ -949,21 +1029,45 @@ class _Decompressor:
         raise TypeError(msg)
 
 class ZstdDecompressor(_Decompressor):
+    """A streaming decompressor, it stops after a frame is decompressed.
+    Thread-safe at method level."""
+
     def __init__(self, zstd_dict=None, option=None):
+        """Initialize a ZstdDecompressor object.
+
+        Arguments
+        zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+        option:    A dict object that contains advanced decompression parameters.
+        """
         super().__init__(zstd_dict, option)
         self._eof = False
         self._unused_data = None
         self._type = _Decompressor_type.DECOMPRESSOR
 
     def decompress(self, data, max_length=-1):
+        """Decompress data, return a chunk of decompressed data if possible, or b''
+        otherwise.
+
+        It stops after a frame is decompressed.
+
+        Arguments
+        data:       A bytes-like object, zstd data to be decompressed.
+        max_length: Maximum size of returned data. When it is negative, the size of
+                    output buffer is unlimited. When it is nonnegative, returns at
+                    most max_length bytes of decompressed data.
+        """
         return self._stream_decompress(data, max_length)
 
     @property
     def eof(self):
+        """True means the end of the first frame has been reached. If decompress data
+        after that, an EOFError exception will be raised."""
         return self._eof
 
     @property
     def unused_data(self):
+        """A bytes object. When ZstdDecompressor object stops after a frame is
+        decompressed, unused input data after the frame. Otherwise this will be b''."""
         try:
             self._lock.acquire()
 
@@ -981,27 +1085,84 @@ class ZstdDecompressor(_Decompressor):
             self._lock.release()
 
 class EndlessZstdDecompressor(_Decompressor):
+    """A streaming decompressor, accepts multiple concatenated frames.
+    Thread-safe at method level."""
+
     def __init__(self, zstd_dict=None, option=None):
+        """Initialize an EndlessZstdDecompressor object.
+
+        Arguments
+        zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+        option:    A dict object that contains advanced decompression parameters.
+        """
         super().__init__(zstd_dict, option)
         self._at_frame_edge = True
         self._type = _Decompressor_type.ENDLESS_DECOMPRESSOR
 
     def decompress(self, data, max_length=-1):
+        """Decompress data, return a chunk of decompressed data if possible, or b''
+        otherwise.
+
+        Arguments
+        data:       A bytes-like object, zstd data to be decompressed.
+        max_length: Maximum size of returned data. When it is negative, the size of
+                    output buffer is unlimited. When it is nonnegative, returns at
+                    most max_length bytes of decompressed data.
+        """
         return self._stream_decompress(data, max_length)
 
     @property
     def at_frame_edge(self):
+        """True when both input and output streams are at a frame edge, means a frame is
+        completely decoded and fully flushed, or the decompressor just be initialized.
+
+        This flag could be used to check data integrity in some cases.
+        """
         return self._at_frame_edge
 
 def compress(data, level_or_option=None, zstd_dict=None):
+    """Compress a block of data, return a bytes object.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
+
+    Arguments
+    data:            A bytes-like object, data to be compressed.
+    level_or_option: When it's an int object, it represents compression level.
+                     When it's a dict object, it contains advanced compression
+                     parameters.
+    zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
+    """
     comp = ZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 def richmem_compress(data, level_or_option=None, zstd_dict=None):
+    """Compress a block of data, return a bytes object.
+
+    Use rich memory mode, it's faster than compress() in some cases, but
+    allocates more memory.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
+
+    Arguments
+    data:            A bytes-like object, data to be compressed.
+    level_or_option: When it's an int object, it represents compression level.
+                     When it's a dict object, it contains advanced compression
+                     parameters.
+    zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
+    """
     comp = RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
 
 def decompress(data, zstd_dict=None, option=None):
+    """Decompress a zstd data, return a bytes object.
+
+    Support multiple concatenated frames.
+
+    Arguments
+    data:      A bytes-like object, compressed zstd data.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option:    A dict object, contains advanced decompression parameters.
+    """
     decomp = EndlessZstdDecompressor(zstd_dict, option)
     ret = decomp.decompress(data)
 
@@ -1056,6 +1217,30 @@ def compress_stream(input_stream, output_stream, *,
                     read_size = m.ZSTD_CStreamInSize(),
                     write_size = m.ZSTD_CStreamOutSize(),
                     callback = None):
+    """Compresses input_stream and writes the compressed data to output_stream, it
+    doesn't close the streams.
+
+    If input stream is b'', nothing will be written to output stream.
+
+    Return a tuple, (total_input, total_output), the items are int objects.
+
+    Arguments
+    input_stream: Input stream that has a .readinto(b) method.
+    output_stream: Output stream that has a .write(b) method. If use callback
+        function, this argument can be None.
+    level_or_option: When it's an int object, it represents the compression
+        level. When it's a dict object, it contains advanced compression
+        parameters.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    pledged_input_size: If set this argument to the size of input data, the size
+        will be written into frame header. If the actual input data doesn't match
+        it, a ZstdError will be raised.
+    read_size: Input buffer size, in bytes.
+    write_size: Output buffer size, in bytes.
+    callback: A callback function that accepts four parameters:
+        (total_input, total_output, read_data, write_data), the first two are
+        int objects, the last two are readonly memoryview objects.
+    """
     level = 0  # 0 means use zstd's default compression level
     use_multithreaded = False
     total_input_size = 0
@@ -1203,6 +1388,25 @@ def decompress_stream(input_stream, output_stream, *,
                       read_size = m.ZSTD_DStreamInSize(),
                       write_size = m.ZSTD_DStreamOutSize(),
                       callback = None):
+    """Decompresses input_stream and writes the decompressed data to output_stream,
+    it doesn't close the streams.
+
+    Supports multiple concatenated frames.
+
+    Return a tuple, (total_input, total_output), the items are int objects.
+
+    Arguments
+    input_stream: Input stream that has a .readinto(b) method.
+    output_stream: Output stream that has a .write(b) method. If use callback
+        function, this argument can be None.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option: A dict object, contains advanced decompression parameters.
+    read_size: Input buffer size, in bytes.
+    write_size: Output buffer size, in bytes.
+    callback: A callback function that accepts four parameters:
+        (total_input, total_output, read_data, write_data), the first two are
+        int objects, the last two are readonly memoryview objects.
+    """
     at_frame_edge = True
     total_input_size = 0
     total_output_size = 0
@@ -1330,6 +1534,13 @@ def decompress_stream(input_stream, output_stream, *,
         m.ZSTD_freeDCtx(dctx)
 
 def train_dict(samples, dict_size):
+    """Train a zstd dictionary, return a ZstdDict object.
+
+    Arguments
+    samples:   An iterable of samples, a sample is a bytes-like object
+               represents a file.
+    dict_size: The dictionary's maximum size, in bytes.
+    """
     # Check parameters
     dict_size = int(dict_size)
 
@@ -1375,6 +1586,26 @@ def train_dict(samples, dict_size):
     return ZstdDict(b)
 
 def finalize_dict(zstd_dict, samples, dict_size, level):
+    """Finalize a zstd dictionary, return a ZstdDict object.
+
+    Given a custom content as a basis for dictionary, and a set of samples,
+    finalize dictionary by adding headers and statistics according to the zstd
+    dictionary format.
+
+    You may compose an effective dictionary content by hand, which is used as
+    basis dictionary, and use some samples to finalize a dictionary. The basis
+    dictionary can be a "raw content" dictionary, see is_raw argument in
+    ZstdDict.__init__ method.
+
+    Arguments
+    zstd_dict: A ZstdDict object, basis dictionary.
+    samples:   An iterable of samples, a sample is a bytes-like object
+               represents a file.
+    dict_size: The dictionary's maximum size, in bytes.
+    level:     The compression level expected to use in production. The
+               statistics for each compression level differ, so tuning the
+               dictionary for the compression level can help quite a bit.
+    """
     # If m.ZSTD_VERSION_NUMBER < 10405, m.ZDICT_finalizeDictionary() is an
     # empty function defined in build_cffi.py.
     # If m.ZSTD_versionNumber() < 10405, m.ZDICT_finalizeDictionary() doesn't
@@ -1451,6 +1682,24 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
 _nt_frame_info = namedtuple('frame_info', ['decompressed_size', 'dictionary_id'])
 
 def get_frame_info(frame_buffer):
+    """Get zstd frame infomation from a frame header.
+
+    Arguments
+    frame_buffer: A bytes-like object. It should starts from the beginning of
+                  a frame, and needs to include at least the frame header (6 to
+                  18 bytes).
+
+    Return a two-items namedtuple: (decompressed_size, dictionary_id)
+
+    If decompressed_size is None, decompressed size is unknown.
+
+    dictionary_id is a 32-bit unsigned integer value. 0 means dictionary ID was
+    not recorded in frame header, the frame may or may not need a dictionary to
+    be decoded, and the ID of such a dictionary is not specified.
+
+    It's possible to append more items to the namedtuple in the future.
+    """
+
     content_size = m.ZSTD_getFrameContentSize(
                       ffi.from_buffer(frame_buffer), len(frame_buffer))
     if content_size == m.ZSTD_CONTENTSIZE_UNKNOWN:
@@ -1469,6 +1718,17 @@ def get_frame_info(frame_buffer):
     return ret
 
 def get_frame_size(frame_buffer):
+    """Get the size of a zstd frame, including frame header and 4-byte checksum if it
+    has.
+
+    It will iterate all blocks' header within a frame, to accumulate the frame
+    size.
+
+    Arguments
+    frame_buffer: A bytes-like object, it should starts from the beginning of a
+                  frame, and contains at least one complete frame.
+    """
+
     frame_size = m.ZSTD_findFrameCompressedSize(
                      ffi.from_buffer(frame_buffer), len(frame_buffer))
     if m.ZSTD_isError(frame_size):

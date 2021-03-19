@@ -1437,7 +1437,7 @@ ZstdCompressor_dealloc(ZstdCompressor *self)
 }
 
 PyDoc_STRVAR(ZstdCompressor_doc,
-"A stream compressor. It's thread-safe at method level.\n\n"
+"A streaming compressor. Thread-safe at method level.\n\n"
 "ZstdCompressor.__init__(self, level_or_option=None, zstd_dict=None)\n"
 "----\n"
 "Initialize a ZstdCompressor object.\n\n"
@@ -1836,7 +1836,8 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
 PyDoc_STRVAR(RichMemZstdCompressor_compress_doc,
 "compress(data)\n"
 "----\n"
-"Compress data use rich memory mode, return a single zstd frame.\n\n"
+"Compress data using rich memory mode, return a single zstd frame.\n\n"
+"Compressing b'' will get an empty content frame (9 bytes or more).\n\n"
 "Arguments\n"
 "data: A bytes-like object, data to be compressed.");
 
@@ -2361,10 +2362,12 @@ ZstdDecompressor_dealloc(ZstdDecompressor *self)
 }
 
 PyDoc_STRVAR(ZstdDecompressor_doc,
-"Zstd stream decompressor. It stops after a frame is decompressed.\n\n"
+"A streaming decompressor, it stops after a frame is decompressed.\n"
+"Thread-safe at method level.\n\n"
 "ZstdDecompressor.__init__(self, zstd_dict=None, option=None)\n"
 "----\n"
 "Initialize a ZstdDecompressor object.\n\n"
+"Arguments\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option:    A dict object that contains advanced decompression parameters.");
 
@@ -2518,10 +2521,12 @@ static PyType_Spec ZstdDecompressor_type_spec = {
      EndlessZstdDecompressor code
    ------------------------------- */
 PyDoc_STRVAR(EndlessZstdDecompressor_doc,
-"Zstd stream decompressor, accepts multiple concatenated frames.\n\n"
+"A streaming decompressor, accepts multiple concatenated frames.\n"
+"Thread-safe at method level.\n\n"
 "EndlessZstdDecompressor.__init__(self, zstd_dict=None, option=None)\n"
 "----\n"
 "Initialize an EndlessZstdDecompressor object.\n\n"
+"Arguments\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option:    A dict object that contains advanced decompression parameters.");
 
@@ -2923,9 +2928,11 @@ PyDoc_STRVAR(compress_stream_doc,
 "                read_size=131072, write_size=131591,\n"
 "                callback=None)\n"
 "----\n"
-"Compress from input_stream to output_stream.\n\n"
+"Compresses input_stream and writes the compressed data to output_stream, it\n"
+"doesn't close the streams.\n\n"
+"If input stream is b'', nothing will be written to output stream.\n\n"
 "Return a tuple, (total_input, total_output), the items are int objects.\n\n"
-"Arguments\n\n"
+"Arguments\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
 "output_stream: Output stream that has a .write(b) method. If use callback\n"
 "    function, this argument can be None.\n"
@@ -3193,9 +3200,11 @@ PyDoc_STRVAR(decompress_stream_doc,
 "                  read_size=131075, write_size=131072,\n"
 "                  callback=None)\n"
 "----\n"
-"Decompress from input_stream to output_stream.\n\n"
+"Decompresses input_stream and writes the decompressed data to output_stream,\n"
+"it doesn't close the streams.\n\n"
+"Supports multiple concatenated frames.\n\n"
 "Return a tuple, (total_input, total_output), the items are int objects.\n\n"
-"Arguments\n\n"
+"Arguments\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
 "output_stream: Output stream that has a .write(b) method. If use callback\n"
 "    function, this argument can be None.\n"

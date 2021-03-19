@@ -28,8 +28,7 @@ compressionLevel_values = _nt_values(_zstd._ZSTD_CLEVEL_DEFAULT,
 _nt_frame_info = namedtuple('frame_info', ['decompressed_size', 'dictionary_id'])
 
 def get_frame_info(frame_buffer):
-    """
-    Get zstd frame infomation from a frame header.
+    """Get zstd frame infomation from a frame header.
 
     Arguments
     frame_buffer: A bytes-like object. It should starts from the beginning of
@@ -92,8 +91,8 @@ class DParameter(IntEnum):
 class Strategy(IntEnum):
     """Compression strategies, listed from fastest to strongest.
 
-       Note : new strategies _might_ be added in the future, only the order
-       (from fast to strong) is guaranteed.
+    Note : new strategies _might_ be added in the future, only the order
+    (from fast to strong) is guaranteed.
     """
     fast     = _zstd._ZSTD_fast
     dfast    = _zstd._ZSTD_dfast
@@ -108,6 +107,8 @@ class Strategy(IntEnum):
 
 def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
 
     Arguments
     data:            A bytes-like object, data to be compressed.
@@ -125,6 +126,8 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
 
     Use rich memory mode, it's faster than compress() in some cases, but
     allocates more memory.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
 
     Arguments
     data:            A bytes-like object, data to be compressed.
