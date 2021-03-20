@@ -262,7 +262,6 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 class ZstdFile(_compression.BaseStream):
-
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None):
         self._fp = None

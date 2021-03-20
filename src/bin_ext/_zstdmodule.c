@@ -2966,6 +2966,10 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     Py_ssize_t write_size = ZSTD_CStreamOutSize();
     PyObject *callback = Py_None;
 
+    /* If fails, modify value in __init__.pyi and doc. */
+    assert(read_size == 131072);
+    assert(write_size == 131591);
+
     size_t zstd_ret;
     PyObject *temp;
     ZstdCompressor self = {0};
@@ -3231,6 +3235,10 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     Py_ssize_t read_size = ZSTD_DStreamInSize();
     Py_ssize_t write_size = ZSTD_DStreamOutSize();
     PyObject *callback = Py_None;
+
+    /* If fails, modify value in __init__.pyi and doc. */
+    assert(read_size == 131075);
+    assert(write_size == 131072);
 
     size_t zstd_ret;
     PyObject *temp;

@@ -2,10 +2,10 @@ try:
     from cffi import FFI
 except ImportError:
     # PyPy includes cffi by default
-    msg = ("To build the CFFI implementation of pyzstd module, need to "
-           "install cffi module like this: \"sudo python3 -m pip install "
-           "cffi\". On CPython, CFFI implementation is slower than C "
-           "implementation.")
+    msg = ('To build the CFFI implementation of pyzstd module, need to '
+           'install cffi module like this: "sudo python3 -m pip install '
+           'cffi". On CPython, CFFI implementation is slower than C '
+           'implementation.')
     raise ImportError(msg)
 
 ffibuilder = FFI()
@@ -94,8 +94,7 @@ typedef enum {
 
 typedef enum {
     ZSTD_reset_session_only,
-    ZSTD_reset_parameters,
-    ZSTD_reset_session_and_parameters
+    ...
 } ZSTD_ResetDirective;
 
 size_t      ZSTD_compressBound(size_t srcSize);
@@ -191,5 +190,5 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
 #endif
 """
 
-def set_args(**kw):
-    ffibuilder.set_source(source=source, **kw)
+def set_kwargs(**kwargs):
+    ffibuilder.set_source(source=source, **kwargs)

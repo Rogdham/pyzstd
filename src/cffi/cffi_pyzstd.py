@@ -245,12 +245,12 @@ class ZstdDict:
         self.__dict_id = m.ZDICT_getDictID(ffi.from_buffer(dict_content), len(dict_content))
 
         if not is_raw and self.dict_id == 0:
-            msg = ("The \"dict_content\" argument is not a valid zstd "
-                   "dictionary. The first 4 bytes of a valid zstd dictionary "
-                   "should be a magic number: b'\\x37\\xA4\\x30\\xEC'.\n"
-                   "If you are an advanced user, and can be sure that "
-                   "\"dict_content\" is a \"raw content\" zstd dictionary, "
-                   "set \"is_raw\" argument to True.")
+            msg = ('The "dict_content" argument is not a valid zstd '
+                   'dictionary. The first 4 bytes of a valid zstd dictionary '
+                   'should be a magic number: b"\\x37\\xA4\\x30\\xEC".\n'
+                   'If you are an advanced user, and can be sure that '
+                   '"dict_content" is a "raw content" zstd dictionary, '
+                   'set "is_raw" argument to True.')
             raise ValueError(msg)
 
     @property
@@ -416,14 +416,14 @@ def _set_parameter_error(is_compress, posi, key, value):
     else:
         bounds = m.ZSTD_dParam_getBounds(key)
     if m.ZSTD_isError(bounds.error):
-        msg = "Error when getting bounds of zstd %s parameter \"%s\"." % \
+        msg = 'Error when getting bounds of zstd %s parameter "%s".' % \
               (type_msg, name)
         raise ZstdError(msg)
 
     # Error message
-    msg = ("Error when setting zstd %s parameter \"%s\", it "
-           "should %d <= value <= %d, provided value is %d. "
-           "(zstd v%s, %s-bit build)") % \
+    msg = ('Error when setting zstd %s parameter "%s", it '
+           'should %d <= value <= %d, provided value is %d. '
+           '(zstd v%s, %s-bit build)') % \
           (type_msg, name,
            bounds.lowerBound, bounds.upperBound, value,
            zstd_version, '64' if maxsize > 2**32 else '32')
@@ -744,10 +744,10 @@ class RichMemZstdCompressor(_Compressor):
         super().__init__(level_or_option=level_or_option, zstd_dict=zstd_dict)
 
         if self._use_multithreaded:
-            msg = ("Currently \"rich memory mode\" has no effect on "
-                   "zstd multi-threaded compression (set "
-                   "\"CParameter.nbWorkers\" > 1), it will allocate "
-                   "unnecessary memory.")
+            msg = ('Currently "rich memory mode" has no effect on '
+                   'zstd multi-threaded compression (set '
+                   '"CParameter.nbWorkers" > 1), it will allocate '
+                   'unnecessary memory.')
             warn(msg, ResourceWarning, 1)
 
     def compress(self, data):
@@ -770,9 +770,8 @@ class RichMemZstdCompressor(_Compressor):
         finally:
             self._lock.release()
 
-class _Decompressor_type(IntEnum):
-    DECOMPRESSOR = 0
-    ENDLESS_DECOMPRESSOR = 1
+_TYPE_DEC         = 0
+_TYPE_ENDLESS_DEC = 1
 
 class _Decompressor:
     def __init__(self, zstd_dict=None, option=None):
@@ -814,7 +813,7 @@ class _Decompressor:
     def _decompress_impl(self, in_buf, max_length, decompressed_size):
         # The first AFE check for setting .at_frame_edge flag, search "AFE" in
         # _zstdmodule.c to see details.
-        if self._type == _Decompressor_type.ENDLESS_DECOMPRESSOR:
+        if self._type == _TYPE_ENDLESS_DEC:
             if self._at_frame_edge and in_buf.pos == in_buf.size:
                 return b""
 
@@ -836,7 +835,7 @@ class _Decompressor:
                 _set_zstd_error(_ErrorType.ERR_DECOMPRESS, zstd_ret)
 
             # Set .eof/.af_frame_edge flag
-            if self._type == _Decompressor_type.DECOMPRESSOR:
+            if self._type == _TYPE_DEC:
                 # ZstdDecompressor class stops when a frame is decompressed
                 if zstd_ret == 0:
                     self._eof = True
@@ -876,7 +875,7 @@ class _Decompressor:
             if in_buf == ffi.NULL:
                 raise MemoryError
 
-            if self._type == _Decompressor_type.DECOMPRESSOR:
+            if self._type == _TYPE_DEC:
                 # Check .eof flag
                 if self._eof:
                     raise EOFError("Already at the end of a zstd frame.")
@@ -964,7 +963,7 @@ class _Decompressor:
 
             # Unconsumed input data
             if in_buf.pos == in_buf.size:
-                if self._type == _Decompressor_type.DECOMPRESSOR:
+                if self._type == _TYPE_DEC:
                     if len(ret) == max_length or self._eof:
                         self._needs_input = False
                     else:
@@ -983,7 +982,7 @@ class _Decompressor:
                 data_size = in_buf.size - in_buf.pos
 
                 self._needs_input = False
-                if self._type == _Decompressor_type.ENDLESS_DECOMPRESSOR:
+                if self._type == _TYPE_ENDLESS_DEC:
                     self._at_frame_edge = False
 
                 if not use_input_buffer:
@@ -1013,7 +1012,7 @@ class _Decompressor:
             self._in_end = 0
 
             self._needs_input = True
-            if self._type == _Decompressor_type.DECOMPRESSOR:
+            if self._type == _TYPE_DEC:
                 self._eof = False
             else:
                 self._at_frame_edge = True
@@ -1041,8 +1040,8 @@ class ZstdDecompressor(_Decompressor):
         """
         super().__init__(zstd_dict, option)
         self._eof = False
-        self._unused_data = None
-        self._type = _Decompressor_type.DECOMPRESSOR
+        self._unused_data = ffi.NULL
+        self._type = _TYPE_DEC
 
     def decompress(self, data, max_length=-1):
         """Decompress data, return a chunk of decompressed data if possible, or b''
@@ -1074,7 +1073,7 @@ class ZstdDecompressor(_Decompressor):
             if not self._eof:
                 return b""
             else:
-                if self._unused_data == None:
+                if self._unused_data == ffi.NULL:
                     if self._input_buffer == ffi.NULL:
                         self._unused_data = b""
                     else:
@@ -1097,7 +1096,7 @@ class EndlessZstdDecompressor(_Decompressor):
         """
         super().__init__(zstd_dict, option)
         self._at_frame_edge = True
-        self._type = _Decompressor_type.ENDLESS_DECOMPRESSOR
+        self._type = _TYPE_ENDLESS_DEC
 
     def decompress(self, data, max_length=-1):
         """Decompress data, return a chunk of decompressed data if possible, or b''
@@ -1736,7 +1735,6 @@ def get_frame_size(frame_buffer):
 
     return frame_size
 
-
 class ZstdDecompressReader(_compression.DecompressReader):
     def readall(self):
         chunks = []
@@ -1750,13 +1748,11 @@ class ZstdDecompressReader(_compression.DecompressReader):
             chunks.append(data)
         return b"".join(chunks)
 
-
 _MODE_CLOSED = 0
 _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 class ZstdFile(_compression.BaseStream):
-
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None):
         self._fp = None
@@ -1929,7 +1925,6 @@ class ZstdFile(_compression.BaseStream):
         if self._mode == _MODE_READ:
             return self._buffer.tell()
         return self._pos
-
 
 def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
          encoding=None, errors=None, newline=None):

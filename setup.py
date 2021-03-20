@@ -28,7 +28,9 @@ def get_zstd_c_files_list():
     lst = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
         directory = 'lib/' + sub_dir + '/'
-        l = [directory + fn for fn in os.listdir(directory) if fnmatch.fnmatch(fn, '*.[cC]')]
+        l = [directory + fn
+               for fn in os.listdir(directory)
+               if fnmatch.fnmatch(fn, '*.[cC]')]
         lst.extend(l)
     return lst
 
@@ -62,23 +64,24 @@ else:  # statically link to zstd lib
 
 if CFFI:
     # packages
-    packages=['pyzstd', 'pyzstd.cffi']
+    packages = ['pyzstd', 'pyzstd.cffi']
 
     # binary extension
     kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
+    sys.path.append('src/bin_ext')
     import build_cffi
-    build_cffi.set_args(**kwargs)
-    ext_module = build_cffi.ffibuilder.distutils_extension()
+    build_cffi.set_kwargs(**kwargs)
+    binary_extension = build_cffi.ffibuilder.distutils_extension()
 else:  # C implementation
     # packages
-    packages=['pyzstd', 'pyzstd.c']
+    packages = ['pyzstd', 'pyzstd.c']
 
     # binary extension
     kwargs['name'] = 'pyzstd.c._zstd'
-    kwargs['sources'].append('src/_zstdmodule.c')
+    kwargs['sources'].append('src/bin_ext/_zstdmodule.c')
 
-    ext_module = Extension(**kwargs)
+    binary_extension = Extension(**kwargs)
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
@@ -112,7 +115,6 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
-        "Programming Language :: Python :: 3 :: Only",
         "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
@@ -125,7 +127,7 @@ setup(
     packages=packages,
     package_data={'pyzstd': ['__init__.pyi', 'py.typed']},
 
-    ext_modules=[ext_module],
+    ext_modules=[binary_extension],
     cmdclass={'build_ext': build_ext_compiler_check},
 
     test_suite='tests'

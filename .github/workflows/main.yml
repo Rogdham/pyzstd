@@ -127,7 +127,7 @@ jobs:
     steps:
       - uses: actions/checkout@v2
 
-      - uses: uraimo/run-on-arch-action@v2.0.5
+      - uses: uraimo/run-on-arch-action@v2.0.9
         name: Build & run test
         with:
           arch: ${{ matrix.arch }}

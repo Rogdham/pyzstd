@@ -18,6 +18,12 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**next release  (xx x, 2021)**
+
+#. Add a CFFI implementation that can work with PyPy.
+
+#. Allow dynamically link to zstd library.
+
 **0.14.3  (Mar 4, 2021)**
 
 Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
