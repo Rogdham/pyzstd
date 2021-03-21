@@ -50,6 +50,8 @@ def _get_param_bounds(is_compress, key):
     return (bounds.lowerBound, bounds.upperBound)
 
 class CParameter(IntEnum):
+    """Compression parameters"""
+
     compressionLevel           = m.ZSTD_c_compressionLevel
     windowLog                  = m.ZSTD_c_windowLog
     hashLog                    = m.ZSTD_c_hashLog
@@ -81,6 +83,8 @@ class CParameter(IntEnum):
 _SUPPORT_MULTITHREAD = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class DParameter(IntEnum):
+    """Decompression parameters"""
+
     windowLogMax = m.ZSTD_d_windowLogMax
 
     def bounds(self):
@@ -124,7 +128,7 @@ class _BlocksOutputBuffer:
         # The first block
         block = _new_nonzero("char[]", block_size)
         if block == ffi.NULL:
-            raise MemoryError(self.MEM_ERR_MSG)
+            raise MemoryError
 
         # Create the list
         self.list = [block]
@@ -698,7 +702,7 @@ class ZstdCompressor(_Compressor):
         Arguments
         mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.
         """
-        if mode not in (ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME):
+        if mode not in (ZstdCompressor.FLUSH_FRAME, ZstdCompressor.FLUSH_BLOCK):
             msg = ("mode argument wrong value, it should be "
                    "ZstdCompressor.FLUSH_FRAME or ZstdCompressor.FLUSH_BLOCK.")
             raise ValueError(msg)

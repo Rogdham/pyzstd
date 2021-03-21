@@ -50,6 +50,8 @@ def get_frame_info(frame_buffer):
 
 
 class CParameter(IntEnum):
+    """Compression parameters"""
+
     compressionLevel           = _zstd._ZSTD_c_compressionLevel
     windowLog                  = _zstd._ZSTD_c_windowLog
     hashLog                    = _zstd._ZSTD_c_hashLog
@@ -80,6 +82,8 @@ class CParameter(IntEnum):
 
 
 class DParameter(IntEnum):
+    """Decompression parameters"""
+
     windowLogMax = _zstd._ZSTD_d_windowLogMax
 
     def bounds(self):

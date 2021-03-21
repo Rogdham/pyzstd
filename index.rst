@@ -818,13 +818,13 @@ Advanced parameters
 
         Maximum allowed back-reference distance, expressed as power of 2, ``1 << windowLog`` bytes.
 
-        This will set a memory budget for streaming decompression, with larger values requiring more memory and typically compressing more.
+        Larger values requiring more memory and typically compressing more.
+
+        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.4.8, means 128 MiB (1 << 27).
 
         Must be clamped between ``ZSTD_WINDOWLOG_MIN`` and ``ZSTD_WINDOWLOG_MAX``.
 
         Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
-
-        Note: Using a windowLog greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, the constant is ``27`` in zstd v1.4.8, means 128 MiB (1 << 27).
 
     .. py:attribute:: hashLog
 
@@ -904,9 +904,9 @@ Advanced parameters
 
         Enable long distance matching.
 
-        This parameter is designed to improve compression ratio, for large inputs, by finding large matches at long distance.
+        Default value is ``0``, can be ``1``.
 
-        It increases memory usage and window size.
+        This parameter is designed to improve compression ratio, for large inputs, by finding large matches at long distance. It increases memory usage and window size.
 
         Note:
             * Enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MiB except when expressly set to a different value.
@@ -962,7 +962,7 @@ Advanced parameters
 
         Uncompressed content size will be written into frame header whenever known.
 
-        Default value is ``1``.
+        Default value is ``1``, can be ``0``.
 
         In traditional streaming compression, content size is unknown.
 
@@ -978,15 +978,17 @@ Advanced parameters
 
     .. py:attribute:: checksumFlag
 
-        A 4-byte checksum of uncompressed content is written at the end of frame. If decompression verification fails, a :py:class:`ZstdError` exception will be raised.
+        A 4-byte checksum of uncompressed content is written at the end of frame.
 
-        Default value is ``0``.
+        Default value is ``0``, can be ``1``.
+
+        Zstd's decompression code verifies it. If checksum mismatch, raises a :py:class:`ZstdError` exception, with a message like "Restored data doesn't match checksum".
 
     .. py:attribute:: dictIDFlag
 
         When applicable, dictionary's ID is written into frame header. See :ref:`this note<dict_id>` for details.
 
-        Default value is ``1``.
+        Default value is ``1``, can be ``0``.
 
     .. py:attribute:: nbWorkers
 
@@ -996,45 +998,40 @@ Advanced parameters
 
         More workers improve speed, but also increase memory usage.
 
-        Default value is ``0``, aka "single-threaded mode" : no worker is spawned, compression is performed inside caller's thread.
+        ``0`` (default) or ``1`` means to use single-threaded compression, no worker is spawned, compression is performed inside caller's thread.
 
     .. py:attribute:: jobSize
 
-        Size of a compression job, in bytes. This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
-
-        Each compression job is completed in parallel, so this value can indirectly impact the nb of active threads.
-
-        ``0`` means default, which is dynamically determined based on compression parameters.
-
-        Job size must be a minimum of overlap size (specified by :py:attr:`CParameter.overlapLog`), or 1 MiB, whichever is largest.
-
-        The minimum size is automatically and transparently enforced.
-
-    .. py:attribute:: overlapLog
-
-        Control the overlap size, as a fraction of window size.
-
-        The overlap size is an amount of data reloaded from previous job at the beginning of a new job.
-
-        It helps preserve compression ratio, while each job is compressed in parallel.
+        Size of a compression job, in bytes.
 
         This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
 
-        Larger values increase compression ratio, but decrease speed.
+        Each compression job is completed in parallel, so this value can indirectly impact the number of active threads.
 
-        Possible values range from 0 to 9 :
+        ``0`` means default, which is dynamically determined based on compression parameters.
 
-        - 0 means "default" : value will be determined by the library, depending on :py:attr:`~CParameter.strategy`
+        Non-zero value will be silently clamped to:
+
+        * minimum value: ``max(overlap_size, 1_MiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
+        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``. (zstd v1.4.8 values)
+
+    .. py:attribute:: overlapLog
+
+        Control the overlap size, as a fraction of window size. (The "window size" here is not strict :py:attr:`~CParameter.windowLog`, see zstd source code.)
+
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+
+        The overlap size is an amount of data reloaded from previous job at the beginning of a new job. It helps preserve compression ratio, while each job is compressed in parallel. Larger values increase compression ratio, but decrease speed.
+
+        Possible values range from 0 to 9:
+
+        - 0 means "default" : The value will be determined by the library. The value varies between 6 and 9, depending on :py:attr:`~CParameter.strategy`.
         - 1 means "no overlap"
         - 9 means "full overlap", using a full window size.
 
-        Each intermediate rank increases/decreases load size by a factor 2 :
+        Each intermediate rank increases/decreases load size by a factor 2:
 
         9: full window;  8: w/2;  7: w/4;  6: w/8;  5:w/16;  4: w/32;  3:w/64;  2:w/128;  1:no overlap;  0:default
-
-        Default value varies between 6 and 9, depending on :py:attr:`~CParameter.strategy`.
-
-        "Window size" and :py:attr:`CParameter.windowLog` are different, see `zstd format document <https://github.com/facebook/zstd/blob/release/doc/zstd_compression_format.md#window_descriptor>`_ for details.
 
 
 .. _DParameter:
@@ -1073,6 +1070,8 @@ Advanced parameters
     .. py:attribute:: windowLogMax
 
         Select a size limit (in power of 2) beyond which the streaming API will refuse to allocate memory buffer in order to protect the host from unreasonable memory requirements.
+
+        If a :ref:`frame<frame_block>` requires more memory than the set value, raises a :py:class:`ZstdError` exception, with a message like "Frame requires too much memory for decoding".
 
         This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode. :py:func:`decompress` function may use streaming mode or single-pass mode.
 
