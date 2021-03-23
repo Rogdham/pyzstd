@@ -2714,7 +2714,7 @@ _get_frame_info(PyObject *module, PyObject *args)
     } else if (content_size == ZSTD_CONTENTSIZE_ERROR) {
         PyErr_SetString(static_state.ZstdError,
                         "Error when getting a zstd frame's decompressed size, "
-                        "make sure that frame_buffer argument starts from the "
+                        "make sure the frame_buffer argument starts from the "
                         "beginning of a frame and its size larger than the "
                         "frame header (6~18 bytes).");
         goto error;
@@ -3410,6 +3410,15 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                the last byte is kept as hostage, it will be released when all
                output is flushed. */
             if (in.pos == in.size) {
+                /* If input stream ends in an incomplete frame, output as much
+                   as possible. */
+                if (read_bytes == 0 &&
+                    self.at_frame_edge == 0 &&
+                    out.pos == out.size)
+                {
+                    continue;
+                }
+
                 break;
             }
         } /* Decompress & write loop */
@@ -3427,7 +3436,6 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
                              total_input_size, total_output_size);
                 goto error;
             }
-
             break;
         }
     } /* Read loop */

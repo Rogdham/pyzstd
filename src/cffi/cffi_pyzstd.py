@@ -372,7 +372,7 @@ def _set_zstd_error(type, zstd_code):
 
     type_msg = _ErrorType.get_type_msg(type)
     msg = "Unable to %s: %s." % \
-          (type_msg, ffi.string(m.ZSTD_getErrorName(zstd_code)).decode("ascii"))
+          (type_msg, ffi.string(m.ZSTD_getErrorName(zstd_code)).decode('utf-8'))
     raise ZstdError(msg)
 
 def _set_parameter_error(is_compress, posi, key, value):
@@ -1515,6 +1515,13 @@ def decompress_stream(input_stream, output_stream, *,
                 # the last byte is kept as hostage, it will be released when all
                 # output is flushed.
                 if in_buf.pos == in_buf.size:
+                    # If input stream ends in an incomplete frame, output as
+                    # much as possible.
+                    if (read_bytes == 0
+                          and not at_frame_edge
+                          and out_buf.pos == out_buf.size):
+                        continue
+
                     break
 
             # Input stream ended
@@ -1706,7 +1713,7 @@ def get_frame_info(frame_buffer):
         content_size = None
     elif content_size == m.ZSTD_CONTENTSIZE_ERROR:
         msg = ("Error when getting a zstd frame's decompressed size, "
-               "make sure that frame_buffer argument starts from the "
+               "make sure the frame_buffer argument starts from the "
                "beginning of a frame and its size larger than the "
                "frame header (6~18 bytes).")
         raise ZstdError(msg)
