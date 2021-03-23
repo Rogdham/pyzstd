@@ -303,6 +303,10 @@ class ZstdDict:
                            "dictionary content.")
                     raise ZstdError(msg)
 
+                # Call ZSTD_freeCDict() when GC
+                cdict = ffi.gc(cdict,
+                               m.ZSTD_freeCDict,
+                               m.ZSTD_sizeof_CDict(cdict))
                 self.__cdicts[level] = cdict
             return cdict
         finally:
@@ -314,23 +318,20 @@ class ZstdDict:
 
             if self.__ddict == ffi.NULL:
                 # Create ZSTD_DDict instance
-                self.__ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
-                                                  len(self.__dict_content))
-                if self.__ddict == ffi.NULL:
+                ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
+                                           len(self.__dict_content))
+                if ddict == ffi.NULL:
                     msg = ("Failed to get ZSTD_DDict instance from zstd "
                            "dictionary content.")
                     raise ZstdError(msg)
+
+                # Call ZSTD_freeDDict() when GC
+                self.__ddict = ffi.gc(ddict,
+                                      m.ZSTD_freeDDict,
+                                      m.ZSTD_sizeof_DDict(ddict))
             return self.__ddict
         finally:
             self.__lock.release()
-
-    def __del__(self):
-        try:
-            for cdict in self.__cdicts.values():
-                m.ZSTD_freeCDict(cdict)
-            m.ZSTD_freeDDict(self.__ddict)
-        except:
-            pass
 
 class _ErrorType:
     ERR_DECOMPRESS=0
@@ -543,9 +544,13 @@ class _Compressor:
         level = 0  # 0 means use zstd's default compression level
 
         # Compression context
-        self._cctx = m.ZSTD_createCCtx()
-        if self._cctx == ffi.NULL:
+        cctx = m.ZSTD_createCCtx()
+        if cctx == ffi.NULL:
             raise ZstdError("Unable to create ZSTD_CCtx instance.")
+        # Call ZSTD_freeCCtx() when GC
+        self._cctx = ffi.gc(cctx,
+                            m.ZSTD_freeCCtx,
+                            m.ZSTD_sizeof_CCtx(cctx))
 
         # Set compressLevel/option to compression context
         if level_or_option is not None:
@@ -631,12 +636,6 @@ class _Compressor:
             # Output buffer should be exhausted, grow the buffer.
             if out_buf.pos == out_buf.size:
                 out.grow(out_buf)
-
-    def __del__(self):
-        try:
-            m.ZSTD_freeCCtx(self._cctx)
-        except:
-            pass
 
     def __reduce__(self):
         msg = "Cannot pickle %s object." % type(self)
@@ -787,9 +786,13 @@ class _Decompressor:
         self._in_end = 0
 
         # Decompression context
-        self._dctx = m.ZSTD_createDCtx()
-        if self._dctx == ffi.NULL:
+        dctx = m.ZSTD_createDCtx()
+        if dctx == ffi.NULL:
             raise ZstdError("Unable to create ZSTD_DCtx instance.")
+        # Call ZSTD_freeDCtx() when GC
+        self._dctx = ffi.gc(dctx,
+                            m.ZSTD_freeDCtx,
+                            m.ZSTD_sizeof_DCtx(dctx))
 
         # Load dictionary to compression context
         if zstd_dict is not None:
@@ -799,12 +802,6 @@ class _Decompressor:
         # Set compressLevel/option to compression context
         if option is not None:
             _set_d_parameters(self._dctx, option)
-
-    def __del__(self):
-        try:
-            m.ZSTD_freeDCtx(self._dctx)
-        except:
-            pass
 
     @property
     def needs_input(self):
