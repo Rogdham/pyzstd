@@ -1,6 +1,6 @@
+__pycache__/
 /pyzstd.egg-info
 /dist
 /build
 /.vscode
-/test/__pycache__
 /*.pdb

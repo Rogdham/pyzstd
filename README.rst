@@ -5,7 +5,7 @@ Introduction
 
 The API is similar to Python's bz2/lzma/zlib module.
 
-Includes zstd v1.4.9 source code.
+Includes zstd v1.4.9 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
 
 
 Links
@@ -18,6 +18,12 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.14.4  (Mar 24, 2021)**
+
+#. Add a CFFI implementation that can work with PyPy.
+
+#. Allow dynamically link to zstd library.
+
 **0.14.3  (Mar 4, 2021)**
 
 Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.

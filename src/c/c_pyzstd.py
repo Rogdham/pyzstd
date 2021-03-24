@@ -1,10 +1,9 @@
-import builtins
-import enum
-import io
-import sys
-import os
 import _compression
+import io
 from collections import namedtuple
+from enum import IntEnum
+from os import PathLike
+from sys import maxsize
 
 from ._zstd import *
 from . import _zstd
@@ -29,8 +28,7 @@ compressionLevel_values = _nt_values(_zstd._ZSTD_CLEVEL_DEFAULT,
 _nt_frame_info = namedtuple('frame_info', ['decompressed_size', 'dictionary_id'])
 
 def get_frame_info(frame_buffer):
-    """
-    Get zstd frame infomation from a frame header.
+    """Get zstd frame infomation from a frame header.
 
     Arguments
     frame_buffer: A bytes-like object. It should starts from the beginning of
@@ -51,7 +49,9 @@ def get_frame_info(frame_buffer):
     return _nt_frame_info(*ret_tuple)
 
 
-class CParameter(enum.IntEnum):
+class CParameter(IntEnum):
+    """Compression parameters"""
+
     compressionLevel           = _zstd._ZSTD_c_compressionLevel
     windowLog                  = _zstd._ZSTD_c_windowLog
     hashLog                    = _zstd._ZSTD_c_hashLog
@@ -81,7 +81,9 @@ class CParameter(enum.IntEnum):
         return _zstd._get_param_bounds(1, self.value)
 
 
-class DParameter(enum.IntEnum):
+class DParameter(IntEnum):
+    """Decompression parameters"""
+
     windowLogMax = _zstd._ZSTD_d_windowLogMax
 
     def bounds(self):
@@ -90,11 +92,11 @@ class DParameter(enum.IntEnum):
         return _zstd._get_param_bounds(0, self.value)
 
 
-class Strategy(enum.IntEnum):
+class Strategy(IntEnum):
     """Compression strategies, listed from fastest to strongest.
 
-       Note : new strategies _might_ be added in the future, only the order
-       (from fast to strong) is guaranteed.
+    Note : new strategies _might_ be added in the future, only the order
+    (from fast to strong) is guaranteed.
     """
     fast     = _zstd._ZSTD_fast
     dfast    = _zstd._ZSTD_dfast
@@ -109,6 +111,8 @@ class Strategy(enum.IntEnum):
 
 def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
 
     Arguments
     data:            A bytes-like object, data to be compressed.
@@ -127,6 +131,8 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     Use rich memory mode, it's faster than compress() in some cases, but
     allocates more memory.
 
+    Compressing b'' will get an empty content frame (9 bytes or more).
+
     Arguments
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
@@ -136,6 +142,31 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     """
     comp = RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
+
+
+def decompress(data, zstd_dict=None, option=None):
+    """Decompress a zstd data, return a bytes object.
+
+    Support multiple concatenated frames.
+
+    Arguments
+    data:      A bytes-like object, compressed zstd data.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option:    A dict object, contains advanced decompression parameters.
+    """
+    decomp = EndlessZstdDecompressor(zstd_dict, option)
+    ret = decomp.decompress(data)
+
+    if not decomp.at_frame_edge:
+        extra_msg = '.' if len(ret) == 0 else \
+                    (', if want to output these decompressed data, use '
+                     'an EndlessZstdDecompressor object to decompress.')
+        msg = ('Decompression failed: zstd data ends in an incomplete '
+               'frame, maybe the input data was truncated. Decompressed '
+               'data is %s bytes%s') % (format(len(ret), ','), extra_msg)
+        raise ZstdError(msg)
+
+    return ret
 
 
 def train_dict(samples, dict_size):
@@ -223,7 +254,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
             # sys.maxsize means the max length of output buffer is unlimited,
             # so that the whole input buffer can be decompressed within one
             # .decompress() call.
-            data = self.read(sys.maxsize)
+            data = self.read(maxsize)
             if not data:
                 break
             chunks.append(data)
@@ -235,7 +266,6 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 class ZstdFile(_compression.BaseStream):
-
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None):
         self._fp = None
@@ -263,10 +293,10 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
-        if isinstance(filename, (str, bytes, os.PathLike)):
+        if isinstance(filename, (str, bytes, PathLike)):
             if "b" not in mode:
                 mode += "b"
-            self._fp = builtins.open(filename, mode)
+            self._fp = io.open(filename, mode)
             self._closefp = True
             self._mode = mode_code
         elif hasattr(filename, "read") or hasattr(filename, "write"):

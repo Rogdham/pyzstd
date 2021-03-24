@@ -3,7 +3,11 @@
 Introduction
 ------------
 
-pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm. The API is similar to Python's bz2/lzma/zlib module.
+pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+
+The API is similar to Python's bz2/lzma/zlib module.
+
+Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -18,7 +22,7 @@ Features of zstd:
     Two other zstd modules on PyPI:
 
     * `zstd <https://pypi.org/project/zstd/>`_, a very simple module.
-    * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API, supports PyPy.
+    * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API.
 
 Exception
 ---------
@@ -37,7 +41,7 @@ Common functions
         * function :py:func:`decompress`
 
     .. hint::
-        If there is a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
+        If there are a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
         * compression: :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
         * decompression: :py:class:`EndlessZstdDecompressor`.
@@ -46,6 +50,8 @@ Common functions
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
 
     Compress *data*, return the compressed data.
+
+    Compressing ``b''`` will get an empty content frame (9 bytes or more).
 
     :param data: Data to be compressed.
     :type data: bytes-like object
@@ -101,6 +107,8 @@ Rich memory compression
 
     The parameters are the same as :py:func:`compress` function.
 
+    Compressing ``b''`` will get an empty content frame (9 bytes or more).
+
 
 .. py:class:: RichMemZstdCompressor
 
@@ -116,7 +124,9 @@ Rich memory compression
 
     .. py:method:: compress(self, data)
 
-        Compress *data* use :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+        Compress *data* using :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
+
+        Compressing ``b''`` will get an empty content frame (9 bytes or more).
 
         :param data: Data to be compressed.
         :type data: bytes-like object
@@ -144,9 +154,13 @@ Streaming compression
 
 .. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
-    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It's zero memory copy.
+    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It doesn't close the streams.
 
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+    If input stream is ``b''``, nothing will be written to output stream.
+
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
+
+    .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
@@ -154,7 +168,7 @@ Streaming compression
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
+    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -162,37 +176,39 @@ Streaming compression
     :type write_size: int
     :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
     :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
+    :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
-.. sourcecode:: python
+    .. sourcecode:: python
 
-    # compress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh, level_or_option=5)
+        # compress an input file, and write to an output file.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(ifh, ofh, level_or_option=5)
 
-    # compress a bytes object, and write to a file.
-    with io.BytesIO(raw_dat) as bi:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(bi, ofh)
+        # compress a bytes object, and write to a file.
+        with io.BytesIO(raw_dat) as bi:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(bi, ofh, pledged_input_size=len(raw_dat))
 
-    # compress an input file, obtain a bytes object.
-    # compared to reading a file and compressing it in memory,
-    # it's faster on Linux, slower on Windows.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.BytesIO() as bo:
-            compress_stream(ifh, bo)
-            compressed_dat = bo.getvalue()
+        # Compress an input file, obtain a bytes object.
+        # It's faster than reading a file and compressing it in
+        # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
+        # Maybe the OS has prefetching, it can read and compress
+        # data in parallel to some degree, reading file from HDD
+        # is the bottleneck in this case.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.BytesIO() as bo:
+                compress_stream(ifh, bo)
+                compressed_dat = bo.getvalue()
 
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
+        # with callback function
+        def func(total_input, total_output, read_data, write_data):
+            percent = 100 * total_input / input_file_size
+            print(f'Progress: {percent:.1f}%')
 
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            compress_stream(ifh, ofh, callback=func)
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                compress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdCompressor
@@ -292,11 +308,13 @@ Streaming decompression
 
 .. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
-    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It's zero memory copy.
+    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It doesn't close the streams.
 
     Supports multiple concatenated frames.
 
-    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster.
+    The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
+
+    .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
     :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
@@ -310,38 +328,40 @@ Streaming decompression
     :type write_size: int
     :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
     :type callback: callable
-    :return: A 2-items tuple, ``(total_input, total_output)``, the items are ``int`` objects.
-    :rtype: tuple
+    :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.
 
-.. sourcecode:: python
+    .. sourcecode:: python
 
-    # decompress an input file, and write to an output file.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(ifh, ofh)
+        # decompress an input file, and write to an output file.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(ifh, ofh)
 
-    # decompress a bytes object, and write to a file.
-    with io.BytesIO(compressed_dat) as bi:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(bi, ofh)
+        # decompress a bytes object, and write to a file.
+        with io.BytesIO(compressed_dat) as bi:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(bi, ofh)
 
-    # decompress an input file, obtain a bytes object.
-    # compared to reading a file and decompressing it in memory,
-    # it's faster on Linux, slower on Windows.
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.BytesIO() as bo:
-            decompress_stream(ifh, bo)
-            decompressed_dat = bo.getvalue()
+        # Decompress an input file, obtain a bytes object.
+        # It's faster than reading a file and decompressing it in
+        # memory, tested on Ubuntu(Python3.8)/Windows(Python3.9).
+        # Maybe the OS has prefetching, it can read and decompress
+        # data in parallel to some degree, reading file from HDD
+        # is the bottleneck in this case.
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.BytesIO() as bo:
+                decompress_stream(ifh, bo)
+                decompressed_dat = bo.getvalue()
 
-    # with callback function
-    def func(total_input, total_output, read_data, write_data):
-        percent = 100 * total_input / input_file_size
-        print(f'Progress: {percent:.1f}%')
+        # with callback function
+        def func(total_input, total_output, read_data, write_data):
+            percent = 100 * total_input / input_file_size
+            print(f'Progress: {percent:.1f}%')
 
-    with io.open(input_file_path, 'rb') as ifh:
-        with io.open(output_file_path, 'wb') as ofh:
-            decompress_stream(ifh, ofh, callback=func)
+        with io.open(input_file_path, 'rb') as ifh:
+            with io.open(output_file_path, 'wb') as ofh:
+                decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdDecompressor
@@ -380,7 +400,7 @@ Streaming decompression
 
     .. py:attribute:: eof
 
-        ``True`` means the end of the first frame has been reached. If decompress data after that, ``EOFError`` exception will be raised.
+        ``True`` means the end of the first frame has been reached. If decompress data after that, an ``EOFError`` exception will be raised.
 
     .. py:attribute:: unused_data
 
@@ -798,13 +818,13 @@ Advanced parameters
 
         Maximum allowed back-reference distance, expressed as power of 2, ``1 << windowLog`` bytes.
 
-        This will set a memory budget for streaming decompression, with larger values requiring more memory and typically compressing more.
+        Larger values requiring more memory and typically compressing more.
+
+        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.4.8, means 128 MiB (1 << 27).
 
         Must be clamped between ``ZSTD_WINDOWLOG_MIN`` and ``ZSTD_WINDOWLOG_MAX``.
 
         Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
-
-        Note: Using a windowLog greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, the constant is ``27`` in zstd v1.4.8, means 128 MiB (1 << 27).
 
     .. py:attribute:: hashLog
 
@@ -884,11 +904,13 @@ Advanced parameters
 
         Enable long distance matching.
 
-        This parameter is designed to improve compression ratio, for large inputs, by finding large matches at long distance.
+        Default value is ``0``, can be ``1``.
 
-        It increases memory usage and window size.
+        This parameter is designed to improve compression ratio, for large inputs, by finding large matches at long distance. It increases memory usage and window size.
 
-        Note: enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MiB except when expressly set to a different value.
+        Note:
+            * Enabling this parameter increases default :py:attr:`~CParameter.windowLog` to 128 MiB except when expressly set to a different value.
+            * This will be enabled by default if :py:attr:`~CParameter.windowLog` >= 128 MiB and compression strategy >= :py:attr:`~Strategy.btopt` (compression level 16+).
 
     .. py:attribute:: ldmHashLog
 
@@ -940,7 +962,7 @@ Advanced parameters
 
         Uncompressed content size will be written into frame header whenever known.
 
-        Default value is ``1``.
+        Default value is ``1``, can be ``0``.
 
         In traditional streaming compression, content size is unknown.
 
@@ -956,15 +978,17 @@ Advanced parameters
 
     .. py:attribute:: checksumFlag
 
-        A 4-byte checksum of uncompressed content is written at the end of frame. If decompression verification fails, a :py:class:`ZstdError` will be raised.
+        A 4-byte checksum of uncompressed content is written at the end of frame.
 
-        Default value is ``0``.
+        Default value is ``0``, can be ``1``.
+
+        Zstd's decompression code verifies it. If checksum mismatch, raises a :py:class:`ZstdError` exception, with a message like "Restored data doesn't match checksum".
 
     .. py:attribute:: dictIDFlag
 
         When applicable, dictionary's ID is written into frame header. See :ref:`this note<dict_id>` for details.
 
-        Default value is ``1``.
+        Default value is ``1``, can be ``0``.
 
     .. py:attribute:: nbWorkers
 
@@ -974,45 +998,40 @@ Advanced parameters
 
         More workers improve speed, but also increase memory usage.
 
-        Default value is ``0``, aka "single-threaded mode" : no worker is spawned, compression is performed inside caller's thread.
+        ``0`` (default) or ``1`` means to use single-threaded compression, no worker is spawned, compression is performed inside caller's thread.
 
     .. py:attribute:: jobSize
 
-        Size of a compression job, in bytes. This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
-
-        Each compression job is completed in parallel, so this value can indirectly impact the nb of active threads.
-
-        ``0`` means default, which is dynamically determined based on compression parameters.
-
-        Job size must be a minimum of overlap size (specified by :py:attr:`CParameter.overlapLog`), or 1 MiB, whichever is largest.
-
-        The minimum size is automatically and transparently enforced.
-
-    .. py:attribute:: overlapLog
-
-        Control the overlap size, as a fraction of window size.
-
-        The overlap size is an amount of data reloaded from previous job at the beginning of a new job.
-
-        It helps preserve compression ratio, while each job is compressed in parallel.
+        Size of a compression job, in bytes.
 
         This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
 
-        Larger values increase compression ratio, but decrease speed.
+        Each compression job is completed in parallel, so this value can indirectly impact the number of active threads.
 
-        Possible values range from 0 to 9 :
+        ``0`` means default, which is dynamically determined based on compression parameters.
 
-        - 0 means "default" : value will be determined by the library, depending on :py:attr:`~CParameter.strategy`
+        Non-zero value will be silently clamped to:
+
+        * minimum value: ``max(overlap_size, 1_MiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
+        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``. (zstd v1.4.8 values)
+
+    .. py:attribute:: overlapLog
+
+        Control the overlap size, as a fraction of window size. (The "window size" here is not strict :py:attr:`~CParameter.windowLog`, see zstd source code.)
+
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+
+        The overlap size is an amount of data reloaded from previous job at the beginning of a new job. It helps preserve compression ratio, while each job is compressed in parallel. Larger values increase compression ratio, but decrease speed.
+
+        Possible values range from 0 to 9:
+
+        - 0 means "default" : The value will be determined by the library. The value varies between 6 and 9, depending on :py:attr:`~CParameter.strategy`.
         - 1 means "no overlap"
         - 9 means "full overlap", using a full window size.
 
-        Each intermediate rank increases/decreases load size by a factor 2 :
+        Each intermediate rank increases/decreases load size by a factor 2:
 
         9: full window;  8: w/2;  7: w/4;  6: w/8;  5:w/16;  4: w/32;  3:w/64;  2:w/128;  1:no overlap;  0:default
-
-        Default value varies between 6 and 9, depending on :py:attr:`~CParameter.strategy`.
-
-        "Window size" and :py:attr:`CParameter.windowLog` are different, see `zstd format document <https://github.com/facebook/zstd/blob/release/doc/zstd_compression_format.md#window_descriptor>`_ for details.
 
 
 .. _DParameter:
@@ -1051,6 +1070,8 @@ Advanced parameters
     .. py:attribute:: windowLogMax
 
         Select a size limit (in power of 2) beyond which the streaming API will refuse to allocate memory buffer in order to protect the host from unreasonable memory requirements.
+
+        If a :ref:`frame<frame_block>` requires more memory than the set value, raises a :py:class:`ZstdError` exception, with a message like "Frame requires too much memory for decoding".
 
         This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode. :py:func:`decompress` function may use streaming mode or single-pass mode.
 
@@ -1132,7 +1153,7 @@ Frame and block
 
     .. attention::
 
-        In some `language bindings <https://facebook.github.io/zstd/#other-languages>`_, decompress() function doesn't support multiple frames, or/and doesn't support a frame with unknown :ref:`content size<content_size>`, pay attention when compressing data for other languages/modules.
+        In some `language bindings <https://facebook.github.io/zstd/#other-languages>`_, decompress() function doesn't support multiple frames, or/and doesn't support a frame with unknown :ref:`content size<content_size>`, pay attention when compressing data for other language bindings.
 
 
 Multi-threaded compression
@@ -1260,3 +1281,63 @@ Zstd dictionary ID
     In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
 
     In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
+
+
+Build pyzstd module with options
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+.. _build_pyzstd:
+
+.. versionadded:: 0.14.4
+
+.. note:: Build pyzstd module with options
+
+    Pyzstd module supports:
+
+        * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
+        * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
+
+    On CPython, add these options to setup.py:
+
+        #. no option: C implementation, statically link to zstd library.
+        #. ``--dynamic-link-zstd``: C implementation, dynamically link to zstd library.
+        #. ``--cffi``: CFFI implementation (slower), statically link to zstd library.
+        #. ``--cffi --dynamic-link-zstd``: CFFI implementation (slower), dynamically link to zstd library.
+
+    On PyPy, only CFFI implementation can be used, so ``--cffi`` is added implicitly. ``--dynamic-link-zstd`` is optional.
+
+    Some notes:
+
+        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
+        * Support zstd library downgrade. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows, w/wo \-\-cffi.)
+        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when using multi-threaded compression, pyzstd module will use single-threaded compression instead and issue a ``RuntimeWarning``.
+
+    On Linux, dynamically link to zstd library provided by system:
+
+    .. sourcecode:: shell
+
+        # build and install
+        sudo python3 setup.py --dynamic-link-zstd install
+        # build a distributable wheel
+        python3 setup.py --dynamic-link-zstd bdist_wheel
+
+    On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
+
+    .. sourcecode:: python
+
+        # E:\zstd_dll folder has zstd.h / zdict.h / libzstd.lib that
+        # along with libzstd.dll
+        if DYNAMIC_LINK:
+            kwargs = {
+            'include_dirs': ['E:\zstd_dll'], # .h directory
+            'library_dirs': ['E:\zstd_dll'], # .lib directory
+            'libraries': ['libzstd'],        # lib name, not filename, for the linker.
+            ...
+
+    And put ``libzstd.dll`` into one of these directories:
+
+        * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function.
+        * Python's root directory that has python.exe.
+        * %SystemRoot%\System32
+
+    Note that the above list doesn't include the current working directory and %PATH% directories.
