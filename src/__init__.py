@@ -9,7 +9,7 @@ except ImportError:
                "implementation can be imported.")
         raise ImportError(msg)
 
-__version__ = '0.14.3'
+__version__ = '0.14.4'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API is similar to

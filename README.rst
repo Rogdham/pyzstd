@@ -18,7 +18,7 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**next release  (xx x, 2021)**
+**0.14.4  (Mar 24, 2021)**
 
 #. Add a CFFI implementation that can work with PyPy.
 

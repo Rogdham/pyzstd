@@ -1288,11 +1288,9 @@ Build pyzstd module with options
 
 .. _build_pyzstd:
 
+.. versionadded:: 0.14.4
+
 .. note:: Build pyzstd module with options
-
-    .. attention::
-
-        These features will be available in next release, pyzstd verion > 0.14.3.
 
     Pyzstd module supports:
 
