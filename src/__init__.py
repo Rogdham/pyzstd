@@ -5,9 +5,11 @@ except ImportError:
     try:
         from .cffi.cffi_pyzstd import *
     except ImportError:
-        msg = ("pyzstd module: Neither C implementation nor CFFI "
-               "implementation can be imported.")
-        raise ImportError(msg)
+        raise ImportError(
+            "pyzstd module: Neither C implementation nor CFFI implementation "
+            "can be imported. If pyzstd module is dynamically linked to zstd "
+            "library, make sure not to remove zstd library, and the run-time "
+            "zstd library's version can't be lower than that at compile-time.")
 
 __version__ = '0.14.4'
 

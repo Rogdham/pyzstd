@@ -32,8 +32,8 @@ Exception
     This exception is raised when an error occurs when calling the underlying zstd library.
 
 
-Common functions
-----------------
+Simple compression/decompression
+--------------------------------
 
     This section contains:
 
@@ -52,6 +52,8 @@ Common functions
     Compress *data*, return the compressed data.
 
     Compressing ``b''`` will get an empty content frame (9 bytes or more).
+
+    :py:func:`richmem_compress` function is faster in some cases.
 
     :param data: Data to be compressed.
     :type data: bytes-like object
@@ -1189,16 +1191,18 @@ Rich memory mode
 
     pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory, but faster in some cases.
 
-    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
+    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
+
+    Currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
 
     Effects:
 
     * The output buffer is larger than input data a little.
-    * If input data is larger than ~31.8KB, 4 ~ 15% faster.
+    * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
 
     When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
+    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra copy memory for this output buffer size.
 
     .. sourcecode:: python
 
@@ -1308,9 +1312,8 @@ Build pyzstd module with options
 
     Some notes:
 
-        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Support zstd library downgrade. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows, w/wo \-\-cffi.)
-        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when using multi-threaded compression, pyzstd module will use single-threaded compression instead and issue a ``RuntimeWarning``.
+        * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
+        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API)
 
     On Linux, dynamically link to zstd library provided by system:
 

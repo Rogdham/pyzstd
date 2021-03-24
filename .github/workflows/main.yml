@@ -66,6 +66,7 @@ jobs:
     env:
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
+      CIBW_SKIP: pp*
 
     steps:
       - uses: actions/checkout@v2
