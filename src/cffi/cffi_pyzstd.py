@@ -26,7 +26,7 @@ zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
 zstd_version_info = tuple(int(i) for i in zstd_version.split('.'))
 
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_values(m.ZSTD_CLEVEL_DEFAULT,
+compressionLevel_values = _nt_values(m.ZSTD_defaultCLevel(),
                                      m.ZSTD_minCLevel(),
                                      m.ZSTD_maxCLevel())
 

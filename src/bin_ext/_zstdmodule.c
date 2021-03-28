@@ -3544,9 +3544,14 @@ add_constants(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
 
-    /* _ZSTD_CLEVEL_DEFAULT */
+    /* _ZSTD_defaultCLevel, ZSTD_defaultCLevel() was added in zstd v1.5.0. */
+#if ZSTD_VERSION_NUMBER < 10500
     temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
-    if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
+#else
+    temp = PyLong_FromLong(ZSTD_defaultCLevel());
+#endif
+
+    if (PyModule_AddObject(module, "_ZSTD_defaultCLevel", temp) < 0) {
         Py_XDECREF(temp);
         return -1;
     }

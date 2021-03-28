@@ -20,7 +20,7 @@ __all__ = ('compress', 'richmem_compress', 'decompress',
 
 
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_values(_zstd._ZSTD_CLEVEL_DEFAULT,
+compressionLevel_values = _nt_values(_zstd._ZSTD_defaultCLevel,
                                      _zstd._ZSTD_minCLevel,
                                      _zstd._ZSTD_maxCLevel)
 

@@ -12,7 +12,6 @@ ffibuilder = FFI()
 
 ffibuilder.cdef("""
 #define ZSTD_VERSION_NUMBER ...
-#define ZSTD_CLEVEL_DEFAULT ...
 #define ZSTD_CONTENTSIZE_UNKNOWN ...
 #define ZSTD_CONTENTSIZE_ERROR ...
 
@@ -102,6 +101,7 @@ unsigned    ZSTD_isError(size_t code);
 const char* ZSTD_getErrorName(size_t code);
 int         ZSTD_minCLevel(void);
 int         ZSTD_maxCLevel(void);
+int         ZSTD_defaultCLevel(void);
 
 unsigned long long ZSTD_getFrameContentSize(const void *src, size_t srcSize);
 unsigned ZSTD_getDictID_fromFrame(const void* src, size_t srcSize);
@@ -190,6 +190,13 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
                                 ZDICT_params_t parameters)
 {
     return 0;
+}
+#endif
+
+#if ZSTD_VERSION_NUMBER < 10500
+int ZSTD_defaultCLevel(void)
+{
+    return ZSTD_CLEVEL_DEFAULT;
 }
 #endif
 """
