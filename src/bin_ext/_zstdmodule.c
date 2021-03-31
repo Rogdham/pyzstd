@@ -1209,8 +1209,8 @@ _train_dict(PyObject *module, PyObject *args)
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in samples_size_list should be int object, "
-                            "with a size_t value.");
+                            "Items in samples_size_list should be an int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
@@ -1325,8 +1325,8 @@ _finalize_dict(PyObject *module, PyObject *args)
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in samples_size_list should be int object, "
-                            "with a size_t value.");
+                            "Items in samples_size_list should be an int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
@@ -1652,7 +1652,10 @@ ZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     }
 
     /* Check mode value */
-    if ((uint32_t) mode > ZSTD_e_end) {
+    if (mode != ZSTD_e_continue &&
+        mode != ZSTD_e_flush &&
+        mode != ZSTD_e_end)
+    {
         PyErr_SetString(PyExc_ValueError,
                         "mode argument wrong value, it should be one of "
                         "ZstdCompressor.CONTINUE, ZstdCompressor.FLUSH_BLOCK, "
@@ -3566,6 +3569,20 @@ add_constants(PyObject *module)
     /* _ZSTD_maxCLevel */
     temp = PyLong_FromLong(ZSTD_maxCLevel());
     if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
+        Py_XDECREF(temp);
+        return -1;
+    }
+
+    /* _ZSTD_DStreamInSize */
+    temp = PyLong_FromSize_t(ZSTD_DStreamInSize());
+    if (PyModule_AddObject(module, "_ZSTD_DStreamInSize", temp) < 0) {
+        Py_XDECREF(temp);
+        return -1;
+    }
+
+    /* _ZSTD_DStreamOutSize */
+    temp = PyLong_FromSize_t(ZSTD_DStreamOutSize());
+    if (PyModule_AddObject(module, "_ZSTD_DStreamOutSize", temp) < 0) {
         Py_XDECREF(temp);
         return -1;
     }

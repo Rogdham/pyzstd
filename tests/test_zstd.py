@@ -2383,14 +2383,22 @@ class FileTestCase(unittest.TestCase):
             self.assertListEqual(f.readlines(), lines)
 
     def test_decompress_limited(self):
-        bomb = compress(b'\0' * int(2e6), 10)
-        self.assertLess(len(bomb), _compression.BUFFER_SIZE)
+        if hasattr(pyzstd, 'CFFI_PYZSTD'):
+            _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
+            _ZSTD_DStreamOutSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamOutSize
+        else:
+            _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize
+            _ZSTD_DStreamOutSize = pyzstd.c._zstd._ZSTD_DStreamOutSize
+
+        bomb = compress(b'\0' * int(2e6), level_or_option=10)
+        self.assertLess(len(bomb), _ZSTD_DStreamInSize)
 
         decomp = ZstdFile(BytesIO(bomb))
         self.assertEqual(decomp.read(1), b'\0')
 
-        max_decomp = 1 + _compression.BUFFER_SIZE
-        self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp)
+        max_decomp = 1 + _ZSTD_DStreamOutSize
+        self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp,
+            "Excessive amount of data was decompressed")
 
     def test_write(self):
         with BytesIO() as dst:
