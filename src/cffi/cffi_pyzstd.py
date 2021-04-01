@@ -108,6 +108,8 @@ class _BlocksOutputBuffer:
     KB = 1024
     MB = 1024 * 1024
     BUFFER_BLOCK_SIZE = (
+        # If modify this list, also modify the C implementation,
+        # ZstdDecompressReader.seek() method, OutputBufferTestCase unittest.
         32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
         32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
         256*MB )

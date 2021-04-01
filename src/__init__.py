@@ -240,8 +240,9 @@ class ZstdDecompressReader(_compression.DecompressReader):
         self._pos += len(data)
         return data
 
-    # Copied from base class, except use _ZSTD_DStreamOutSize instead of
-    # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
+    # Copied from base class, except use 32 KiB max_length instead of
+    # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) max_length. The first block of
+    # output buffer is 32 KiB, it has a fast path for this size.
     def seek(self, offset, whence=io.SEEK_SET):
         # Recalculate offset as an absolute file position.
         if whence == io.SEEK_SET:
@@ -251,7 +252,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
         elif whence == io.SEEK_END:
             # Seeking relative to EOF - we need to know the file's size.
             if self._size < 0:
-                while self.read(_ZSTD_DStreamOutSize):
+                while self.read(32*1024):
                     pass
             offset = self._size + offset
         else:
@@ -265,7 +266,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
         # Read and discard data until we reach the desired position.
         while offset > 0:
-            data = self.read(min(_ZSTD_DStreamOutSize, offset))
+            data = self.read(min(32*1024, offset))
             if not data:
                 break
             offset -= len(data)
@@ -278,9 +279,9 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 # Copied from lzma module, except:
-# __init__(): BufferedReader() uses _ZSTD_DStreamOutSize instead of default
-#             value (8 KiB) as buffer_size.
-# read1():    Use _ZSTD_DStreamOutSize instead of compression.BUFFER_SIZE
+# __init__(): BufferedReader() uses _ZSTD_DStreamOutSize as buffer_size
+#             (Default is 8 KiB).
+# read1():    Use _ZSTD_DStreamOutSize instead of _compression.BUFFER_SIZE
 #             (Default is 8 KiB).
 class ZstdFile(_compression.BaseStream):
     """A file object providing transparent zstd (de)compression.
