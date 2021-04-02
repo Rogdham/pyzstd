@@ -1931,8 +1931,8 @@ class OutputBufferTestCase(unittest.TestCase):
             dat = decompress(known_size + unkown_size)
             self.assertEqual(len(dat), SIZE1 + SIZE2)
 
-    @bigmemtest(size = 2*_1G, memuse = 1)
-    @unittest.skipUnless(sys.maxsize > 2**32, '64-bit build test')
+    @bigmemtest(size = 2*_1G, memuse = 2)
+    @skipIf(sys.maxsize <= 2**32, '64-bit build test')
     def test_large_output(self, size):
         SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
         dat1 = self.compress_unknown_size(SIZE)
