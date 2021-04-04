@@ -7,13 +7,13 @@ try:
     # Import C implementation
     from .c.c_pyzstd import *
     from .c.c_pyzstd import _train_dict, _finalize_dict, \
-                            _ZSTD_DStreamInSize, _ZSTD_DStreamOutSize
+                            _ZSTD_DStreamInSize
 except ImportError:
     try:
         # Import CFFI implementation
         from .cffi.cffi_pyzstd import *
         from .cffi.cffi_pyzstd import _train_dict, _finalize_dict, \
-                                      _ZSTD_DStreamInSize, _ZSTD_DStreamOutSize
+                                      _ZSTD_DStreamInSize
         CFFI_PYZSTD = True
     except ImportError:
         raise ImportError(
@@ -182,6 +182,25 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     return ZstdDict(dict_content)
 
 
+# Below code were copied from Python stdlib (_compression.py, lzma.py), except:
+#
+# ZstdDecompressReader.read():
+#     Uses ZSTD_DStreamInSize() (131,075 in zstd v1.x) instead of
+#     _compression.BUFFER_SIZE (default is 8 KiB) as read size.
+# ZstdDecompressReader.seek():
+#     Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as
+#     max_length.
+# ZstdFile.__init__():
+#     io.BufferedReader uses 32 KiB buffer size instead of default value
+#     io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+# ZstdFile.read1():
+#     Use 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB),
+#     consistent with ZstdFile.__init__().
+#
+# In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
+# fast path for this size, if the output data is 32 KiB, it only allocates
+# memory and copies data once.
+
 class ZstdDecompressReader(_compression.DecompressReader):
     # Add .readall() method for speedup
     # https://bugs.python.org/issue41486
@@ -197,7 +216,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
             chunks.append(data)
         return b''.join(chunks)
 
-    # Copied from base class, except use _ZSTD_DStreamInSize instead of
+    # Copied from base class, except use ZSTD_DStreamInSize() instead of
     # BUFFER_SIZE (default is 8 KiB) as read size.
     def read(self, size=-1):
         if size < 0:
@@ -240,9 +259,8 @@ class ZstdDecompressReader(_compression.DecompressReader):
         self._pos += len(data)
         return data
 
-    # Copied from base class, except use 32 KiB max_length instead of
-    # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) max_length. The first block of
-    # output buffer is 32 KiB, it has a fast path for this size.
+    # Copied from base class, except use 32 KiB instead of
+    # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
     def seek(self, offset, whence=io.SEEK_SET):
         # Recalculate offset as an absolute file position.
         if whence == io.SEEK_SET:
@@ -279,10 +297,12 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 # Copied from lzma module, except:
-# __init__(): BufferedReader() uses _ZSTD_DStreamOutSize as buffer_size
-#             (Default is 8 KiB).
-# read1():    Use _ZSTD_DStreamOutSize instead of _compression.BUFFER_SIZE
-#             (Default is 8 KiB).
+# ZstdFile.__init__():
+#   io.BufferedReader uses 32 KiB buffer size instead of default value
+#   io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+# ZstdFile.read1():
+#   Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB),
+#   consistent with ZstdFile.__init__().
 class ZstdFile(_compression.BaseStream):
     """A file object providing transparent zstd (de)compression.
 
@@ -355,7 +375,7 @@ class ZstdFile(_compression.BaseStream):
             raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
                                        trailing_error=ZstdError,
                                        zstd_dict=zstd_dict, option=level_or_option)
-            self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
+            self._buffer = io.BufferedReader(raw, 32*1024)
 
     def close(self):
         """Flush and close the file.
@@ -434,7 +454,7 @@ class ZstdFile(_compression.BaseStream):
         """
         self._check_can_read()
         if size < 0:
-            size = _ZSTD_DStreamOutSize
+            size = 32*1024
         return self._buffer.read1(size)
 
     def readline(self, size=-1):
@@ -442,7 +462,7 @@ class ZstdFile(_compression.BaseStream):
 
         The terminating newline (if present) is retained. If size is
         non-negative, no more than size bytes will be read (in which
-        case the line may be incomplete). Returns b"" if already at EOF.
+        case the line may be incomplete). Returns b'' if already at EOF.
         """
         self._check_can_read()
         return self._buffer.readline(size)
@@ -484,6 +504,7 @@ class ZstdFile(_compression.BaseStream):
         if self._mode == _MODE_READ:
             return self._buffer.tell()
         return self._pos
+
 
 # Copied from lzma module
 def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,

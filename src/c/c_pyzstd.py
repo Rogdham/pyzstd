@@ -17,7 +17,6 @@ __all__ = (# From this file
 
 # Used in __init__.py
 _ZSTD_DStreamInSize = _zstd._ZSTD_DStreamInSize
-_ZSTD_DStreamOutSize = _zstd._ZSTD_DStreamOutSize
 _train_dict = _zstd._train_dict
 _finalize_dict = _zstd._finalize_dict
 

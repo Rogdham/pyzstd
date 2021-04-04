@@ -16,7 +16,6 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
 
 # Used in __init__.py
 _ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()
-_ZSTD_DStreamOutSize = m.ZSTD_DStreamOutSize()
 
 zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
 zstd_version_info = tuple(int(i) for i in zstd_version.split('.'))
@@ -108,8 +107,14 @@ class _BlocksOutputBuffer:
     KB = 1024
     MB = 1024 * 1024
     BUFFER_BLOCK_SIZE = (
-        # If modify this list, also modify the C implementation,
-        # ZstdDecompressReader.seek() method, OutputBufferTestCase unittest.
+        # If change this list, also change:
+        #   The CFFI implementation
+        #   OutputBufferTestCase unittest
+        # If change the first blocks's size, also change:
+        #   ZstdDecompressReader.seek() method
+        #   ZstdFile.__init__() method
+        #   ZstdFile.read1() method
+        #   FileTestCase.test_decompress_limited() test
         32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
         32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
         256*MB )

@@ -2,6 +2,7 @@ import _compression
 from io import BytesIO, UnsupportedOperation
 import builtins
 import itertools
+import io
 import os
 import re
 import sys
@@ -2385,10 +2386,8 @@ class FileTestCase(unittest.TestCase):
     def test_decompress_limited(self):
         if hasattr(pyzstd, 'CFFI_PYZSTD'):
             _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
-            _ZSTD_DStreamOutSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamOutSize
         else:
             _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize
-            _ZSTD_DStreamOutSize = pyzstd.c._zstd._ZSTD_DStreamOutSize
 
         bomb = compress(b'\0' * int(2e6), level_or_option=10)
         self.assertLess(len(bomb), _ZSTD_DStreamInSize)
@@ -2396,7 +2395,8 @@ class FileTestCase(unittest.TestCase):
         decomp = ZstdFile(BytesIO(bomb))
         self.assertEqual(decomp.read(1), b'\0')
 
-        max_decomp = 1 + _ZSTD_DStreamOutSize
+        # BufferedReader uses 32 KiB buffer in __init__.py
+        max_decomp = 1 + 32*1024
         self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp,
             "Excessive amount of data was decompressed")
 
