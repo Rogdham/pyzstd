@@ -96,7 +96,7 @@ Simple compression/decompression
 Rich memory compression
 -----------------------
 
-    Compress data using :ref:`rich memory mode<rich_mem>`. This mode is designed to allocate more memory, but faster in some cases.
+    Compress data using :ref:`rich memory mode<rich_mem>`. This mode allocates more memory for output buffer, it's faster in some cases.
 
     This section contains:
 
@@ -156,9 +156,11 @@ Streaming compression
 
 .. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
-    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It doesn't close the streams.
+    A fast and convenient function, compresses *input_stream* and writes the compressed data to *output_stream*, it doesn't close the streams.
 
     If input stream is ``b''``, nothing will be written to output stream.
+
+    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -310,9 +312,11 @@ Streaming decompression
 
 .. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
-    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It doesn't close the streams.
+    A fast and convenient function, decompresses *input_stream* and writes the decompressed data to *output_stream*, it doesn't close the streams.
 
     Supports multiple concatenated frames.
+
+    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -1189,7 +1193,7 @@ Rich memory mode
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory, but faster in some cases.
+    pyzstd module has a "rich memory mode" for compression. It allocates more memory for output buffer, and faster in some cases.
 
     There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
 
@@ -1312,17 +1316,18 @@ Build pyzstd module with options
 
     Some notes:
 
+        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
         * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API)
+        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API if possible.)
 
     On Linux, dynamically link to zstd library provided by system:
 
     .. sourcecode:: shell
 
         # build and install
-        sudo python3 setup.py --dynamic-link-zstd install
+        sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
         # build a distributable wheel
-        python3 setup.py --dynamic-link-zstd bdist_wheel
+        pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
 
