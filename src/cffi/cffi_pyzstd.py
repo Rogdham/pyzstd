@@ -1136,8 +1136,9 @@ def _write_to_output(output_stream, out_mv, out_buf):
             continue
         else:
             if write_bytes < 0 or write_bytes > left_bytes:
-                msg = "output_stream.write(b) method returned wrong value."
-                raise ValueError(msg)
+                msg = ("output_stream.write() returned invalid length %d "
++                      "(should be 0 <= value <= %d)")
+                raise ValueError(msg % (write_bytes, left_bytes))
             write_pos += write_bytes
 
 def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
@@ -1265,9 +1266,9 @@ def compress_stream(input_stream, output_stream, *,
                 continue
             else:
                 if read_bytes < 0 or read_bytes > read_size:
-                    msg = ("input_stream.readinto(b) method returned "
-                           "wrong value.")
-                    raise ValueError(msg)
+                    msg = ("input_stream.readinto() returned invalid length "
+                           "%d (should be 0 <= value <= %d)")
+                    raise ValueError(msg % (read_bytes, read_size))
 
                 # Don't generate empty frame
                 if read_bytes == 0 and total_input_size == 0:
@@ -1416,9 +1417,9 @@ def decompress_stream(input_stream, output_stream, *,
                 continue
             else:
                 if read_bytes < 0 or read_bytes > read_size:
-                    msg = ("input_stream.readinto(b) method returned "
-                           "wrong value.")
-                    raise ValueError(msg)
+                    msg = ("input_stream.readinto() returned invalid length "
+                           "%d (should be 0 <= value <= %d)")
+                    raise ValueError(msg % (read_bytes, read_size))
 
                 total_input_size += read_bytes
 

@@ -2769,6 +2769,29 @@ success:
     return ret;
 }
 
+/* Goto `error` label if (RET_VALUE < 0 || RET_VALUE > UPPER_BOUND),
+   RET_VALUE/UPPER_BOUND should be Py_ssize_t. Using macro rather than inlined
+   function, the performance of string concatenation is better. */
+#define CHECK_STREAM_RETURN_VALUE(FUN_NAME, RET_VALUE, UPPER_BOUND) \
+    do {                                                 \
+        if (RET_VALUE < 0 || RET_VALUE > UPPER_BOUND) {  \
+            /* Check PyLong_AsSsize_t() failed */        \
+            if (RET_VALUE == -1 && PyErr_Occurred()) {   \
+                PyErr_SetString(                         \
+                    PyExc_TypeError,                     \
+                    FUN_NAME " returned wrong type.");   \
+                goto error;                              \
+            }                                            \
+                                                         \
+            PyErr_Format(                                \
+                PyExc_ValueError,                        \
+                FUN_NAME " returned invalid length %zd " \
+                "(should be 0 <= value <= %zd)",         \
+                RET_VALUE, UPPER_BOUND);                 \
+            goto error;                                  \
+        }                                                \
+    } while(0)
+
 /* Write all output data to output_stream */
 FORCE_INLINE int
 write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
@@ -2808,12 +2831,11 @@ write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
             Py_ssize_t write_bytes = PyLong_AsSsize_t(write_ret);
             Py_DECREF(write_ret);
 
-            if (write_bytes < 0 || write_bytes > left_bytes) {
-                PyErr_SetString(PyExc_ValueError,
-                                "output_stream.write(b) method "
-                                "returned wrong value.");
-                goto error;
-            }
+            /* Check wrong value, `goto error` if
+               (write_bytes < 0 || write_bytes > left_bytes) */
+            CHECK_STREAM_RETURN_VALUE("output_stream.write()",
+                                      write_bytes, left_bytes);
+
             write_pos += (size_t) write_bytes;
         }
     }
@@ -3112,12 +3134,11 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         } else {
             read_bytes = PyLong_AsSsize_t(temp);
             Py_DECREF(temp);
-            if (read_bytes < 0 || read_bytes > read_size) {
-                PyErr_SetString(PyExc_ValueError,
-                                "input_stream.readinto(b) method returned "
-                                "wrong value.");
-                goto error;
-            }
+
+            /* Check wrong value, `goto error` if
+               (read_bytes < 0 || read_bytes > read_size) */
+            CHECK_STREAM_RETURN_VALUE("input_stream.readinto()",
+                                      read_bytes, read_size);
 
             /* Don't generate empty frame */
             if (read_bytes == 0 && total_input_size == 0) {
@@ -3362,12 +3383,12 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         } else {
             read_bytes = PyLong_AsSsize_t(temp);
             Py_DECREF(temp);
-            if (read_bytes < 0 || read_bytes > read_size) {
-                PyErr_SetString(PyExc_ValueError,
-                                "input_stream.readinto(b) method returned "
-                                "wrong value.");
-                goto error;
-            }
+
+            /* Check wrong value, `goto error` if
+               (read_bytes < 0 || read_bytes > read_size) */
+            CHECK_STREAM_RETURN_VALUE("input_stream.readinto()",
+                                      read_bytes, read_size);
+
             total_input_size += (size_t) read_bytes;
         }
 

@@ -2887,6 +2887,52 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bi.close()
         bo.close()
 
+    def test_stream_return_wrong_value(self):
+        # wrong type
+        class M:
+            def readinto(self, b):
+                return 'a'
+            def write(self, b):
+                return 'a'
+
+        with self.assertRaises(TypeError):
+            compress_stream(M(), BytesIO())
+        with self.assertRaises(TypeError):
+            decompress_stream(M(), BytesIO())
+        with self.assertRaises(TypeError):
+            compress_stream(BytesIO(THIS_FILE_BYTES), M())
+        with self.assertRaises(TypeError):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), M())
+
+        # wrong value
+        class N:
+            def __init__(self, ret_value):
+                self.ret_value = ret_value
+            def readinto(self, b):
+                return self.ret_value
+            def write(self, b):
+                return self.ret_value
+
+        # < 0
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            compress_stream(N(-1), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            decompress_stream(N(-2), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            compress_stream(BytesIO(THIS_FILE_BYTES), N(-2))
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(-1))
+
+        # should > upper bound (~128 KiB)
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            compress_stream(N(10000000), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            decompress_stream(N(10000000), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            compress_stream(BytesIO(THIS_FILE_BYTES), N(10000000))
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
+
 def test_main():
     run_unittest(
         FunctionsTestCase,
