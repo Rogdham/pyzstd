@@ -19,7 +19,6 @@ jobs:
     env:
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
       CIBW_MANYLINUX_I686_IMAGE: manylinux2014
-      CIBW_ARCHS_LINUX: "auto aarch64"
       CIBW_ARCHS_MACOS: "x86_64 arm64"
 
     steps:
@@ -30,12 +29,6 @@ jobs:
         run: |
           python setup.py install
           python tests/test_zstd.py
-
-      - name: Set up QEMU
-        if: runner.os == 'Linux' && github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-        uses: docker/setup-qemu-action@v1
-        with:
-          platforms: arm64
 
       - name: Install cibuildwheel & build wheels
         if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
@@ -66,6 +59,7 @@ jobs:
     env:
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
+      CIBW_SKIP: pp*
 
     steps:
       - uses: actions/checkout@v2
@@ -90,6 +84,38 @@ jobs:
           path: |
             wheelhouse/*.whl
             !wheelhouse/*manylinux2010_x86_64*
+
+  # Build aarch64/ppc64le/s390x wheels
+  build_arch_wheels:
+    name: Build ${{ matrix.arch }} wheels
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        arch: [aarch64, ppc64le, s390x]
+
+    env:
+      CIBW_ARCHS: ${{ matrix.arch }}
+      CIBW_SKIP: pp*
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v1
+
+      - name: Install cibuildwheel & build wheels
+        run: |
+          python -m pip install -U cibuildwheel
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - name: Upload ${{ matrix.arch }} wheels
+        uses: actions/upload-artifact@v2
+        with:
+          name: pyzstd-files
+          path: wheelhouse/*.whl
 
   # Run test on PyPy
   test_on_pypy:
@@ -146,7 +172,8 @@ jobs:
   # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_in_manylinux2010, test_on_pypy, test_on_arches]
+    needs: [build_wheels, build_in_manylinux2010, build_arch_wheels,
+            test_on_pypy, test_on_arches]
     runs-on: ubuntu-latest
 
     steps:
