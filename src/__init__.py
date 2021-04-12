@@ -377,6 +377,12 @@ class ZstdFile(_compression.BaseStream):
                                        zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw, 32*1024)
 
+    # Override IOBase.__iter__
+    # https://bugs.python.org/issue43787
+    def __iter__(self):
+        self._check_can_read()
+        return self._buffer.__iter__()
+
     def close(self):
         """Flush and close the file.
 

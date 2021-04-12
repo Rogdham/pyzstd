@@ -2367,19 +2367,18 @@ class FileTestCase(unittest.TestCase):
             lines = f.readlines()
         compressed = compress(THIS_FILE_BYTES)
 
+        # iter
         with ZstdFile(BytesIO(compressed)) as f:
             self.assertListEqual(list(iter(f)), lines)
 
         # readline
-        with BytesIO(THIS_FILE_BYTES) as f:
-            lines = f.readlines()
         with ZstdFile(BytesIO(compressed)) as f:
             for line in lines:
                 self.assertEqual(f.readline(), line)
+            self.assertEqual(f.readline(), b'')
+            self.assertEqual(f.readline(), b'')
 
         # readlines
-        with BytesIO(THIS_FILE_BYTES) as f:
-            lines = f.readlines()
         with ZstdFile(BytesIO(compressed)) as f:
             self.assertListEqual(f.readlines(), lines)
 
