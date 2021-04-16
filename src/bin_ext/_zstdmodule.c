@@ -11,7 +11,7 @@
 #include "zdict.h"
 
 #if ZSTD_VERSION_NUMBER < 10400
-    #error pyzstd module requires zstd v1.4.0+
+    #error "pyzstd module requires zstd v1.4.0+"
 #endif
 
 #ifndef Py_UNREACHABLE
@@ -2248,7 +2248,8 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             /* Discard buffer if it's too small
                (resizing it may needlessly copy the current contents) */
             if (self->input_buffer != NULL &&
-                self->input_buffer_size < data_size) {
+                self->input_buffer_size < data_size)
+            {
                 PyMem_Free(self->input_buffer);
                 self->input_buffer = NULL;
                 self->input_buffer_size = 0;
