@@ -235,7 +235,6 @@ class ZstdDict:
                       specified format.
         """
         self.__cdicts = {}
-        self.__ddict = ffi.NULL
         self.__lock = Lock()
 
         # Check dict_content's type
@@ -249,9 +248,24 @@ class ZstdDict:
         if len(dict_content) < 8:
             raise ValueError('Zstd dictionary content should at least 8 bytes.')
 
-        self.__dict_id = m.ZDICT_getDictID(ffi.from_buffer(dict_content), len(dict_content))
+        # Create ZSTD_DDict instance from dictionary content, also check content
+        # integrity to some degree.
+        ddict = m.ZSTD_createDDict(ffi.from_buffer(dict_content), len(dict_content))
+        if ddict == ffi.NULL:
+            msg = ("Failed to get ZSTD_DDict instance from zstd "
+                   "dictionary content. Maybe the content is corrupted.")
+            raise ZstdError(msg)
 
-        if not is_raw and self.dict_id == 0:
+        # Call ZSTD_freeDDict() when GC
+        self.__ddict = ffi.gc(ddict,
+                              m.ZSTD_freeDDict,
+                              m.ZSTD_sizeof_DDict(ddict))
+
+        # Get dict_id, 0 means "raw content" dictionary.
+        self.__dict_id = m.ZSTD_getDictID_fromDDict(ddict)
+
+        # Check validity for ordinary dictionary
+        if not is_raw and self.__dict_id == 0:
             msg = ('The "dict_content" argument is not a valid zstd '
                    'dictionary. The first 4 bytes of a valid zstd dictionary '
                    'should be a magic number: b"\\x37\\xA4\\x30\\xEC".\n'
@@ -316,25 +330,7 @@ class ZstdDict:
             self.__lock.release()
 
     def _get_ddict(self):
-        try:
-            self.__lock.acquire()
-
-            if self.__ddict == ffi.NULL:
-                # Create ZSTD_DDict instance
-                ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
-                                           len(self.__dict_content))
-                if ddict == ffi.NULL:
-                    msg = ("Failed to get ZSTD_DDict instance from zstd "
-                           "dictionary content.")
-                    raise ZstdError(msg)
-
-                # Call ZSTD_freeDDict() when GC
-                self.__ddict = ffi.gc(ddict,
-                                      m.ZSTD_freeDDict,
-                                      m.ZSTD_sizeof_DDict(ddict))
-            return self.__ddict
-        finally:
-            self.__lock.release()
+        return self.__ddict
 
 class _ErrorType:
     ERR_DECOMPRESS=0

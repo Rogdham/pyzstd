@@ -120,8 +120,6 @@ size_t ZSTD_CStreamOutSize(void);
 size_t ZSTD_DStreamInSize(void);
 size_t ZSTD_DStreamOutSize(void);
 
-unsigned ZDICT_getDictID(const void* dictBuffer, size_t dictSize);
-
 ZSTD_CDict* ZSTD_createCDict(const void* dictBuffer, size_t dictSize,
                              int compressionLevel);
 size_t ZSTD_CCtx_refCDict(ZSTD_CCtx* cctx, const ZSTD_CDict* cdict);
@@ -132,6 +130,7 @@ ZSTD_DDict* ZSTD_createDDict(const void* dictBuffer, size_t dictSize);
 size_t ZSTD_DCtx_refDDict(ZSTD_DCtx* dctx, const ZSTD_DDict* ddict);
 size_t      ZSTD_freeDDict(ZSTD_DDict* ddict);
 size_t ZSTD_sizeof_DDict(const ZSTD_DDict* ddict);
+unsigned ZSTD_getDictID_fromDDict(const ZSTD_DDict* ddict);
 
 ZSTD_CCtx* ZSTD_createCCtx(void);
 size_t     ZSTD_freeCCtx(ZSTD_CCtx* cctx);

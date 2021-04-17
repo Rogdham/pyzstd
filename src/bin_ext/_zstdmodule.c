@@ -33,7 +33,7 @@ typedef struct {
     PyObject *c_dicts;
     ZSTD_DDict *d_dict;
 
-    /* Thread lock for generating ZSTD_CDict/ZSTD_DDict */
+    /* Thread lock for generating ZSTD_CDict */
     PyThread_type_lock lock;
 
     /* __init__ has been called, 0 or 1. */
@@ -703,21 +703,6 @@ success:
 static inline ZSTD_DDict *
 _get_DDict(ZstdDict *self)
 {
-    ACQUIRE_LOCK(self);
-    if (self->d_dict == NULL) {
-        Py_BEGIN_ALLOW_THREADS
-        self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
-                                        Py_SIZE(self->dict_content));
-        Py_END_ALLOW_THREADS
-
-        if (self->d_dict == NULL) {
-            PyErr_SetString(static_state.ZstdError,
-                            "Failed to get ZSTD_DDict instance from zstd "
-                            "dictionary content.");
-        }
-    }
-    RELEASE_LOCK(self);
-
     return self->d_dict;
 }
 
@@ -1065,9 +1050,22 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
         return -1;
     }
 
+    /* Create ZSTD_DDict instance from dictionary content, also check content
+       integrity to some degree. */
+    Py_BEGIN_ALLOW_THREADS
+    self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
+                                    Py_SIZE(self->dict_content));
+    Py_END_ALLOW_THREADS
+
+    if (self->d_dict == NULL) {
+        PyErr_SetString(static_state.ZstdError,
+                        "Failed to get ZSTD_DDict instance from zstd "
+                        "dictionary content. Maybe the content is corrupted.");
+        return -1;
+    }
+
     /* Get dict_id, 0 means "raw content" dictionary. */
-    self->dict_id = ZDICT_getDictID(PyBytes_AS_STRING(dict_content),
-                                    Py_SIZE(dict_content));
+    self->dict_id = ZSTD_getDictID_fromDDict(self->d_dict);
 
     /* Check validity for ordinary dictionary */
     if (!is_raw && self->dict_id == 0) {

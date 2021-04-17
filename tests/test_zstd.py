@@ -1604,14 +1604,10 @@ class ZstdDictTestCase(unittest.TestCase):
 
     def test_invalid_dict(self):
         DICT_MAGIC = 0xEC30A437.to_bytes(4, byteorder='little')
-        dict = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
-        zd = ZstdDict(dict, is_raw=False)
+        dict_content = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
 
-        with self.assertRaisesRegex(ZstdError, 'ZSTD_CDict'):
-            compress(b'', 12, zd)
-
-        with self.assertRaisesRegex(ZstdError, 'ZSTD_DDict'):
-            decompress(b'', zd)
+        with self.assertRaisesRegex(ZstdError, r'ZSTD_DDict.*?corrupted'):
+            ZstdDict(dict_content, is_raw=False)
 
     def test_train_dict(self):
         DICT_SIZE1 = 200*1024
