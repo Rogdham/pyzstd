@@ -121,8 +121,7 @@ class _BlocksOutputBuffer:
     MEM_ERR_MSG = "Unable to allocate output buffer."
 
     def initAndGrow(self, out, max_length):
-        # Set & check max_length
-        self.max_length = max_length
+        # Get block size
         if 0 <= max_length < self.BUFFER_BLOCK_SIZE[0]:
             block_size = max_length
         else:
@@ -138,6 +137,8 @@ class _BlocksOutputBuffer:
 
         # Set variables
         self.allocated = block_size
+        self.max_length = max_length
+
         out.dst = block
         out.size = block_size
         out.pos = 0
@@ -154,6 +155,7 @@ class _BlocksOutputBuffer:
         # Set variables
         self.allocated = init_size
         self.max_length = -1
+
         out.dst = block
         out.size = init_size
         out.pos = 0
@@ -187,6 +189,7 @@ class _BlocksOutputBuffer:
 
         # Set variables
         self.allocated += block_size
+
         out.dst = b
         out.size = block_size
         out.pos = 0

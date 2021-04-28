@@ -1193,7 +1193,7 @@ Rich memory mode
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It allocates more memory for output buffer, and faster in some cases.
+    pyzstd module has a "rich memory mode" for compression. It allocates more memory for output buffer, and faster in some cases. Suitable for extremely fast compression scenarios.
 
     There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
 
@@ -1261,6 +1261,45 @@ Use with tarfile module
 
         # read .tar.zst file (decompression)
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
+            # do something
+
+    When the above code is in read mode (decompression), ``TarFile`` may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and operate on it. This code encapsulates the process:
+
+    .. sourcecode:: python
+
+        import contextlib
+        import io
+        import tarfile
+        import tempfile
+
+        @contextlib.contextmanager
+        def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
+            try:
+                ifh = io.open(name, 'rb')
+                tmp = tempfile.TemporaryFile()
+                decompress_stream(ifh, tmp,
+                                  zstd_dict=zstd_dict, option=option)
+                tmp.seek(0)
+
+                tar = tarfile.TarFile(fileobj=tmp, **kwargs)
+                yield tar
+            finally:
+                try:
+                    tar.close()
+                except:
+                    pass
+
+                try:
+                    tmp.close()
+                except:
+                    pass
+
+                try:
+                    ifh.close()
+                except:
+                    pass
+
+        with ZstdTarReader('archive.tar.zst') as tar:
             # do something
 
 
