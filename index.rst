@@ -535,8 +535,8 @@ Dictionary
     **Attention**
 
         #. If you lose a zstd dictionary, then can't decompress the corresponding data.
-        #. Zstd dictionary is vulnerable.
         #. Zstd dictionary has negligible effect on large data (multi-MiB) compression.
+        #. There is a possibility that the dictionary content could be maliciously tampered by a third party.
 
     **Background**
 
@@ -1275,7 +1275,9 @@ Use with tarfile module
         @contextlib.contextmanager
         def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
             try:
+                ifh = tmp = tar = None
                 ifh = io.open(name, 'rb')
+
                 tmp = tempfile.TemporaryFile()
                 decompress_stream(ifh, tmp,
                                   zstd_dict=zstd_dict, option=option)
@@ -1284,20 +1286,12 @@ Use with tarfile module
                 tar = tarfile.TarFile(fileobj=tmp, **kwargs)
                 yield tar
             finally:
-                try:
+                if tar is not None:
                     tar.close()
-                except:
-                    pass
-
-                try:
+                if tmp is not None:
                     tmp.close()
-                except:
-                    pass
-
-                try:
+                if ifh is not None:
                     ifh.close()
-                except:
-                    pass
 
         with ZstdTarReader('archive.tar.zst') as tar:
             # do something

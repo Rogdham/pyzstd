@@ -1939,6 +1939,43 @@ class OutputBufferTestCase(unittest.TestCase):
         del dat2
         self.assertEqual(leng_dat2, SIZE)
 
+    def test_endless_maxlength(self):
+        DECOMPRESSED_SIZE = 100_000
+        dat1 = compress(b'a' * DECOMPRESSED_SIZE, -3)
+
+        # -1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, -1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE + 1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE+1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE - 1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE-1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE-1)
+        self.assertFalse(d.needs_input)
+        self.assertFalse(d.at_frame_edge)
+
+        dat2 = d.decompress(b'')
+        self.assertEqual(len(dat2), 1)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
 class FileTestCase(unittest.TestCase):
 
     def test_init(self):

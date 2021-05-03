@@ -143,9 +143,15 @@ class _BlocksOutputBuffer:
         out.size = block_size
         out.pos = 0
 
-    def initWithSize(self, out, init_size):
+    def initWithSize(self, out, max_length, init_size):
+        # Get block size
+        if max_length >= 0:
+            block_size = min(max_length, init_size)
+        else:
+            block_size = init_size
+
         # The first block
-        block = _new_nonzero("char[]", init_size)
+        block = _new_nonzero("char[]", block_size)
         if block == ffi.NULL:
             raise MemoryError(self.MEM_ERR_MSG)
 
@@ -153,11 +159,11 @@ class _BlocksOutputBuffer:
         self.list = [block]
 
         # Set variables
-        self.allocated = init_size
-        self.max_length = -1
+        self.allocated = block_size
+        self.max_length = max_length
 
         out.dst = block
-        out.size = init_size
+        out.size = block_size
         out.pos = 0
 
     def grow(self, out):
@@ -582,7 +588,7 @@ class _Compressor:
         # Initialize output buffer
         if rich_mem:
             init_size = m.ZSTD_compressBound(len(data))
-            out.initWithSize(out_buf, init_size)
+            out.initWithSize(out_buf, -1, init_size)
         else:
             out.initAndGrow(out_buf, -1)
 
@@ -813,7 +819,7 @@ class _Decompressor:
         """
         return self._needs_input
 
-    def _decompress_impl(self, in_buf, max_length, decompressed_size):
+    def _decompress_impl(self, in_buf, max_length, initial_size):
         # The first AFE check for setting .at_frame_edge flag, search "AFE" in
         # _zstdmodule.c to see details.
         if self._type == _TYPE_ENDLESS_DEC:
@@ -825,11 +831,10 @@ class _Decompressor:
         if out_buf == ffi.NULL:
             raise MemoryError
         out = _BlocksOutputBuffer()
-        if decompressed_size in (m.ZSTD_CONTENTSIZE_UNKNOWN,
-                                 m.ZSTD_CONTENTSIZE_ERROR):
-            out.initAndGrow(out_buf, max_length)
+        if initial_size >= 0:
+            out.initWithSize(out_buf, max_length, initial_size)
         else:
-            out.initWithSize(out_buf, decompressed_size)
+            out.initAndGrow(out_buf, max_length)
 
         while True:
             # Decompress
@@ -873,7 +878,8 @@ class _Decompressor:
         try:
             self._lock.acquire()
 
-            decompressed_size = m.ZSTD_CONTENTSIZE_UNKNOWN
+            initial_buffer_size = -1
+
             in_buf = _new_nonzero("ZSTD_inBuffer *")
             if in_buf == ffi.NULL:
                 raise MemoryError
@@ -883,13 +889,20 @@ class _Decompressor:
                 if self._eof:
                     raise EOFError("Already at the end of a zstd frame.")
             else:
-                # Fast path for one-shot decompression
-                if (self._at_frame_edge
-                      and max_length < 0
-                      and self._in_begin == self._in_end):
+                # Fast path for the first frame
+                if self._at_frame_edge and self._in_begin == self._in_end:
                     # Read decompressed size
                     decompressed_size = m.ZSTD_getFrameContentSize(ffi.from_buffer(data),
                                                                    len(data))
+
+                    # Use ZSTD_findFrameCompressedSize() to check complete frame,
+                    # prevent allocating too much memory for small input chunk.
+                    if (decompressed_size not in (m.ZSTD_CONTENTSIZE_UNKNOWN,
+                                                  m.ZSTD_CONTENTSIZE_ERROR) \
+                          and \
+                          not m.ZSTD_isError(m.ZSTD_findFrameCompressedSize(ffi.from_buffer(data),
+                                                                            len(data))) ):
+                        initial_buffer_size = decompressed_size
 
             # Prepare input buffer w/wo unconsumed data
             if self._in_begin == self._in_end:
@@ -962,7 +975,7 @@ class _Decompressor:
                 in_buf.pos = 0
             # Now in_buf.pos == 0
 
-            ret = self._decompress_impl(in_buf, max_length, decompressed_size)
+            ret = self._decompress_impl(in_buf, max_length, initial_buffer_size)
 
             # Unconsumed input data
             if in_buf.pos == in_buf.size:
