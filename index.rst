@@ -585,7 +585,9 @@ Dictionary
 
 .. py:function:: train_dict(samples, dict_size)
 
-    Train a zstd dictionary, see :ref:`tips<train_tips>` for training a zstd dictionary.
+    Train a zstd dictionary.
+
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
 
     :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
     :type samples: iterable
@@ -609,24 +611,11 @@ Dictionary
 
         dic = pyzstd.train_dict(samples(), 100*1024)
 
-.. _train_tips:
-
-.. tip:: Training a zstd dictionary
-
-   1. A reasonable dictionary has a size of ~100 KiB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
-   2. It's recommended to provide a few thousands samples, though this can vary a lot.
-   3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
-   4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
-   5. You may compose a more efficient dictionary by hand, and use :py:func:`finalize_dict` function to finalize a dictionary. For example, use the general parts of some files to compose a more efficient dictionary.
-   6. It would be nice to know some knowledge about dictionary ID, see :ref:`this note<dict_id>`.
-
 .. py:function:: finalize_dict(zstd_dict, samples, dict_size, level)
 
     Given a custom content as a basis for dictionary, and a set of samples, finalize dictionary by adding headers and statistics according to the zstd dictionary format.
 
-    You may compose an efficient dictionary content by hand, which is used as basis dictionary, and use some samples to finalize a dictionary. The basis dictionary can be a "raw content" dictionary, see *is_raw* argument in :py:meth:`ZstdDict.__init__` method. When composing text content, pay attention to newline characters.
-
-    There is a practical `usage <https://github.com/facebook/zstd/issues/2203>`_ on zstd GitHub Issues.
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
 
     :param zstd_dict: A basis dictionary.
     :type zstd_dict: ZstdDict
@@ -1018,8 +1007,8 @@ Advanced parameters
 
         Non-zero value will be silently clamped to:
 
-        * minimum value: ``max(overlap_size, 1_MiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
-        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``. (zstd v1.4.8 values)
+        * minimum value: ``max(overlap_size, 512_KiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
+        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``.
 
     .. py:attribute:: overlapLog
 
