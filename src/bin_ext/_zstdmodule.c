@@ -2113,8 +2113,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
         }
     } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
         /* Fast path for the first frame */
-        if (self->at_frame_edge && self->in_begin == self->in_end)
-        {
+        if (self->at_frame_edge && self->in_begin == self->in_end) {
             /* Read decompressed size */
             uint64_t decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
 
@@ -2623,6 +2622,108 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
 /* --------------------------
      Module level functions
    -------------------------- */
+
+PyDoc_STRVAR(decompress_doc,
+"decompress(data, zstd_dict=None, option=None)\n"
+"----\n"
+"Decompress a zstd data, return a bytes object.\n\n"
+"Support multiple concatenated frames.\n\n"
+"Arguments\n"
+"data:      A bytes-like object, compressed zstd data.\n"
+"zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
+"option:    A dict object, contains advanced decompression parameters.");
+
+static PyObject *
+decompress(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"data", "zstd_dict", "option", NULL};
+    Py_buffer data;
+    PyObject *zstd_dict = Py_None;
+    PyObject *option = Py_None;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*|OO:decompress", kwlist,
+                                     &data, &zstd_dict, &option)) {
+        return NULL;
+    }
+
+    uint64_t decompressed_size;
+    Py_ssize_t initial_size;
+    ZstdDecompressor self = {0};
+    ZSTD_inBuffer in;
+    PyObject *ret = NULL;
+
+    /* Initialize & set ZstdDecompressor */
+    self.dctx = ZSTD_createDCtx();
+    if (self.dctx == NULL) {
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_DCtx instance.");
+        goto error;
+    }
+    self.at_frame_edge = 1;
+
+    /* Load dictionary to decompression context */
+    if (zstd_dict != Py_None) {
+        if (load_d_dict(self.dctx, zstd_dict) < 0) {
+            goto error;
+        }
+    }
+
+    /* Set option to decompression context */
+    if (option != Py_None) {
+        if (set_d_parameters(self.dctx, option) < 0) {
+            goto error;
+        }
+    }
+
+    /* Prepare input data */
+    in.src = data.buf;
+    in.size = data.len;
+    in.pos = 0;
+
+    /* Get decompressed size */
+    decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
+    /* These two zstd constants always > PY_SSIZE_T_MAX:
+         ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
+         ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
+    if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
+        initial_size = (Py_ssize_t) decompressed_size;
+    } else {
+        initial_size = -1;
+    }
+
+    /* Decompress */
+    ret = decompress_impl(&self, &in, -1, initial_size,
+                          TYPE_ENDLESS_DECOMPRESSOR);
+    if (ret == NULL) {
+        goto error;
+    }
+
+    /* Check data integrity. at_frame_edge flag is 1 when both the input and
+       output streams are at a frame edge. */
+    if (self.at_frame_edge == 0) {
+        char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
+                          ", if want to output these decompressed data, use "
+                          "an EndlessZstdDecompressor object to decompress.";
+        PyErr_Format(static_state.ZstdError,
+                     "Decompression failed: zstd data ends in an incomplete "
+                     "frame, maybe the input data was truncated. Decompressed "
+                     "data is %zd bytes%s",
+                     Py_SIZE(ret), extra_msg);
+        goto error;
+    }
+
+    goto success;
+
+error:
+    Py_CLEAR(ret);
+success:
+    /* Free decompression context */
+    ZSTD_freeDCtx(self.dctx);
+    /* Release data */
+    PyBuffer_Release(&data);
+    return ret;
+}
 
 PyDoc_STRVAR(_get_param_bounds_doc,
 "Internal funciton, get CParameter/DParameter bounds.");
@@ -3514,6 +3615,7 @@ success:
 }
 
 static PyMethodDef _zstd_methods[] = {
+    {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
     {"_finalize_dict", (PyCFunction)_finalize_dict, METH_VARARGS, _finalize_dict_doc},
     {"_get_param_bounds", (PyCFunction)_get_param_bounds, METH_VARARGS, _get_param_bounds_doc},

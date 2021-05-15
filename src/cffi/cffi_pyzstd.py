@@ -10,7 +10,7 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'ZstdDecompressor', 'EndlessZstdDecompressor',
            'ZstdDict', 'ZstdError',
            'CParameter', 'DParameter', 'Strategy',
-           'get_frame_info', 'get_frame_size',
+           'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info', 'compressionLevel_values')
 
@@ -1134,6 +1134,54 @@ class EndlessZstdDecompressor(_Decompressor):
         This flag could be used to check data integrity in some cases.
         """
         return self._at_frame_edge
+
+def decompress(data, zstd_dict=None, option=None):
+    """Decompress a zstd data, return a bytes object.
+
+    Support multiple concatenated frames.
+
+    Arguments
+    data:      A bytes-like object, compressed zstd data.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option:    A dict object, contains advanced decompression parameters.
+    """
+    # Initialize & set ZstdDecompressor
+    decomp = _Decompressor(zstd_dict, option)
+    decomp._at_frame_edge = True
+    decomp._type = _TYPE_ENDLESS_DEC
+
+    # Prepare input data
+    in_buf = _new_nonzero("ZSTD_inBuffer *")
+    if in_buf == ffi.NULL:
+        raise MemoryError
+
+    in_buf.src = ffi.from_buffer(data)
+    in_buf.size = len(data)
+    in_buf.pos = 0
+
+    # Get decompressed size
+    decompressed_size = m.ZSTD_getFrameContentSize(ffi.from_buffer(data), len(data))
+    if decompressed_size not in (m.ZSTD_CONTENTSIZE_UNKNOWN,
+                                 m.ZSTD_CONTENTSIZE_ERROR):
+        initial_size = decompressed_size
+    else:
+        initial_size = -1
+
+    # Decompress
+    ret = decomp._decompress_impl(in_buf, -1, initial_size)
+
+    # Check data integrity. at_frame_edge flag is True when the both input and
+    # output streams are at a frame edge.
+    if not decomp._at_frame_edge:
+        extra_msg = "." if (len(ret) == 0) \
+                        else (", if want to output these decompressed data, use "
+                              "an EndlessZstdDecompressor object to decompress.")
+        msg = ("Decompression failed: zstd data ends in an incomplete "
+               "frame, maybe the input data was truncated. Decompressed "
+               "data is %d bytes%s") % (len(ret), extra_msg)
+        raise ZstdError(msg)
+
+    return ret
 
 def _write_to_output(output_stream, out_mv, out_buf):
     write_pos = 0

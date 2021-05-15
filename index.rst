@@ -446,8 +446,8 @@ Streaming decompression
 
     It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used in these scenarios:
 
-        * Streaming decompression for multiple concatenated frames
-        * Reuse for big number of same type individual data
+        * Streaming decompression for multiple concatenated frames.
+        * Reuse for big number of same type individual data. (Compared to :py:func:`decompress` function, significantly faster on Windows, no significant improvement on Linux.)
 
     Thread-safe at method level.
 

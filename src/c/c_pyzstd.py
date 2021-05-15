@@ -10,7 +10,7 @@ __all__ = (# From this file
            # From _zstd
            'ZstdCompressor', 'RichMemZstdCompressor',
            'ZstdDecompressor', 'EndlessZstdDecompressor',
-           'ZstdDict', 'ZstdError', 'get_frame_size',
+           'ZstdDict', 'ZstdError', 'decompress', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info', )
 
