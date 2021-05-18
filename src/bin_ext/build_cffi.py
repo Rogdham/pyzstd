@@ -12,7 +12,6 @@ ffibuilder = FFI()
 
 ffibuilder.cdef("""
 #define ZSTD_VERSION_NUMBER ...
-#define ZSTD_CLEVEL_DEFAULT ...
 #define ZSTD_CONTENTSIZE_UNKNOWN ...
 #define ZSTD_CONTENTSIZE_ERROR ...
 
@@ -102,6 +101,7 @@ unsigned    ZSTD_isError(size_t code);
 const char* ZSTD_getErrorName(size_t code);
 int         ZSTD_minCLevel(void);
 int         ZSTD_maxCLevel(void);
+int         ZSTD_defaultCLevel(void);
 
 unsigned long long ZSTD_getFrameContentSize(const void *src, size_t srcSize);
 unsigned ZSTD_getDictID_fromFrame(const void* src, size_t srcSize);
@@ -120,8 +120,6 @@ size_t ZSTD_CStreamOutSize(void);
 size_t ZSTD_DStreamInSize(void);
 size_t ZSTD_DStreamOutSize(void);
 
-unsigned ZDICT_getDictID(const void* dictBuffer, size_t dictSize);
-
 ZSTD_CDict* ZSTD_createCDict(const void* dictBuffer, size_t dictSize,
                              int compressionLevel);
 size_t ZSTD_CCtx_refCDict(ZSTD_CCtx* cctx, const ZSTD_CDict* cdict);
@@ -132,6 +130,7 @@ ZSTD_DDict* ZSTD_createDDict(const void* dictBuffer, size_t dictSize);
 size_t ZSTD_DCtx_refDDict(ZSTD_DCtx* dctx, const ZSTD_DDict* ddict);
 size_t      ZSTD_freeDDict(ZSTD_DDict* ddict);
 size_t ZSTD_sizeof_DDict(const ZSTD_DDict* ddict);
+unsigned ZSTD_getDictID_fromDDict(const ZSTD_DDict* ddict);
 
 ZSTD_CCtx* ZSTD_createCCtx(void);
 size_t     ZSTD_freeCCtx(ZSTD_CCtx* cctx);
@@ -174,7 +173,7 @@ source = """
 #include "zdict.h"
 
 #if ZSTD_VERSION_NUMBER < 10400
-    #error pyzstd module requires zstd v1.4.0+
+    #error "pyzstd module requires zstd v1.4.0+"
 #endif
 
 #if ZSTD_VERSION_NUMBER < 10405
@@ -190,6 +189,13 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
                                 ZDICT_params_t parameters)
 {
     return 0;
+}
+#endif
+
+#if ZSTD_VERSION_NUMBER < 10500
+int ZSTD_defaultCLevel(void)
+{
+    return ZSTD_CLEVEL_DEFAULT;
 }
 #endif
 """

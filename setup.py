@@ -51,7 +51,7 @@ if DYNAMIC_LINK:
         'library_dirs': [],    # .lib directory
         'libraries': ['zstd'], # lib name, not filename, for the linker.
         'sources': [],
-        'define_macros': [('ZSTD_MULTITHREAD', None)]
+        'define_macros': []
     }
 else:  # statically link to zstd lib
     kwargs = {
@@ -115,7 +115,6 @@ setup(
         "License :: OSI Approved :: BSD License",
         "Programming Language :: Python :: Implementation :: CPython",
         "Programming Language :: Python :: Implementation :: PyPy",
-        "Programming Language :: Python :: 3.5",
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",

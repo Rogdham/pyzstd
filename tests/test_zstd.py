@@ -2,6 +2,7 @@ import _compression
 from io import BytesIO, UnsupportedOperation
 import builtins
 import itertools
+import io
 import os
 import re
 import sys
@@ -1603,14 +1604,10 @@ class ZstdDictTestCase(unittest.TestCase):
 
     def test_invalid_dict(self):
         DICT_MAGIC = 0xEC30A437.to_bytes(4, byteorder='little')
-        dict = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
-        zd = ZstdDict(dict, is_raw=False)
+        dict_content = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
 
-        with self.assertRaisesRegex(ZstdError, 'ZSTD_CDict'):
-            compress(b'', 12, zd)
-
-        with self.assertRaisesRegex(ZstdError, 'ZSTD_DDict'):
-            decompress(b'', zd)
+        with self.assertRaisesRegex(ZstdError, r'ZSTD_DDict.*?corrupted'):
+            ZstdDict(dict_content, is_raw=False)
 
     def test_train_dict(self):
         DICT_SIZE1 = 200*1024
@@ -1931,8 +1928,8 @@ class OutputBufferTestCase(unittest.TestCase):
             dat = decompress(known_size + unkown_size)
             self.assertEqual(len(dat), SIZE1 + SIZE2)
 
-    @bigmemtest(size = 2*_1G, memuse = 1)
-    @unittest.skipUnless(sys.maxsize > 2**32, '64-bit build test')
+    @bigmemtest(size = 2*_1G, memuse = 2)
+    @skipIf(sys.maxsize <= 2**32, '64-bit build test')
     def test_large_output(self, size):
         SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
         dat1 = self.compress_unknown_size(SIZE)
@@ -1941,6 +1938,43 @@ class OutputBufferTestCase(unittest.TestCase):
         leng_dat2 = len(dat2)
         del dat2
         self.assertEqual(leng_dat2, SIZE)
+
+    def test_endless_maxlength(self):
+        DECOMPRESSED_SIZE = 100_000
+        dat1 = compress(b'a' * DECOMPRESSED_SIZE, -3)
+
+        # -1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, -1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE + 1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE+1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
+
+        # DECOMPRESSED_SIZE - 1
+        d = EndlessZstdDecompressor()
+        dat2 = d.decompress(dat1, DECOMPRESSED_SIZE-1)
+        self.assertEqual(len(dat2), DECOMPRESSED_SIZE-1)
+        self.assertFalse(d.needs_input)
+        self.assertFalse(d.at_frame_edge)
+
+        dat2 = d.decompress(b'')
+        self.assertEqual(len(dat2), 1)
+        self.assertTrue(d.needs_input)
+        self.assertTrue(d.at_frame_edge)
 
 class FileTestCase(unittest.TestCase):
 
@@ -2366,31 +2400,37 @@ class FileTestCase(unittest.TestCase):
             lines = f.readlines()
         compressed = compress(THIS_FILE_BYTES)
 
+        # iter
         with ZstdFile(BytesIO(compressed)) as f:
             self.assertListEqual(list(iter(f)), lines)
 
         # readline
-        with BytesIO(THIS_FILE_BYTES) as f:
-            lines = f.readlines()
         with ZstdFile(BytesIO(compressed)) as f:
             for line in lines:
                 self.assertEqual(f.readline(), line)
+            self.assertEqual(f.readline(), b'')
+            self.assertEqual(f.readline(), b'')
 
         # readlines
-        with BytesIO(THIS_FILE_BYTES) as f:
-            lines = f.readlines()
         with ZstdFile(BytesIO(compressed)) as f:
             self.assertListEqual(f.readlines(), lines)
 
     def test_decompress_limited(self):
-        bomb = compress(b'\0' * int(2e6), 10)
-        self.assertLess(len(bomb), _compression.BUFFER_SIZE)
+        if hasattr(pyzstd, 'CFFI_PYZSTD'):
+            _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
+        else:
+            _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize
+
+        bomb = compress(b'\0' * int(2e6), level_or_option=10)
+        self.assertLess(len(bomb), _ZSTD_DStreamInSize)
 
         decomp = ZstdFile(BytesIO(bomb))
         self.assertEqual(decomp.read(1), b'\0')
 
-        max_decomp = 1 + _compression.BUFFER_SIZE
-        self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp)
+        # BufferedReader uses 32 KiB buffer in __init__.py
+        max_decomp = 1 + 32*1024
+        self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp,
+            "Excessive amount of data was decompressed")
 
     def test_write(self):
         with BytesIO() as dst:
@@ -2878,6 +2918,52 @@ class StreamFunctionsTestCase(unittest.TestCase):
             decompress_stream(bi, bo)
         bi.close()
         bo.close()
+
+    def test_stream_return_wrong_value(self):
+        # wrong type
+        class M:
+            def readinto(self, b):
+                return 'a'
+            def write(self, b):
+                return 'a'
+
+        with self.assertRaises(TypeError):
+            compress_stream(M(), BytesIO())
+        with self.assertRaises(TypeError):
+            decompress_stream(M(), BytesIO())
+        with self.assertRaises(TypeError):
+            compress_stream(BytesIO(THIS_FILE_BYTES), M())
+        with self.assertRaises(TypeError):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), M())
+
+        # wrong value
+        class N:
+            def __init__(self, ret_value):
+                self.ret_value = ret_value
+            def readinto(self, b):
+                return self.ret_value
+            def write(self, b):
+                return self.ret_value
+
+        # < 0
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            compress_stream(N(-1), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            decompress_stream(N(-2), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            compress_stream(BytesIO(THIS_FILE_BYTES), N(-2))
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(-1))
+
+        # should > upper bound (~128 KiB)
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            compress_stream(N(10000000), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+            decompress_stream(N(10000000), BytesIO())
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            compress_stream(BytesIO(THIS_FILE_BYTES), N(10000000))
+        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
+            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
 def test_main():
     run_unittest(

@@ -11,7 +11,7 @@
 #include "zdict.h"
 
 #if ZSTD_VERSION_NUMBER < 10400
-    #error pyzstd module requires zstd v1.4.0+
+    #error "pyzstd module requires zstd v1.4.0+"
 #endif
 
 #ifndef Py_UNREACHABLE
@@ -33,7 +33,7 @@ typedef struct {
     PyObject *c_dicts;
     ZSTD_DDict *d_dict;
 
-    /* Thread lock for generating ZSTD_CDict/ZSTD_DDict */
+    /* Thread lock for generating ZSTD_CDict */
     PyThread_type_lock lock;
 
     /* __init__ has been called, 0 or 1. */
@@ -129,10 +129,18 @@ typedef struct {
 
 static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 
-/* Block size sequence. Below functions assume the type is int. */
+/* Block size sequence. */
 #define KB (1024)
 #define MB (1024*1024)
-static const int BUFFER_BLOCK_SIZE[] =
+static const Py_ssize_t BUFFER_BLOCK_SIZE[] =
+    /* If change this list, also change:
+         The CFFI implementation
+         OutputBufferTestCase unittest
+       If change the first blocks's size, also change:
+         ZstdDecompressReader.seek() method
+         ZstdFile.__init__() method
+         ZstdFile.read1() method
+         FileTestCase.test_decompress_limited() test */
     { 32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
       32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
       256*MB };
@@ -171,15 +179,17 @@ static const int BUFFER_BLOCK_SIZE[] =
 */
 static inline int
 OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
-                         Py_ssize_t max_length)
+                         const Py_ssize_t max_length)
 {
     PyObject *b;
-    int block_size;
+    Py_ssize_t block_size;
 
-    /* Set & check max_length */
-    buffer->max_length = max_length;
+    /* Ensure .list was set to NULL */
+    assert(buffer->list == NULL);
+
+    /* Get block size */
     if (0 <= max_length && max_length < BUFFER_BLOCK_SIZE[0]) {
-        block_size = (int) max_length;
+        block_size = max_length;
     } else {
         block_size = BUFFER_BLOCK_SIZE[0];
     }
@@ -187,7 +197,6 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
     /* The first block */
     b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
-        buffer->list = NULL; /* For OutputBuffer_OnError() */
         return -1;
     }
 
@@ -201,9 +210,10 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
 
     /* Set variables */
     buffer->allocated = block_size;
+    buffer->max_length = max_length;
 
     ob->dst = PyBytes_AS_STRING(b);
-    ob->size = block_size;
+    ob->size = (size_t) block_size;
     ob->pos = 0;
     return 0;
 }
@@ -215,14 +225,25 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
 */
 static inline int
 OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
-                          Py_ssize_t init_size)
+                          const Py_ssize_t max_length,
+                          const Py_ssize_t init_size)
 {
     PyObject *b;
+    Py_ssize_t block_size;
+
+    /* Ensure .list was set to NULL */
+    assert(buffer->list == NULL);
+
+    /* Get block size */
+    if (max_length >= 0) {
+        block_size = Py_MIN(max_length, init_size);
+    } else {
+        block_size = init_size;
+    }
 
     /* The first block */
-    b = PyBytes_FromStringAndSize(NULL, init_size);
+    b = PyBytes_FromStringAndSize(NULL, block_size);
     if (b == NULL) {
-        buffer->list = NULL; /* For OutputBuffer_OnError() */
         PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
     }
@@ -236,11 +257,11 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
     PyList_SET_ITEM(buffer->list, 0, b);
 
     /* Set variables */
-    buffer->allocated = init_size;
-    buffer->max_length = -1;
+    buffer->allocated = block_size;
+    buffer->max_length = max_length;
 
     ob->dst = PyBytes_AS_STRING(b);
-    ob->size = (size_t) init_size;
+    ob->size = (size_t) block_size;
     ob->pos = 0;
     return 0;
 }
@@ -254,7 +275,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *b;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
-    int block_size;
+    Py_ssize_t block_size;
 
     /* Ensure no gaps in the data */
     assert(ob->pos == ob->size);
@@ -274,7 +295,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 
         /* block_size of the last block */
         if (block_size > rest) {
-            block_size = (int) rest;
+            block_size = rest;
         }
     }
 
@@ -300,7 +321,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     buffer->allocated += block_size;
 
     ob->dst = PyBytes_AS_STRING(b);
-    ob->size = block_size;
+    ob->size = (size_t) block_size;
     ob->pos = 0;
     return 0;
 }
@@ -320,7 +341,7 @@ OutputBuffer_ReachedMaxLength(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
    Return a bytes object on success
    Return NULL on failure
 */
-static PyObject *
+static inline PyObject *
 OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
@@ -333,7 +354,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         block = PyList_GET_ITEM(buffer->list, 0);
         Py_INCREF(block);
 
-        Py_DECREF(buffer->list);
+        Py_CLEAR(buffer->list);
         return block;
     }
 
@@ -359,11 +380,10 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         block = PyList_GET_ITEM(buffer->list, i);
         memcpy(posi, PyBytes_AS_STRING(block), ob->pos);
     } else {
-        /* buffer->list has at least one block, see initialize functions. */
-        Py_UNREACHABLE();
+        assert(Py_SIZE(result) == 0);
     }
 
-    Py_DECREF(buffer->list);
+    Py_CLEAR(buffer->list);
     return result;
 }
 
@@ -371,7 +391,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 static inline void
 OutputBuffer_OnError(BlocksOutputBuffer *buffer)
 {
-    Py_XDECREF(buffer->list);
+    Py_CLEAR(buffer->list);
 }
 
 /* -------------------------
@@ -695,21 +715,6 @@ success:
 static inline ZSTD_DDict *
 _get_DDict(ZstdDict *self)
 {
-    ACQUIRE_LOCK(self);
-    if (self->d_dict == NULL) {
-        Py_BEGIN_ALLOW_THREADS
-        self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
-                                        Py_SIZE(self->dict_content));
-        Py_END_ALLOW_THREADS
-
-        if (self->d_dict == NULL) {
-            PyErr_SetString(static_state.ZstdError,
-                            "Failed to get ZSTD_DDict instance from zstd "
-                            "dictionary content.");
-        }
-    }
-    RELEASE_LOCK(self);
-
     return self->d_dict;
 }
 
@@ -1057,9 +1062,22 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
         return -1;
     }
 
+    /* Create ZSTD_DDict instance from dictionary content, also check content
+       integrity to some degree. */
+    Py_BEGIN_ALLOW_THREADS
+    self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
+                                    Py_SIZE(self->dict_content));
+    Py_END_ALLOW_THREADS
+
+    if (self->d_dict == NULL) {
+        PyErr_SetString(static_state.ZstdError,
+                        "Failed to get ZSTD_DDict instance from zstd "
+                        "dictionary content. Maybe the content is corrupted.");
+        return -1;
+    }
+
     /* Get dict_id, 0 means "raw content" dictionary. */
-    self->dict_id = ZDICT_getDictID(PyBytes_AS_STRING(dict_content),
-                                    Py_SIZE(dict_content));
+    self->dict_id = ZSTD_getDictID_fromDDict(self->d_dict);
 
     /* Check validity for ordinary dictionary */
     if (!is_raw && self->dict_id == 0) {
@@ -1209,8 +1227,8 @@ _train_dict(PyObject *module, PyObject *args)
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in samples_size_list should be int object, "
-                            "with a size_t value.");
+                            "Items in samples_size_list should be an int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
@@ -1325,8 +1343,8 @@ _finalize_dict(PyObject *module, PyObject *args)
         chunk_sizes[i] = PyLong_AsSize_t(size);
         if (chunk_sizes[i] == (size_t)-1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
-                            "Items in samples_size_list should be int object, "
-                            "with a size_t value.");
+                            "Items in samples_size_list should be an int "
+                            "object, with a size_t value.");
             goto error;
         }
     }
@@ -1496,7 +1514,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer;
+    BlocksOutputBuffer buffer = {.list = NULL};
     size_t zstd_ret;
     PyObject *ret;
 
@@ -1516,12 +1534,10 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         size_t output_buffer_size = ZSTD_compressBound(in.size);
         if (output_buffer_size > (size_t) PY_SSIZE_T_MAX) {
             PyErr_NoMemory();
-            return NULL;   /* Don't goto error label */
+            goto error;
         }
 
-        /* OutputBuffer(OnError)(&buffer) is after `error` label,
-           so initialize the buffer before any `goto error` statement. */
-        if (OutputBuffer_InitWithSize(&buffer, &out,
+        if (OutputBuffer_InitWithSize(&buffer, &out, -1,
                                       (Py_ssize_t) output_buffer_size) < 0) {
             goto error;
         }
@@ -1574,7 +1590,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer;
+    BlocksOutputBuffer buffer = {.list = NULL};
     size_t zstd_ret;
     PyObject *ret;
 
@@ -1652,7 +1668,10 @@ ZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     }
 
     /* Check mode value */
-    if ((uint32_t) mode > ZSTD_e_end) {
+    if (mode != ZSTD_e_continue &&
+        mode != ZSTD_e_flush &&
+        mode != ZSTD_e_end)
+    {
         PyErr_SetString(PyExc_ValueError,
                         "mode argument wrong value, it should be one of "
                         "ZstdCompressor.CONTINUE, ZstdCompressor.FLUSH_BLOCK, "
@@ -1970,12 +1989,13 @@ typedef enum {
 */
 FORCE_INLINE PyObject *
 decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
-                const Py_ssize_t max_length, const uint64_t decompressed_size,
+                const Py_ssize_t max_length,
+                const Py_ssize_t initial_size,
                 const decompress_type type)
 {
     size_t zstd_ret;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer;
+    BlocksOutputBuffer buffer = {.list = NULL};
     PyObject *ret;
 
     /* The first AFE check for setting .at_frame_edge flag */
@@ -1987,13 +2007,9 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
         }
     }
 
-    /* Initialize output buffer before any `goto error` statement */
-    if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
-        /* These two zstd constants always > PY_SSIZE_T_MAX:
-            ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
-            ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
-        if (OutputBuffer_InitWithSize(&buffer, &out,
-                                      (Py_ssize_t) decompressed_size) < 0) {
+    /* Initialize the output buffer */
+    if (initial_size >= 0) {
+        if (OutputBuffer_InitWithSize(&buffer, &out, max_length, initial_size) < 0) {
             goto error;
         }
     } else {
@@ -2074,7 +2090,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     Py_buffer data;
     Py_ssize_t max_length = -1;
 
-    uint64_t decompressed_size = ZSTD_CONTENTSIZE_UNKNOWN;
+    Py_ssize_t initial_buffer_size = -1;
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
     char use_input_buffer;
@@ -2096,12 +2112,23 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             goto success;
         }
     } else if (type == TYPE_ENDLESS_DECOMPRESSOR) {
-        /* Fast path for one-shot decompression */
-        if (self->at_frame_edge && max_length < 0 &&
-            self->in_begin == self->in_end)
-        {
+        /* Fast path for the first frame */
+        if (self->at_frame_edge && self->in_begin == self->in_end) {
             /* Read decompressed size */
-            decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
+            uint64_t decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
+
+            /* These two zstd constants always > PY_SSIZE_T_MAX:
+                  ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
+                  ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2)
+
+               Use ZSTD_findFrameCompressedSize() to check complete frame,
+               prevent allocating too much memory for small input chunk. */
+
+            if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX &&
+                !ZSTD_isError(ZSTD_findFrameCompressedSize(data.buf, data.len)) )
+            {
+                initial_buffer_size = (Py_ssize_t) decompressed_size;
+            }
         }
     }
 
@@ -2186,7 +2213,9 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     assert(in.pos == 0);
 
     /* Decompress */
-    ret = decompress_impl(self, &in, max_length, decompressed_size, type);
+    ret = decompress_impl(self, &in,
+                          max_length, initial_buffer_size,
+                          type);
     if (ret == NULL) {
         goto error;
     }
@@ -2237,7 +2266,8 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             /* Discard buffer if it's too small
                (resizing it may needlessly copy the current contents) */
             if (self->input_buffer != NULL &&
-                self->input_buffer_size < data_size) {
+                self->input_buffer_size < data_size)
+            {
                 PyMem_Free(self->input_buffer);
                 self->input_buffer = NULL;
                 self->input_buffer_size = 0;
@@ -2593,6 +2623,108 @@ static PyType_Spec EndlessZstdDecompressor_type_spec = {
      Module level functions
    -------------------------- */
 
+PyDoc_STRVAR(decompress_doc,
+"decompress(data, zstd_dict=None, option=None)\n"
+"----\n"
+"Decompress a zstd data, return a bytes object.\n\n"
+"Support multiple concatenated frames.\n\n"
+"Arguments\n"
+"data:      A bytes-like object, compressed zstd data.\n"
+"zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
+"option:    A dict object, contains advanced decompression parameters.");
+
+static PyObject *
+decompress(PyObject *module, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"data", "zstd_dict", "option", NULL};
+    Py_buffer data;
+    PyObject *zstd_dict = Py_None;
+    PyObject *option = Py_None;
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "y*|OO:decompress", kwlist,
+                                     &data, &zstd_dict, &option)) {
+        return NULL;
+    }
+
+    uint64_t decompressed_size;
+    Py_ssize_t initial_size;
+    ZstdDecompressor self = {0};
+    ZSTD_inBuffer in;
+    PyObject *ret = NULL;
+
+    /* Initialize & set ZstdDecompressor */
+    self.dctx = ZSTD_createDCtx();
+    if (self.dctx == NULL) {
+        PyErr_SetString(static_state.ZstdError,
+                        "Unable to create ZSTD_DCtx instance.");
+        goto error;
+    }
+    self.at_frame_edge = 1;
+
+    /* Load dictionary to decompression context */
+    if (zstd_dict != Py_None) {
+        if (load_d_dict(self.dctx, zstd_dict) < 0) {
+            goto error;
+        }
+    }
+
+    /* Set option to decompression context */
+    if (option != Py_None) {
+        if (set_d_parameters(self.dctx, option) < 0) {
+            goto error;
+        }
+    }
+
+    /* Prepare input data */
+    in.src = data.buf;
+    in.size = data.len;
+    in.pos = 0;
+
+    /* Get decompressed size */
+    decompressed_size = ZSTD_getFrameContentSize(data.buf, data.len);
+    /* These two zstd constants always > PY_SSIZE_T_MAX:
+         ZSTD_CONTENTSIZE_UNKNOWN is (0ULL - 1)
+         ZSTD_CONTENTSIZE_ERROR   is (0ULL - 2) */
+    if (decompressed_size <= (uint64_t) PY_SSIZE_T_MAX) {
+        initial_size = (Py_ssize_t) decompressed_size;
+    } else {
+        initial_size = -1;
+    }
+
+    /* Decompress */
+    ret = decompress_impl(&self, &in, -1, initial_size,
+                          TYPE_ENDLESS_DECOMPRESSOR);
+    if (ret == NULL) {
+        goto error;
+    }
+
+    /* Check data integrity. at_frame_edge flag is 1 when both the input and
+       output streams are at a frame edge. */
+    if (self.at_frame_edge == 0) {
+        char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
+                          ", if want to output these decompressed data, use "
+                          "an EndlessZstdDecompressor object to decompress.";
+        PyErr_Format(static_state.ZstdError,
+                     "Decompression failed: zstd data ends in an incomplete "
+                     "frame, maybe the input data was truncated. Decompressed "
+                     "data is %zd bytes%s",
+                     Py_SIZE(ret), extra_msg);
+        goto error;
+    }
+
+    goto success;
+
+error:
+    Py_CLEAR(ret);
+success:
+    /* Free decompression context */
+    ZSTD_freeDCtx(self.dctx);
+    /* Release data */
+    PyBuffer_Release(&data);
+    return ret;
+}
+
 PyDoc_STRVAR(_get_param_bounds_doc,
 "Internal funciton, get CParameter/DParameter bounds.");
 
@@ -2758,6 +2890,29 @@ success:
     return ret;
 }
 
+/* Goto `error` label if (RET_VALUE < 0 || RET_VALUE > UPPER_BOUND),
+   RET_VALUE/UPPER_BOUND should be Py_ssize_t. Using macro rather than inlined
+   function, the performance of string concatenation is better. */
+#define CHECK_STREAM_RETURN_VALUE(FUN_NAME, RET_VALUE, UPPER_BOUND) \
+    do {                                                 \
+        if (RET_VALUE < 0 || RET_VALUE > UPPER_BOUND) {  \
+            /* Check PyLong_AsSsize_t() failed */        \
+            if (RET_VALUE == -1 && PyErr_Occurred()) {   \
+                PyErr_SetString(                         \
+                    PyExc_TypeError,                     \
+                    FUN_NAME " returned wrong type.");   \
+                goto error;                              \
+            }                                            \
+                                                         \
+            PyErr_Format(                                \
+                PyExc_ValueError,                        \
+                FUN_NAME " returned invalid length %zd " \
+                "(should be 0 <= value <= %zd)",         \
+                RET_VALUE, UPPER_BOUND);                 \
+            goto error;                                  \
+        }                                                \
+    } while(0)
+
 /* Write all output data to output_stream */
 FORCE_INLINE int
 write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
@@ -2797,12 +2952,11 @@ write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
             Py_ssize_t write_bytes = PyLong_AsSsize_t(write_ret);
             Py_DECREF(write_ret);
 
-            if (write_bytes < 0 || write_bytes > left_bytes) {
-                PyErr_SetString(PyExc_ValueError,
-                                "output_stream.write(b) method "
-                                "returned wrong value.");
-                goto error;
-            }
+            /* Check wrong value, `goto error` if
+               (write_bytes < 0 || write_bytes > left_bytes) */
+            CHECK_STREAM_RETURN_VALUE("output_stream.write()",
+                                      write_bytes, left_bytes);
+
             write_pos += (size_t) write_bytes;
         }
     }
@@ -3101,12 +3255,11 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         } else {
             read_bytes = PyLong_AsSsize_t(temp);
             Py_DECREF(temp);
-            if (read_bytes < 0 || read_bytes > read_size) {
-                PyErr_SetString(PyExc_ValueError,
-                                "input_stream.readinto(b) method returned "
-                                "wrong value.");
-                goto error;
-            }
+
+            /* Check wrong value, `goto error` if
+               (read_bytes < 0 || read_bytes > read_size) */
+            CHECK_STREAM_RETURN_VALUE("input_stream.readinto()",
+                                      read_bytes, read_size);
 
             /* Don't generate empty frame */
             if (read_bytes == 0 && total_input_size == 0) {
@@ -3351,12 +3504,12 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         } else {
             read_bytes = PyLong_AsSsize_t(temp);
             Py_DECREF(temp);
-            if (read_bytes < 0 || read_bytes > read_size) {
-                PyErr_SetString(PyExc_ValueError,
-                                "input_stream.readinto(b) method returned "
-                                "wrong value.");
-                goto error;
-            }
+
+            /* Check wrong value, `goto error` if
+               (read_bytes < 0 || read_bytes > read_size) */
+            CHECK_STREAM_RETURN_VALUE("input_stream.readinto()",
+                                      read_bytes, read_size);
+
             total_input_size += (size_t) read_bytes;
         }
 
@@ -3462,6 +3615,7 @@ success:
 }
 
 static PyMethodDef _zstd_methods[] = {
+    {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
     {"_finalize_dict", (PyCFunction)_finalize_dict, METH_VARARGS, _finalize_dict_doc},
     {"_get_param_bounds", (PyCFunction)_get_param_bounds, METH_VARARGS, _get_param_bounds_doc},
@@ -3544,9 +3698,14 @@ add_constants(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
     ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
 
-    /* _ZSTD_CLEVEL_DEFAULT */
+    /* _ZSTD_defaultCLevel, ZSTD_defaultCLevel() was added in zstd v1.5.0. */
+#if ZSTD_VERSION_NUMBER < 10500
     temp = PyLong_FromLong(ZSTD_CLEVEL_DEFAULT);
-    if (PyModule_AddObject(module, "_ZSTD_CLEVEL_DEFAULT", temp) < 0) {
+#else
+    temp = PyLong_FromLong(ZSTD_defaultCLevel());
+#endif
+
+    if (PyModule_AddObject(module, "_ZSTD_defaultCLevel", temp) < 0) {
         Py_XDECREF(temp);
         return -1;
     }
@@ -3561,6 +3720,13 @@ add_constants(PyObject *module)
     /* _ZSTD_maxCLevel */
     temp = PyLong_FromLong(ZSTD_maxCLevel());
     if (PyModule_AddObject(module, "_ZSTD_maxCLevel", temp) < 0) {
+        Py_XDECREF(temp);
+        return -1;
+    }
+
+    /* _ZSTD_DStreamInSize */
+    temp = PyLong_FromSize_t(ZSTD_DStreamInSize());
+    if (PyModule_AddObject(module, "_ZSTD_DStreamInSize", temp) < 0) {
         Py_XDECREF(temp);
         return -1;
     }

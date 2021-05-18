@@ -32,8 +32,8 @@ Exception
     This exception is raised when an error occurs when calling the underlying zstd library.
 
 
-Common functions
-----------------
+Simple compression/decompression
+--------------------------------
 
     This section contains:
 
@@ -52,6 +52,8 @@ Common functions
     Compress *data*, return the compressed data.
 
     Compressing ``b''`` will get an empty content frame (9 bytes or more).
+
+    :py:func:`richmem_compress` function is faster in some cases.
 
     :param data: Data to be compressed.
     :type data: bytes-like object
@@ -94,7 +96,7 @@ Common functions
 Rich memory compression
 -----------------------
 
-    Compress data using :ref:`rich memory mode<rich_mem>`. This mode is designed to allocate more memory, but faster in some cases.
+    Compress data using :ref:`rich memory mode<rich_mem>`. This mode allocates more memory for output buffer, it's faster in some cases.
 
     This section contains:
 
@@ -154,9 +156,11 @@ Streaming compression
 
 .. py:function:: compress_stream(input_stream, output_stream, *, level_or_option=None, zstd_dict=None, pledged_input_size=None, read_size=131_072, write_size=131_591, callback=None)
 
-    A fast and convenient function, it compresses *input_stream* and writes the compressed data to *output_stream*. It doesn't close the streams.
+    A fast and convenient function, compresses *input_stream* and writes the compressed data to *output_stream*, it doesn't close the streams.
 
     If input stream is ``b''``, nothing will be written to output stream.
+
+    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -308,9 +312,11 @@ Streaming decompression
 
 .. py:function:: decompress_stream(input_stream, output_stream, *, zstd_dict=None, option=None, read_size=131_075, write_size=131_072, callback=None)
 
-    A fast and convenient function, it decompresses *input_stream* and writes the decompressed data to *output_stream*. It doesn't close the streams.
+    A fast and convenient function, decompresses *input_stream* and writes the decompressed data to *output_stream*, it doesn't close the streams.
 
     Supports multiple concatenated frames.
+
+    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -440,8 +446,8 @@ Streaming decompression
 
     It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used in these scenarios:
 
-        * Streaming decompression for multiple concatenated frames
-        * Reuse for big number of same type individual data
+        * Streaming decompression for multiple concatenated frames.
+        * Reuse for big number of same type individual data. (Compared to :py:func:`decompress` function, significantly faster on Windows, no significant improvement on Linux.)
 
     Thread-safe at method level.
 
@@ -529,8 +535,8 @@ Dictionary
     **Attention**
 
         #. If you lose a zstd dictionary, then can't decompress the corresponding data.
-        #. Zstd dictionary is vulnerable.
         #. Zstd dictionary has negligible effect on large data (multi-MiB) compression.
+        #. There is a possibility that the dictionary content could be maliciously tampered by a third party.
 
     **Background**
 
@@ -579,7 +585,9 @@ Dictionary
 
 .. py:function:: train_dict(samples, dict_size)
 
-    Train a zstd dictionary, see :ref:`tips<train_tips>` for training a zstd dictionary.
+    Train a zstd dictionary.
+
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
 
     :param samples: An iterable of samples, a sample is a bytes-like object represents a file.
     :type samples: iterable
@@ -603,24 +611,11 @@ Dictionary
 
         dic = pyzstd.train_dict(samples(), 100*1024)
 
-.. _train_tips:
-
-.. tip:: Training a zstd dictionary
-
-   1. A reasonable dictionary has a size of ~100 KiB. It's possible to select smaller or larger size, just by specifying *dict_size* argument.
-   2. It's recommended to provide a few thousands samples, though this can vary a lot.
-   3. It's recommended that total size of all samples be about ~x100 times the target size of dictionary.
-   4. Dictionary training will fail if there are not enough samples to construct a dictionary, or if most of the samples are too small (< 8 bytes being the lower limit). If dictionary training fails, you should use zstd without a dictionary, as the dictionary would've been ineffective anyways.
-   5. You may compose a more efficient dictionary by hand, and use :py:func:`finalize_dict` function to finalize a dictionary. For example, use the general parts of some files to compose a more efficient dictionary.
-   6. It would be nice to know some knowledge about dictionary ID, see :ref:`this note<dict_id>`.
-
 .. py:function:: finalize_dict(zstd_dict, samples, dict_size, level)
 
     Given a custom content as a basis for dictionary, and a set of samples, finalize dictionary by adding headers and statistics according to the zstd dictionary format.
 
-    You may compose an efficient dictionary content by hand, which is used as basis dictionary, and use some samples to finalize a dictionary. The basis dictionary can be a "raw content" dictionary, see *is_raw* argument in :py:meth:`ZstdDict.__init__` method. When composing text content, pay attention to newline characters.
-
-    There is a practical `usage <https://github.com/facebook/zstd/issues/2203>`_ on zstd GitHub Issues.
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
 
     :param zstd_dict: A basis dictionary.
     :type zstd_dict: ZstdDict
@@ -1012,8 +1007,8 @@ Advanced parameters
 
         Non-zero value will be silently clamped to:
 
-        * minimum value: ``max(overlap_size, 1_MiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
-        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``. (zstd v1.4.8 values)
+        * minimum value: ``max(overlap_size, 512_KiB)``. overlap_size is specified by :py:attr:`~CParameter.overlapLog` parameter.
+        * maximum value: ``512_MiB if 32_bit_build else 1024_MiB``.
 
     .. py:attribute:: overlapLog
 
@@ -1187,18 +1182,20 @@ Rich memory mode
 
 .. note:: Rich memory mode
 
-    pyzstd module has a "rich memory mode" for compression. It is designed to allocate more memory, but faster in some cases.
+    pyzstd module has a "rich memory mode" for compression. It allocates more memory for output buffer, and faster in some cases. Suitable for extremely fast compression scenarios.
 
-    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class. (Note that currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.)
+    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
+
+    Currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
 
     Effects:
 
     * The output buffer is larger than input data a little.
-    * If input data is larger than ~31.8KB, 4 ~ 15% faster.
+    * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
 
     When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library has a speed optimization for this output buffer size (~4% faster than this size - 1).
+    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra copy memory for this output buffer size.
 
     .. sourcecode:: python
 
@@ -1255,6 +1252,39 @@ Use with tarfile module
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
 
+    When the above code is in read mode (decompression), ``TarFile`` may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and operate on it. This code encapsulates the process:
+
+    .. sourcecode:: python
+
+        import contextlib
+        import io
+        import tarfile
+        import tempfile
+
+        @contextlib.contextmanager
+        def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
+            try:
+                ifh = tmp = tar = None
+                ifh = io.open(name, 'rb')
+
+                tmp = tempfile.TemporaryFile()
+                decompress_stream(ifh, tmp,
+                                  zstd_dict=zstd_dict, option=option)
+                tmp.seek(0)
+
+                tar = tarfile.TarFile(fileobj=tmp, **kwargs)
+                yield tar
+            finally:
+                if tar is not None:
+                    tar.close()
+                if tmp is not None:
+                    tmp.close()
+                if ifh is not None:
+                    ifh.close()
+
+        with ZstdTarReader('archive.tar.zst') as tar:
+            # do something
+
 
 Zstd dictionary ID
 >>>>>>>>>>>>>>>>>>
@@ -1308,18 +1338,18 @@ Build pyzstd module with options
 
     Some notes:
 
-        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Support zstd library downgrade. For example, v1.4.9 at pyzstd module's compile-time, dynamically link to v1.4.0 at run-time. (Tested on Windows, w/wo \-\-cffi.)
-        * If ZSTD_MULTITHREAD macro was not defined when building zstd library, when using multi-threaded compression, pyzstd module will use single-threaded compression instead and issue a ``RuntimeWarning``.
+        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
+        * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
+        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API if possible.)
 
     On Linux, dynamically link to zstd library provided by system:
 
     .. sourcecode:: shell
 
         # build and install
-        sudo python3 setup.py --dynamic-link-zstd install
+        sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
         # build a distributable wheel
-        python3 setup.py --dynamic-link-zstd bdist_wheel
+        pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
 
