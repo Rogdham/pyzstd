@@ -530,7 +530,7 @@ Dictionary
         * function :py:func:`finalize_dict`
 
 .. note::
-    If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically, has best effect on data that smaller than 1 KiB.
+    If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically.
 
     **Attention**
 
@@ -543,6 +543,8 @@ Dictionary
     The smaller the amount of data to compress, the more difficult it is to compress. This problem is common to all compression algorithms, and reason is, compression algorithms learn from past data how to compress future data. But at the beginning of a new data set, there is no "past" to build upon.
 
     Zstd training mode can be used to tune the algorithm for a selected type of data. Training is achieved by providing it with a few samples (one file per sample). The result of this training is stored in a file called "dictionary", which must be loaded before compression and decompression.
+
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
 
 
 .. py:class:: ZstdDict
@@ -632,14 +634,14 @@ Module-level functions
 
     This section contains:
 
-        * function :py:func:`get_frame_info`, get frame infomation from frame header.
+        * function :py:func:`get_frame_info`, get frame infomation from a frame header.
         * function :py:func:`get_frame_size`, get a frame's size.
 
 .. py:function:: get_frame_info(frame_buffer)
 
     Get zstd frame infomation from a frame header.
 
-    Return a two-items namedtuple: (decompressed_size, dictionary_id)
+    Return a 2-item namedtuple: (decompressed_size, dictionary_id)
 
     If ``decompressed_size`` is ``None``, decompressed size is unknown.
 
@@ -708,7 +710,7 @@ Module-level variables
 
 .. py:data:: compressionLevel_values
 
-    A three-items namedtuple, values defined by underlying zstd library, see :ref:`compression level<compression_level>` for details.
+    A 3-item namedtuple, values defined by underlying zstd library, see :ref:`compression level<compression_level>` for details.
 
     ``default`` is default compression level, it is used when compression level is set to ``0``.
 
@@ -965,9 +967,9 @@ Advanced parameters
 
             * :py:func:`compress` function
             * :py:func:`richmem_compress` function
+            * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
             * :py:class:`RichMemZstdCompressor` class
             * :py:func:`compress_stream` function setting *pledged_input_size* argument
-            * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
@@ -1260,27 +1262,17 @@ Use with tarfile module
         import io
         import tarfile
         import tempfile
+        from pyzstd import decompress_stream
 
         @contextlib.contextmanager
         def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
-            try:
-                ifh = tmp = tar = None
-                ifh = io.open(name, 'rb')
-
-                tmp = tempfile.TemporaryFile()
-                decompress_stream(ifh, tmp,
-                                  zstd_dict=zstd_dict, option=option)
-                tmp.seek(0)
-
-                tar = tarfile.TarFile(fileobj=tmp, **kwargs)
-                yield tar
-            finally:
-                if tar is not None:
-                    tar.close()
-                if tmp is not None:
-                    tmp.close()
-                if ifh is not None:
-                    ifh.close()
+            with io.open(name, 'rb') as ifh:
+                with tempfile.TemporaryFile() as tmp_file:
+                    decompress_stream(ifh, tmp_file,
+                                      zstd_dict=zstd_dict, option=option)
+                    tmp_file.seek(0)
+                    with tarfile.TarFile(fileobj=tmp_file, **kwargs) as tar:
+                        yield tar
 
         with ZstdTarReader('archive.tar.zst') as tar:
             # do something

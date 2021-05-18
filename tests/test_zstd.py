@@ -12,10 +12,7 @@ import random
 import tempfile
 import unittest
 from unittest import skipIf
-
-from test.support import (  # type: ignore
-    _1G, bigmemtest, run_unittest
-)
+from test.support import run_unittest
 
 import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
@@ -1928,16 +1925,18 @@ class OutputBufferTestCase(unittest.TestCase):
             dat = decompress(known_size + unkown_size)
             self.assertEqual(len(dat), SIZE1 + SIZE2)
 
-    @bigmemtest(size = 2*_1G, memuse = 2)
-    @skipIf(sys.maxsize <= 2**32, '64-bit build test')
-    def test_large_output(self, size):
-        SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
-        dat1 = self.compress_unknown_size(SIZE)
+    # def test_large_output(self):
+    #     SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
+    #     dat1 = self.compress_unknown_size(SIZE)
 
-        dat2 = decompress(dat1)
-        leng_dat2 = len(dat2)
-        del dat2
-        self.assertEqual(leng_dat2, SIZE)
+    #     try:
+    #         dat2 = decompress(dat1)
+    #     except MemoryError:
+    #         return
+
+    #     leng_dat2 = len(dat2)
+    #     del dat2
+    #     self.assertEqual(leng_dat2, SIZE)
 
     def test_endless_maxlength(self):
         DECOMPRESSED_SIZE = 100_000
