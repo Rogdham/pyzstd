@@ -817,11 +817,11 @@ Advanced parameters
 
         Larger values requiring more memory and typically compressing more.
 
-        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.4.8, means 128 MiB (1 << 27).
+        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.5.0, means 128 MiB (1 << 27).
 
         Must be clamped between ``ZSTD_WINDOWLOG_MIN`` and ``ZSTD_WINDOWLOG_MAX``.
 
-        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: hashLog
 
@@ -831,7 +831,7 @@ Advanced parameters
 
         Larger tables improve compression ratio of strategies <= :py:attr:`~Strategy.dfast`, and improve speed of strategies > :py:attr:`~Strategy.dfast`.
 
-        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: chainLog
 
@@ -845,7 +845,7 @@ Advanced parameters
 
         It's still useful when using :py:attr:`~Strategy.dfast` strategy, in which case it defines a secondary probe table.
 
-        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: searchLog
 
@@ -855,7 +855,7 @@ Advanced parameters
 
         This parameter is useless for :py:attr:`~Strategy.fast` and :py:attr:`~Strategy.dfast` strategies.
 
-        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: minMatch
 
@@ -869,7 +869,7 @@ Advanced parameters
 
         Note that currently, for all strategies < :py:attr:`~Strategy.btopt`, effective minimum is ``4``, for all strategies > :py:attr:`~Strategy.fast`, effective maximum is ``6``.
 
-        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: targetLength
 
@@ -887,7 +887,7 @@ Advanced parameters
 
             Larger values make compression faster, and weaker.
 
-        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: strategy
 
@@ -895,7 +895,7 @@ Advanced parameters
 
         The higher the value of selected strategy, the more complex it is, resulting in stronger and slower compression.
 
-        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
 
     .. py:attribute:: enableLongDistanceMatching
 
@@ -1072,7 +1072,7 @@ Advanced parameters
 
         This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode. :py:func:`decompress` function may use streaming mode or single-pass mode.
 
-        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.4.8, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
+        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.5.0, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
 
         Special: value ``0`` means "use default maximum windowLog".
 
@@ -1122,7 +1122,7 @@ Compression level
 
     **For advanced user**
 
-    Compression levels are just numbers that map to a set of compression parameters, see this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_ for overview. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
+    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
 
     Setting a compression level does not set all other :ref:`compression parameters<CParameter>` to default. Setting this will dynamically impact the compression parameters which have not been manually set, the manually set ones will "stick".
 
