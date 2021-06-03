@@ -8,6 +8,7 @@ from typing import Dict, ByteString, Optional, Union, Callable, \
 __version__: str
 zstd_version: str
 zstd_version_info: Tuple[int, int, int]
+zstd_support_multithread: bool
 
 class values(NamedTuple):
     default: int

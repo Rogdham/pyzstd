@@ -21,8 +21,8 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    compress, compress_stream, richmem_compress, \
                    decompress, decompress_stream, \
                    ZstdDict, train_dict, finalize_dict, \
-                   zstd_version, zstd_version_info, compressionLevel_values, \
-                   get_frame_info, get_frame_size, \
+                   zstd_version, zstd_version_info, zstd_support_multithread, \
+                   compressionLevel_values, get_frame_info, get_frame_size, \
                    ZstdFile, open
 
 if not hasattr(pyzstd, 'CFFI_PYZSTD'):
@@ -45,8 +45,6 @@ COMPRESSED_BOGUS = None
 SAMPLES = None
 
 TRAINED_DICT = None
-
-MULTITHREADED = None
 
 def setUpModule():
     global DECOMPRESSED_DAT
@@ -94,9 +92,6 @@ def setUpModule():
 
     global TRAINED_DICT
     TRAINED_DICT = train_dict(SAMPLES, 200*1024)
-
-    global MULTITHREADED
-    MULTITHREADED = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class FunctionsTestCase(unittest.TestCase):
 
@@ -494,9 +489,9 @@ class CompressorDecompressorTestCase(unittest.TestCase):
              CParameter.checksumFlag : 1,
              CParameter.dictIDFlag : 0,
 
-             CParameter.nbWorkers : 2 if MULTITHREADED else 0,
-             CParameter.jobSize : 50_000 if MULTITHREADED else 0,
-             CParameter.overlapLog : 9 if MULTITHREADED else 0,
+             CParameter.nbWorkers : 2 if zstd_support_multithread else 0,
+             CParameter.jobSize : 50_000 if zstd_support_multithread else 0,
+             CParameter.overlapLog : 9 if zstd_support_multithread else 0,
              }
         ZstdCompressor(level_or_option=d)
 
@@ -518,11 +513,13 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         compress(b'', {CParameter.compressionLevel:compressionLevel_values.min-1})
 
         # zstd lib doesn't support MT compression
-        if not MULTITHREADED:
-            with self.assertWarnsRegex(RuntimeWarning, r'multi-threaded'):
+        if not zstd_support_multithread:
+            with self.assertRaises(ZstdError):
                 ZstdCompressor({CParameter.nbWorkers:4})
-            ZstdCompressor({CParameter.jobSize:4})
-            ZstdCompressor({CParameter.overlapLog:4})
+            with self.assertRaises(ZstdError):
+                ZstdCompressor({CParameter.jobSize:4})
+            with self.assertRaises(ZstdError):
+                ZstdCompressor({CParameter.overlapLog:4})
 
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
@@ -538,7 +535,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         d2[DParameter.windowLogMax] = 32
         self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
+    @skipIf(not zstd_support_multithread,
             "zstd build doesn't support multi-threaded compression")
     def test_zstd_multithread_compress(self):
         size = 40*1024*1024
@@ -573,7 +570,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
+    @skipIf(not zstd_support_multithread,
             "zstd build doesn't support multi-threaded compression")
     def test_rich_mem_compress_warn(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
@@ -2816,7 +2813,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         self.assertEqual(in_dat, THIS_FILE_BYTES)
         self.assertEqual(decompress(out_dat), THIS_FILE_BYTES)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
+    @skipIf(not zstd_support_multithread,
             "zstd build doesn't support multi-threaded compression")
     def test_compress_stream_multi_thread(self):
         size = 40*1024*1024

@@ -12,7 +12,8 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'CParameter', 'DParameter', 'Strategy',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info', 'compressionLevel_values')
+           'zstd_version', 'zstd_version_info', 'zstd_support_multithread',
+           'compressionLevel_values')
 
 # Used in __init__.py
 _ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()
@@ -75,7 +76,7 @@ class CParameter(IntEnum):
         # 1 means compression parameter
         return _get_param_bounds(1, self.value)
 
-_SUPPORT_MULTITHREAD = (CParameter.nbWorkers.bounds() != (0, 0))
+zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class DParameter(IntEnum):
     """Decompression parameters"""
@@ -479,23 +480,8 @@ def _set_c_parameters(cctx, level_or_option):
             if key == m.ZSTD_c_compressionLevel:
                 level = value = _clamp_compression_level(value)
             elif key == m.ZSTD_c_nbWorkers:
-                if value > 1:
+                if value > 0:
                     use_multithread = True
-                elif value == 1:
-                    value = 0
-
-            # Zstd lib doesn't support MT compression
-            if (not _SUPPORT_MULTITHREAD
-                  and key in (m.ZSTD_c_nbWorkers, m.ZSTD_c_jobSize, m.ZSTD_c_overlapLog)
-                  and value > 0):
-                value = 0
-                if key == m.ZSTD_c_nbWorkers:
-                    use_multithread = False
-                    msg = ("The underlying zstd library doesn't support "
-                           "multi-threaded compression, it was built "
-                           "without this feature. Pyzstd module will "
-                           "perform single-threaded compression instead.")
-                    warn(msg, RuntimeWarning, 2)
 
             # Set parameter
             zstd_ret = m.ZSTD_CCtx_setParameter(cctx, key, value)
@@ -547,7 +533,7 @@ def _load_d_dict(dctx, zstd_dict):
 
 class _Compressor:
     def __init__(self, level_or_option=None, zstd_dict=None):
-        self._use_multithreaded = False
+        self._use_multithread = False
         self._lock = Lock()
         level = 0  # 0 means use zstd's default compression level
 
@@ -562,8 +548,8 @@ class _Compressor:
 
         # Set compressLevel/option to compression context
         if level_or_option is not None:
-            level, self._use_multithreaded = _set_c_parameters(self._cctx,
-                                                               level_or_option)
+            level, self._use_multithread = _set_c_parameters(self._cctx,
+                                                             level_or_option)
 
         # Load dictionary to compression context
         if zstd_dict is not None:
@@ -686,7 +672,7 @@ class ZstdCompressor(_Compressor):
         try:
             self._lock.acquire()
 
-            if self._use_multithreaded and mode == ZstdCompressor.CONTINUE:
+            if self._use_multithread and mode == ZstdCompressor.CONTINUE:
                 ret = self._compress_mt_continue_impl(data)
             else:
                 ret = self._compress_impl(data, mode, False)
@@ -754,10 +740,10 @@ class RichMemZstdCompressor(_Compressor):
         """
         super().__init__(level_or_option=level_or_option, zstd_dict=zstd_dict)
 
-        if self._use_multithreaded:
+        if self._use_multithread:
             msg = ('Currently "rich memory mode" has no effect on '
                    'zstd multi-threaded compression (set '
-                   '"CParameter.nbWorkers" > 1), it will allocate '
+                   '"CParameter.nbWorkers" >= 1), it will allocate '
                    'unnecessary memory.')
             warn(msg, ResourceWarning, 1)
 
@@ -1249,7 +1235,7 @@ def compress_stream(input_stream, output_stream, *,
         int objects, the last two are readonly memoryview objects.
     """
     level = 0  # 0 means use zstd's default compression level
-    use_multithreaded = False
+    use_multithread = False
     total_input_size = 0
     total_output_size = 0
 
@@ -1289,7 +1275,7 @@ def compress_stream(input_stream, output_stream, *,
             raise ZstdError("Unable to create ZSTD_CCtx instance.")
 
         if level_or_option is not None:
-            level, use_multithreaded = _set_c_parameters(cctx, level_or_option)
+            level, use_multithread = _set_c_parameters(cctx, level_or_option)
         if zstd_dict is not None:
             _load_c_dict(cctx, zstd_dict, level)
 
@@ -1348,7 +1334,7 @@ def compress_stream(input_stream, output_stream, *,
                 out_buf.pos = 0
 
                 # Compress
-                if use_multithreaded and end_directive == m.ZSTD_e_continue:
+                if use_multithread and end_directive == m.ZSTD_e_continue:
                     while True:
                         zstd_ret = m.ZSTD_compressStream2(cctx, out_buf, in_buf, m.ZSTD_e_continue)
                         if (out_buf.pos == out_buf.size

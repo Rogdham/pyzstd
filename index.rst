@@ -686,7 +686,8 @@ Module-level variables
 
         * :py:data:`zstd_version`, a ``str``.
         * :py:data:`zstd_version_info`, a ``tuple``.
-        * :py:data:`compressionLevel_values`, some values defined by underlying zstd library.
+        * :py:data:`zstd_support_multithread`, whether the underlying zstd library supports multi-threaded compression.
+        * :py:data:`compressionLevel_values`, some values defined by the underlying zstd library.
 
 .. py:data:: zstd_version
 
@@ -708,9 +709,26 @@ Module-level variables
     (1, 4, 5)
 
 
+.. py:data:: zstd_support_multithread
+
+    Whether the underlying zstd library was compiled with multi-threaded compression support.
+
+    If it's ``False``, setting :py:attr:`CParameter.nbWorkers`, :py:attr:`CParameter.jobSize`, :py:attr:`CParameter.overlapLog` to non-zero value will raise a :py:class:`ZstdError` exception.
+
+    * When statically linked to zstd library, it's always ``True``. (PyPI wheels)
+    * When dynamically linked to zstd library, zstd v1.5.0+ enabled multi-threaded compression by default, zstd v1.4.x- disabled it by default.
+
+.. versionadded:: 0.15.1
+
+.. sourcecode:: python
+
+    >>> pyzstd.zstd_support_multithread
+    True
+
+
 .. py:data:: compressionLevel_values
 
-    A 3-item namedtuple, values defined by underlying zstd library, see :ref:`compression level<compression_level>` for details.
+    A 3-item namedtuple, values defined by the underlying zstd library, see :ref:`compression level<compression_level>` for details.
 
     ``default`` is default compression level, it is used when compression level is set to ``0``.
 
@@ -991,17 +1009,21 @@ Advanced parameters
 
         Select how many threads will be spawned to compress in parallel.
 
-        When nbWorkers > ``1``, enables multi-threaded compression, see :ref:`zstd multi-threaded compression<mt_compression>` for details.
+        When nbWorkers >= ``1``, enables multi-threaded compression. See :ref:`zstd multi-threaded compression<mt_compression>` for details.
 
-        More workers improve speed, but also increase memory usage.
+        * More workers improve speed, but also increase memory usage.
+        * If :py:data:`zstd_support_multithread` is ``False``, setting to non-zero value will raise a :py:class:`ZstdError` exception.
 
-        ``0`` (default) or ``1`` means to use single-threaded compression, no worker is spawned, compression is performed inside caller's thread.
+        ``0`` (default) means "single-threaded mode", no worker is spawned, compression is performed inside caller's thread.
+
+    .. versionchanged:: 0.15.1
+        Setting to ``1`` means "1-thread multi-threaded mode", instead of "single-threaded mode".
 
     .. py:attribute:: jobSize
 
         Size of a compression job, in bytes.
 
-        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` >= 1.
 
         Each compression job is completed in parallel, so this value can indirectly impact the number of active threads.
 
@@ -1016,7 +1038,7 @@ Advanced parameters
 
         Control the overlap size, as a fraction of window size. (The "window size" here is not strict :py:attr:`~CParameter.windowLog`, see zstd source code.)
 
-        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` >= 1.
 
         The overlap size is an amount of data reloaded from previous job at the beginning of a new job. It helps preserve compression ratio, while each job is compressed in parallel. Larger values increase compression ratio, but decrease speed.
 
@@ -1028,7 +1050,7 @@ Advanced parameters
 
         Each intermediate rank increases/decreases load size by a factor 2:
 
-        9: full window;  8: w/2;  7: w/4;  6: w/8;  5:w/16;  4: w/32;  3:w/64;  2:w/128;  1:no overlap;  0:default
+        9: full window;  8: w/2;  7: w/4;  6: w/8;  5: w/16;  4: w/32;  3: w/64;  2: w/128;  1: no overlap;  0: default.
 
 
 .. _DParameter:
@@ -1115,14 +1137,14 @@ Compression level
     Compression level is an integer:
 
     * ``1`` to ``22`` (currently), regular levels. Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
-    * ``0`` means use default level, which is currently ``3`` defined by underlying zstd library.
+    * ``0`` means use default level, which is currently ``3`` defined by the underlying zstd library.
     * ``-131072`` to ``-1``, negative levels extend the range of speed vs ratio preferences. The lower the level, the faster the speed, but at the cost of compression ratio. 131072 = 128*1024.
 
-    :py:data:`compressionLevel_values` is some values defined by underlying zstd library.
+    :py:data:`compressionLevel_values` are some values defined by the underlying zstd library.
 
     **For advanced user**
 
-    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
+    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
 
     Setting a compression level does not set all other :ref:`compression parameters<CParameter>` to default. Setting this will dynamically impact the compression parameters which have not been manually set, the manually set ones will "stick".
 
@@ -1160,9 +1182,9 @@ Multi-threaded compression
 
 .. note:: Multi-threaded compression
 
-    Zstd library supports multi-threaded compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable multi-threaded compression.
+    Zstd library supports multi-threaded compression, set :py:attr:`CParameter.nbWorkers` parameter >= ``1`` to enable multi-threaded compression.
 
-    The threads are spawned by underlying zstd library, not by pyzstd module.
+    The threads are spawned by the underlying zstd library, not by pyzstd module.
 
     .. sourcecode:: python
 
@@ -1175,6 +1197,15 @@ Multi-threaded compression
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
 
     The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MiB data, single-threaded output is 273.55 MiB, multi-threaded output is 274.33 MiB.
+
+    There is a small possibility that the underlying zstd library doesn't support multi-threaded compression, check the :py:data:`zstd_support_multithread` variable to avoid throwing a :py:class:`ZstdError` exception:
+
+    .. sourcecode:: python
+
+        option = {CParameter.nbWorkers  : 4 if zstd_support_multithread else 0,
+                  CParameter.jobSize    : 50*1024*1024 if zstd_support_multithread else 0,
+                  CParameter.overlapLog : 5 if zstd_support_multithread else 0}
+        compressed_dat = compress(raw_dat, option)
 
 
 Rich memory mode

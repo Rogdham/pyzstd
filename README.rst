@@ -18,6 +18,16 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.1  (next release)**
+
+#. Two behavior changes:
+
+    * Setting ``CParameter.nbWorkers`` to ``1`` now means "1-thread multi-threaded mode", rather than "single-threaded mode".
+
+    * If the underlying zstd library doesn't support multi-threaded compression, no longer automatically fallback to "single-threaded mode", now raise a ``ZstdError`` exception.
+
+#. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
+
 **0.15.0  (May 18, 2021)**
 
 #. Update zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
