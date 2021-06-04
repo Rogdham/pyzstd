@@ -41,6 +41,7 @@ def has_option(option):
     else:
         return False
 
+WARNING_AS_ERROR = has_option('--warning-as-error')
 DYNAMIC_LINK = has_option('--dynamic-link-zstd')
 CFFI = has_option('--cffi') or \
        platform.python_implementation() == 'PyPy'
@@ -85,14 +86,17 @@ else:  # C implementation
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
-        if 'msvc' in self.compiler.compiler_type.lower():
-            for extension in self.extensions:
-                # The default is /Ox optimization
-                # /Ob3 is more aggressive inlining than /Ob2:
-                # https://github.com/facebook/zstd/issues/2314
+        for extension in self.extensions:
+            if self.compiler.compiler_type.lower() in ('unix', 'mingw32'):
+                if WARNING_AS_ERROR:
+                    extension.extra_compile_args.append('-Werror')
+            elif self.compiler.compiler_type.lower() == 'msvc':
+                # /Ob3 is more aggressive inlining than /Ob2
                 # /GF eliminates duplicate strings
                 # /Gy does function level linking
                 more_options = ['/Ob3', '/GF', '/Gy']
+                if WARNING_AS_ERROR:
+                    more_options.append('/WX')
                 extension.extra_compile_args.extend(more_options)
         super().build_extensions()
 
