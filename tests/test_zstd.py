@@ -6,6 +6,7 @@ import io
 import os
 import re
 import sys
+import array
 import pathlib
 import pickle
 import random
@@ -2724,6 +2725,12 @@ class OpenTestCase(unittest.TestCase):
             dat = f.read()
 
         self.assertEqual(dat, SAMPLES[0])
+
+    def test_pickle_buffer(self):
+        arr = array.array("i", range(1_000_000))
+
+        with open(BytesIO(), "wb") as f:
+            pickle.dump(pickle.PickleBuffer(arr), f, protocol=5)
 
 class StreamFunctionsTestCase(unittest.TestCase):
 
