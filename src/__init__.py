@@ -456,10 +456,18 @@ class ZstdFile(_compression.BaseStream):
         may not reflect the data written until close() is called.
         """
         self._check_can_write()
+
+        if isinstance(data, bytes):
+            size = len(data)
+
+        else:
+            data = memoryview(data)
+            size = data.nbytes
+
         compressed = self._compressor.compress(data)
         self._fp.write(compressed)
-        self._pos += len(data)
-        return len(data)
+        self._pos += size
+        return size
 
     def seek(self, offset, whence=io.SEEK_SET):
         """Change the file position.
