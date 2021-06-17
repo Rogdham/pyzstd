@@ -2726,11 +2726,13 @@ class OpenTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
-    def test_pickle_buffer(self):
+    def test_buffer_protocol(self):
+        # don't use len() for buffer protocol objects
         arr = array.array("i", range(1_000_000))
 
         with open(BytesIO(), "wb") as f:
-            pickle.dump(pickle.PickleBuffer(arr), f, protocol=5)
+            f.write(arr)
+            self.assertEqual(f.tell(), len(arr) * arr.itemsize)
 
 class StreamFunctionsTestCase(unittest.TestCase):
 

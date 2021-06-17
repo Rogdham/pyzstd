@@ -32,6 +32,10 @@ Documentation: https://pyzstd.readthedocs.io
 GitHub: https://github.com/animalize/pyzstd
 PyPI: https://pypi.org/project/pyzstd'''
 
+def _nbytes(dat):
+    if isinstance(dat, (bytes, bytearray)):
+        return len(dat)
+    return memoryview(dat).nbytes
 
 def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
@@ -85,7 +89,7 @@ def train_dict(samples, dict_size):
     chunk_sizes = []
     for chunk in samples:
         chunks.append(chunk)
-        chunk_sizes.append(len(chunk))
+        chunk_sizes.append(_nbytes(chunk))
 
     chunks = b''.join(chunks)
     if not chunks:
@@ -139,7 +143,7 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     chunk_sizes = []
     for chunk in samples:
         chunks.append(chunk)
-        chunk_sizes.append(len(chunk))
+        chunk_sizes.append(_nbytes(chunk))
 
     chunks = b''.join(chunks)
     if not chunks:
@@ -456,18 +460,15 @@ class ZstdFile(_compression.BaseStream):
         may not reflect the data written until close() is called.
         """
         self._check_can_write()
-
-        if isinstance(data, bytes):
-            size = len(data)
-
-        else:
-            data = memoryview(data)
-            size = data.nbytes
-
         compressed = self._compressor.compress(data)
         self._fp.write(compressed)
-        self._pos += size
-        return size
+
+        if isinstance(data, (bytes, bytearray)):
+            length = len(data)
+        else:
+            length = memoryview(data).nbytes
+        self._pos += length
+        return length
 
     def seek(self, offset, whence=io.SEEK_SET):
         """Change the file position.

@@ -28,6 +28,11 @@ compressionLevel_values = _nt_values(m.ZSTD_defaultCLevel(),
 
 _new_nonzero = ffi.new_allocator(should_clear_after_alloc=False)
 
+def _nbytes(dat):
+    if isinstance(dat, (bytes, bytearray)):
+        return len(dat)
+    return memoryview(dat).nbytes
+
 class ZstdError(Exception):
     "Call to the underlying zstd library failed."
     pass
@@ -255,12 +260,12 @@ class ZstdDict:
 
         # Both ordinary dictionary and "raw content" dictionary should
         # at least 8 bytes
-        if len(dict_content) < 8:
+        if len(self.__dict_content) < 8:
             raise ValueError('Zstd dictionary content should at least 8 bytes.')
 
         # Create ZSTD_DDict instance from dictionary content, also check content
         # integrity to some degree.
-        ddict = m.ZSTD_createDDict(ffi.from_buffer(dict_content), len(dict_content))
+        ddict = m.ZSTD_createDDict(ffi.from_buffer(dict_content), len(self.__dict_content))
         if ddict == ffi.NULL:
             msg = ("Failed to get ZSTD_DDict instance from zstd "
                    "dictionary content. Maybe the content is corrupted.")
@@ -562,7 +567,7 @@ class _Compressor:
         if in_buf == ffi.NULL:
             raise MemoryError
         in_buf.src = ffi.from_buffer(data)
-        in_buf.size = len(data)
+        in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
@@ -573,7 +578,7 @@ class _Compressor:
 
         # Initialize output buffer
         if rich_mem:
-            init_size = m.ZSTD_compressBound(len(data))
+            init_size = m.ZSTD_compressBound(_nbytes(data))
             out.initWithSize(out_buf, -1, init_size)
         else:
             out.initAndGrow(out_buf, -1)
@@ -598,7 +603,7 @@ class _Compressor:
         if in_buf == ffi.NULL:
             raise MemoryError
         in_buf.src = ffi.from_buffer(data)
-        in_buf.size = len(data)
+        in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
@@ -1611,7 +1616,7 @@ def _finalize_dict(custom_dict_bytes,
     # Finalize
     zstd_ret = m.ZDICT_finalizeDictionary(
                    _dst_dict_bytes, dict_size,
-                   ffi.from_buffer(custom_dict_bytes), len(custom_dict_bytes),
+                   ffi.from_buffer(custom_dict_bytes), _nbytes(custom_dict_bytes),
                    ffi.from_buffer(samples_bytes), _sizes, _chunks_number,
                    params[0])
     if m.ZDICT_isError(zstd_ret):

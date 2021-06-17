@@ -20,6 +20,8 @@ Release note
 ------------
 **0.15.1  (next release)**
 
+#. Fix wrong length may be used for buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
+
 #. Two behavior changes:
 
     * Setting ``CParameter.nbWorkers`` to ``1`` now means "1-thread multi-threaded mode", rather than "single-threaded mode".
