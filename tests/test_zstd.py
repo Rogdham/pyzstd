@@ -2728,11 +2728,12 @@ class OpenTestCase(unittest.TestCase):
 
     def test_buffer_protocol(self):
         # don't use len() for buffer protocol objects
-        arr = array.array("i", range(1_000_000))
+        arr = array.array("i", range(1_000))
+        LENGTH = len(arr) * arr.itemsize
 
         with open(BytesIO(), "wb") as f:
-            f.write(arr)
-            self.assertEqual(f.tell(), len(arr) * arr.itemsize)
+            self.assertEqual(f.write(arr), LENGTH)
+            self.assertEqual(f.tell(), LENGTH)
 
 class StreamFunctionsTestCase(unittest.TestCase):
 

@@ -151,8 +151,8 @@ class _BlocksOutputBuffer:
 
     def initWithSize(self, out, max_length, init_size):
         # Get block size
-        if max_length >= 0:
-            block_size = min(max_length, init_size)
+        if 0 <= max_length < init_size:
+            block_size = max_length
         else:
             block_size = init_size
 

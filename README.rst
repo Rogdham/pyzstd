@@ -20,7 +20,7 @@ Release note
 ------------
 **0.15.1  (next release)**
 
-#. Fix wrong length may be used for buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
+#. Fix ``ZstdFile.write()`` may use wrong length for some buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
 
 #. Two behavior changes:
 
