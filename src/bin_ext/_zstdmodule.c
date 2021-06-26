@@ -560,14 +560,12 @@ add_parameters(PyObject *module)
 #endif
 
 /* Force no inlining */
-#ifdef _MSC_VER
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_NO_INLINE static __attribute__((__noinline__))
+#elif defined(_MSC_VER)
 #  define FORCE_NO_INLINE static __declspec(noinline)
 #else
-#  if defined(__GNUC__) || defined(__ICCARM__)
-#    define FORCE_NO_INLINE static __attribute__((__noinline__))
-#  else
-#    define FORCE_NO_INLINE static
-#  endif
+#  define FORCE_NO_INLINE static
 #endif
 
 static const char init_twice_msg[] = "__init__ method is called twice.";
@@ -1171,26 +1169,26 @@ _train_dict(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Check dict_size range */
+    /* Check parameters */
     if (dict_size <= 0) {
         PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
         return NULL;
     }
 
-    /* Prepare chunk_sizes */
     if (!PyList_Check(samples_size_list)) {
         PyErr_SetString(PyExc_TypeError,
                         "samples_size_list argument should be a list.");
-        goto error;
+        return NULL;
     }
 
     chunks_number = Py_SIZE(samples_size_list);
     if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
-        goto error;
+        return NULL;
     }
 
+    /* Prepare chunk_sizes */
     chunk_sizes = PyMem_Malloc(chunks_number * sizeof(size_t));
     if (chunk_sizes == NULL) {
         PyErr_NoMemory();
@@ -1287,26 +1285,26 @@ _finalize_dict(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Check dict_size range */
+    /* Check parameters */
     if (dict_size <= 0) {
         PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
         return NULL;
     }
 
-    /* Prepare chunk_sizes */
     if (!PyList_Check(samples_size_list)) {
         PyErr_SetString(PyExc_TypeError,
                         "samples_size_list argument should be a list.");
-        goto error;
+        return NULL;
     }
 
     chunks_number = Py_SIZE(samples_size_list);
     if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
                         "The number of samples is too large.");
-        goto error;
+        return NULL;
     }
 
+    /* Prepare chunk_sizes */
     chunk_sizes = PyMem_Malloc(chunks_number * sizeof(size_t));
     if (chunk_sizes == NULL) {
         PyErr_NoMemory();
@@ -2563,7 +2561,7 @@ static PyMethodDef EndlessZstdDecompressor_methods[] = {
 };
 
 PyDoc_STRVAR(EndlessZstdDecompressor_at_frame_edge_doc,
-"True when both input and output streams are at a frame edge, means a frame is\n"
+"True when both the input and output streams are at a frame edge, means a frame is\n"
 "completely decoded and fully flushed, or the decompressor just be initialized.\n\n"
 "This flag could be used to check data integrity in some cases.");
 
@@ -3553,8 +3551,8 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
         /* Input stream ended */
         if (read_bytes == 0) {
-            /* Check data integrity. at_frame_edge flag is 1 when both input
-               and output streams are at a frame edge. */
+            /* Check data integrity. at_frame_edge flag is 1 when both the
+               input and output streams are at a frame edge. */
             if (self.at_frame_edge == 0) {
                 PyErr_Format(static_state.ZstdError,
                              "Decompression failed: zstd data ends in an "

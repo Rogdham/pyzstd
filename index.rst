@@ -467,7 +467,7 @@ Streaming decompression
 
     .. py:attribute:: at_frame_edge
 
-        ``True`` when both input and output streams are at a :ref:`frame<frame_block>` edge, or the decompressor just be initialized.
+        ``True`` when both the input and output streams are at a :ref:`frame<frame_block>` edge, or the decompressor just be initialized.
 
         This flag could be used to check data integrity in some cases.
 
@@ -1198,7 +1198,7 @@ Multi-threaded compression
 
     The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MiB data, single-threaded output is 273.55 MiB, multi-threaded output is 274.33 MiB.
 
-    There is a small possibility that the underlying zstd library doesn't support multi-threaded compression, check the :py:data:`zstd_support_multithread` variable to avoid throwing a :py:class:`ZstdError` exception:
+    There is a small possibility that the underlying zstd library doesn't support multi-threaded compression (as time goes on, the possibility becomes less and less). Check the :py:data:`zstd_support_multithread` variable to avoid throwing a :py:class:`ZstdError` exception:
 
     .. sourcecode:: python
 

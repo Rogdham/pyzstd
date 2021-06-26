@@ -66,7 +66,7 @@ Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd
 
 #. ``ZstdDecompressor`` class: now it has the same API and behavior as BZ2Decompressor / LZMADecompressor classes in Python standard library, it stops after a frame is decompressed.
 
-#. Add an ``EndlessZstdDecompressor`` class, it accepts multiple concatenated frames. It is renamed from previous ``ZstdDecompressor`` class, but ``.at_frame_edge`` is ``True`` when both input and output streams are at a frame edge.
+#. Add an ``EndlessZstdDecompressor`` class, it accepts multiple concatenated frames. It is renamed from previous ``ZstdDecompressor`` class, but ``.at_frame_edge`` is ``True`` when both the input and output streams are at a frame edge.
 
 #. Rename ``zstd_open()`` function to ``open()``, consistent with Python standard library.
 

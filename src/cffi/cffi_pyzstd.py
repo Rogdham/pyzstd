@@ -1119,8 +1119,9 @@ class EndlessZstdDecompressor(_Decompressor):
 
     @property
     def at_frame_edge(self):
-        """True when both input and output streams are at a frame edge, means a frame is
-        completely decoded and fully flushed, or the decompressor just be initialized.
+        """True when both the input and output streams are at a frame edge, means a
+        frame is completely decoded and fully flushed, or the decompressor just be
+        initialized.
 
         This flag could be used to check data integrity in some cases.
         """
@@ -1161,8 +1162,8 @@ def decompress(data, zstd_dict=None, option=None):
     # Decompress
     ret = decomp._decompress_impl(in_buf, -1, initial_size)
 
-    # Check data integrity. at_frame_edge flag is True when the both input and
-    # output streams are at a frame edge.
+    # Check data integrity. at_frame_edge flag is True when the both the input
+    # and output streams are at a frame edge.
     if not decomp._at_frame_edge:
         extra_msg = "." if (len(ret) == 0) \
                         else (", if want to output these decompressed data, use "
@@ -1524,8 +1525,8 @@ def decompress_stream(input_stream, output_stream, *,
 
             # Input stream ended
             if read_bytes == 0:
-                # Check data integrity. at_frame_edge flag is 1 when both input
-                # and output streams are at a frame edge.
+                # Check data integrity. at_frame_edge flag is 1 when both the
+                # input and output streams are at a frame edge.
                 if not at_frame_edge:
                     msg = ("Decompression failed: zstd data ends in an "
                            "incomplete frame, maybe the input data was "
