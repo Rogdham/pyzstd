@@ -522,6 +522,12 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             with self.assertRaises(ZstdError):
                 ZstdCompressor({CParameter.overlapLog:4})
 
+        # unknown parameter
+        with self.assertRaisesRegex(ZstdError,
+                      r'the 2th parameter \(key 654321\).*?invalid. \(zstd v'):
+            ZstdCompressor({CParameter.compressionLevel:3,
+                            654321:-12345})
+
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
         EndlessZstdDecompressor(option=d)

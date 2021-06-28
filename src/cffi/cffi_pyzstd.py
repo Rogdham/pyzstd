@@ -389,7 +389,7 @@ def _set_zstd_error(type, zstd_code):
           (type_msg, ffi.string(m.ZSTD_getErrorName(zstd_code)).decode('utf-8'))
     raise ZstdError(msg)
 
-def _set_parameter_error(is_compress, posi, key, value):
+def _set_parameter_error(is_compress, pos, key, value):
     COMPRESS_PARAMETERS = \
     {m.ZSTD_c_compressionLevel: "compressionLevel",
      m.ZSTD_c_windowLog:        "windowLog",
@@ -425,9 +425,9 @@ def _set_parameter_error(is_compress, posi, key, value):
 
     # Find parameter's name
     name = parameters.get(key)
+    # Unknown parameter
     if name is None:
-        msg = "The %dth zstd %s parameter is invalid." % (posi, type_msg)
-        raise ZstdError(msg)
+        name = 'the %dth parameter (key %d)' % (pos, key)
 
     # Get parameter bounds
     if is_compress:
@@ -435,8 +435,8 @@ def _set_parameter_error(is_compress, posi, key, value):
     else:
         bounds = m.ZSTD_dParam_getBounds(key)
     if m.ZSTD_isError(bounds.error):
-        msg = 'Error when getting bounds of zstd %s parameter "%s".' % \
-              (type_msg, name)
+        msg = 'Zstd %s parameter "%s" is invalid. (zstd v%s)' % \
+              (type_msg, name, zstd_version)
         raise ZstdError(msg)
 
     # Error message

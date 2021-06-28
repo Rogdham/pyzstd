@@ -711,7 +711,7 @@ Module-level variables
 
 .. py:data:: zstd_support_multithread
 
-    Whether the underlying zstd library was compiled with multi-threaded compression support.
+    Whether the underlying zstd library was compiled with :ref:`multi-threaded compression<mt_compression>` support.
 
     If it's ``False``, setting :py:attr:`CParameter.nbWorkers`, :py:attr:`CParameter.jobSize`, :py:attr:`CParameter.overlapLog` to non-zero value will raise a :py:class:`ZstdError` exception.
 

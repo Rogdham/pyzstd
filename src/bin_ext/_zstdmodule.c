@@ -393,6 +393,35 @@ OutputBuffer_OnError(BlocksOutputBuffer *buffer)
     Py_CLEAR(buffer->list);
 }
 
+/* ------------------
+     Global macros
+   ------------------ */
+#define ACQUIRE_LOCK(obj) do {                    \
+    if (!PyThread_acquire_lock((obj)->lock, 0)) { \
+        Py_BEGIN_ALLOW_THREADS                    \
+        PyThread_acquire_lock((obj)->lock, 1);    \
+        Py_END_ALLOW_THREADS                      \
+    } } while (0)
+#define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
+
+/* Force inlining */
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_INLINE static inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define FORCE_INLINE static inline __forceinline
+#else
+#  define FORCE_INLINE static inline
+#endif
+
+/* Force no inlining */
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_NO_INLINE static __attribute__((__noinline__))
+#elif defined(_MSC_VER)
+#  define FORCE_NO_INLINE static __declspec(noinline)
+#else
+#  define FORCE_NO_INLINE static
+#endif
+
 /* -------------------------
      Parameters from zstd
    ------------------------- */
@@ -433,7 +462,7 @@ static const ParameterInfo dp_list[] =
 };
 
 /* Format an user friendly error message. */
-static void
+FORCE_NO_INLINE void
 set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
 {
     ParameterInfo const *list;
@@ -442,6 +471,7 @@ set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
     char *type;
     ZSTD_bounds bounds;
     int i;
+    char pos_msg[128];
 
     if (is_compress) {
         list = cp_list;
@@ -462,12 +492,11 @@ set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
         }
     }
 
-    /* Not a valid parameter */
+    /* Unknown parameter */
     if (name == NULL) {
-        PyErr_Format(static_state.ZstdError,
-                     "The %zdth zstd %s parameter is invalid.",
-                     pos, type);
-        return;
+        PyOS_snprintf(pos_msg, sizeof(pos_msg),
+                      "the %zdth parameter (key %d)", pos, key_v);
+        name = pos_msg;
     }
 
     /* Get parameter bounds */
@@ -478,8 +507,8 @@ set_parameter_error(int is_compress, Py_ssize_t pos, int key_v, int value_v)
     }
     if (ZSTD_isError(bounds.error)) {
         PyErr_Format(static_state.ZstdError,
-                     "Error when getting bounds of zstd %s parameter \"%s\".",
-                     type, name);
+                     "Zstd %s parameter \"%s\" is invalid. (zstd v%s)",
+                     type, name, ZSTD_versionString());
         return;
     }
 
@@ -538,36 +567,11 @@ add_parameters(PyObject *module)
 }
 
 /* --------------------------------------
-     Global functions/macros
-     Set parameters, load dictionary
-     ACQUIRE_LOCK, reduce_cannot_pickle
+     Global functions
+      - set parameters
+      - load dictionary
+      - reduce_cannot_pickle
    -------------------------------------- */
-#define ACQUIRE_LOCK(obj) do {                    \
-    if (!PyThread_acquire_lock((obj)->lock, 0)) { \
-        Py_BEGIN_ALLOW_THREADS                    \
-        PyThread_acquire_lock((obj)->lock, 1);    \
-        Py_END_ALLOW_THREADS                      \
-    } } while (0)
-#define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
-
-/* Force inlining */
-#if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_INLINE static inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#  define FORCE_INLINE static inline __forceinline
-#else
-#  define FORCE_INLINE static inline
-#endif
-
-/* Force no inlining */
-#if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_NO_INLINE static __attribute__((__noinline__))
-#elif defined(_MSC_VER)
-#  define FORCE_NO_INLINE static __declspec(noinline)
-#else
-#  define FORCE_NO_INLINE static
-#endif
-
 static const char init_twice_msg[] = "__init__ method is called twice.";
 
 typedef enum {
