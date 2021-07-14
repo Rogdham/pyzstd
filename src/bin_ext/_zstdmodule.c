@@ -1538,12 +1538,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 
         /* Finished */
         if (zstd_ret == 0) {
-            ret = OutputBuffer_Finish(&buffer, &out);
-            if (ret != NULL) {
-                goto success;
-            } else {
-                goto error;
-            }
+            break;
         }
 
         /* Output buffer should be exhausted, grow the buffer. */
@@ -1555,8 +1550,12 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
         }
     }
 
-success:
-    return ret;
+    /* Return a bytes object */
+    ret = OutputBuffer_Finish(&buffer, &out);
+    if (ret != NULL) {
+        return ret;
+    }
+
 error:
     OutputBuffer_OnError(&buffer);
     return NULL;
@@ -1596,12 +1595,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
 
         /* Finished */
         if (in.pos == in.size) {
-            ret = OutputBuffer_Finish(&buffer, &out);
-            if (ret != NULL) {
-                goto success;
-            } else {
-                goto error;
-            }
+            break;
         }
 
         /* Output buffer should be exhausted, grow the buffer. */
@@ -1613,8 +1607,12 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
         }
     }
 
-success:
-    return ret;
+    /* Return a bytes object */
+    ret = OutputBuffer_Finish(&buffer, &out);
+    if (ret != NULL) {
+        return ret;
+    }
+
 error:
     OutputBuffer_OnError(&buffer);
     return NULL;
