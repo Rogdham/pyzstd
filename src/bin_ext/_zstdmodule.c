@@ -1166,6 +1166,7 @@ _train_dict(PyObject *module, PyObject *args)
     size_t *chunk_sizes = NULL;
     PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
+    Py_ssize_t sizes_sum;
     Py_ssize_t i;
 
     if (!PyArg_ParseTuple(args, "SOn:_train_dict",
@@ -1199,6 +1200,7 @@ _train_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
+    sizes_sum = 0;
     for (i = 0; i < chunks_number; i++) {
         PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
@@ -1208,6 +1210,13 @@ _train_dict(PyObject *module, PyObject *args)
                             "object, with a size_t value.");
             goto error;
         }
+        sizes_sum += chunk_sizes[i];
+    }
+
+    if (sizes_sum != Py_SIZE(samples_bytes)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "The samples size list doesn't match the concatenation's size.");
+        goto error;
     }
 
     /* Allocate dict buffer */
@@ -1281,6 +1290,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     PyObject *dst_dict_bytes = NULL;
     size_t zstd_ret;
     ZDICT_params_t params;
+    Py_ssize_t sizes_sum;
     Py_ssize_t i;
 
     if (!PyArg_ParseTuple(args, "SSOni:_finalize_dict",
@@ -1315,6 +1325,7 @@ _finalize_dict(PyObject *module, PyObject *args)
         goto error;
     }
 
+    sizes_sum = 0;
     for (i = 0; i < chunks_number; i++) {
         PyObject *size = PyList_GET_ITEM(samples_size_list, i);
         chunk_sizes[i] = PyLong_AsSize_t(size);
@@ -1324,6 +1335,13 @@ _finalize_dict(PyObject *module, PyObject *args)
                             "object, with a size_t value.");
             goto error;
         }
+        sizes_sum += chunk_sizes[i];
+    }
+
+    if (sizes_sum != Py_SIZE(samples_bytes)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "The samples size list doesn't match the concatenation's size.");
+        goto error;
     }
 
     /* Allocate dict buffer */

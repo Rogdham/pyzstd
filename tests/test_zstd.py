@@ -1752,6 +1752,45 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
 
+    def test_train_buffer_protocal_samples(self):
+        def _nbytes(dat):
+            if isinstance(dat, (bytes, bytearray)):
+                return len(dat)
+            return memoryview(dat).nbytes
+
+        # prepare samples
+        chunk_lst = []
+        wrong_size_lst = []
+        correct_size_lst = []
+        for _ in range(300):
+            arr = array.array('Q', [random.randint(0, 20) for i in range(20)])
+            chunk_lst.append(arr)
+            correct_size_lst.append(_nbytes(arr))
+            wrong_size_lst.append(len(arr))
+        concatenation = b''.join(chunk_lst)
+
+        # wrong size list
+        with self.assertRaisesRegex(ValueError,
+                "The samples size list doesn't match the concatenation's size"):
+            pyzstd._train_dict(concatenation, wrong_size_lst, 100*1024)
+
+        # correct size list
+        pyzstd._train_dict(concatenation, correct_size_lst, 100*1024)
+
+        # test _finalize_dict
+        if zstd_version_info < (1, 4, 5):
+            return
+
+        # wrong size list
+        with self.assertRaisesRegex(ValueError,
+                "The samples size list doesn't match the concatenation's size"):
+            pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+                                  concatenation, wrong_size_lst, 300*1024, 5)
+
+        # correct size list
+        pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+                              concatenation, correct_size_lst, 300*1024, 5)
+
 class OutputBufferTestCase(unittest.TestCase):
 
     def setUp(self):

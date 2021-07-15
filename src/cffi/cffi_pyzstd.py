@@ -265,7 +265,8 @@ class ZstdDict:
 
         # Create ZSTD_DDict instance from dictionary content, also check content
         # integrity to some degree.
-        ddict = m.ZSTD_createDDict(ffi.from_buffer(dict_content), len(self.__dict_content))
+        ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
+                                   len(self.__dict_content))
         if ddict == ffi.NULL:
             msg = ("Failed to get ZSTD_DDict instance from zstd "
                    "dictionary content. Maybe the content is corrupted.")
@@ -1539,19 +1540,25 @@ def decompress_stream(input_stream, output_stream, *,
     finally:
         m.ZSTD_freeDCtx(dctx)
 
-def _train_dict(chunks, chunk_sizes, dict_size):
+def _train_dict(samples_bytes, samples_size_list, dict_size):
     # C code
     if dict_size <= 0:
         raise ValueError("dict_size argument should be positive number.")
 
     # Prepare chunk_sizes
-    _chunks_number = len(chunk_sizes)
+    _chunks_number = len(samples_size_list)
     _sizes = _new_nonzero("size_t[]", _chunks_number)
     if _sizes == ffi.NULL:
         raise MemoryError
 
-    for i, size in enumerate(chunk_sizes):
+    _sizes_sum = 0
+    for i, size in enumerate(samples_size_list):
         _sizes[i] = size
+        _sizes_sum += size
+
+    if _sizes_sum != _nbytes(samples_bytes):
+        msg = "The samples size list doesn't match the concatenation's size."
+        raise ValueError(msg)
 
     # Allocate dict buffer
     _dst_dict_bytes = _new_nonzero("char[]", dict_size)
@@ -1560,7 +1567,7 @@ def _train_dict(chunks, chunk_sizes, dict_size):
 
     # Train
     zstd_ret = m.ZDICT_trainFromBuffer(_dst_dict_bytes, dict_size,
-                                       ffi.from_buffer(chunks),
+                                       ffi.from_buffer(samples_bytes),
                                        _sizes, _chunks_number)
     if m.ZDICT_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_TRAIN_DICT, zstd_ret)
@@ -1595,8 +1602,14 @@ def _finalize_dict(custom_dict_bytes,
     if _sizes == ffi.NULL:
         raise MemoryError
 
+    _sizes_sum = 0
     for i, size in enumerate(samples_size_list):
         _sizes[i] = size
+        _sizes_sum += size
+
+    if _sizes_sum != _nbytes(samples_bytes):
+        msg = "The samples size list doesn't match the concatenation's size."
+        raise ValueError(msg)
 
     # Allocate dict buffer
     _dst_dict_bytes = _new_nonzero("char[]", dict_size)
