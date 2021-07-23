@@ -85,6 +85,8 @@ class ZstdCompressor:
     def flush(self,
               mode: Union[ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.FLUSH_FRAME) -> bytes: ...
 
+    def _set_pledged_size(self, size: Optional[int]) -> None: ...
+
 class RichMemZstdCompressor:
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,

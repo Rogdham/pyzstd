@@ -589,6 +589,70 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
+    def test_set_pledged_size(self):
+        DAT = DECOMPRESSED_100_PLUS_32KB
+        CHUNK_SIZE = len(DAT) // 3
+
+        # wrong value
+        c = ZstdCompressor()
+        with self.assertRaisesRegex(ValueError, r'64-bit unsigned integer'):
+            c._set_pledged_size(-300)
+
+        # wrong mode
+        c = ZstdCompressor(1)
+        c.compress(b'123456')
+        self.assertEqual(c.last_mode, c.CONTINUE)
+        with self.assertRaisesRegex(RuntimeError, r'\.last_mode == \.FLUSH_FRAME'):
+            c._set_pledged_size(300)
+
+        # None value
+        c = ZstdCompressor(1)
+        c._set_pledged_size(None)
+        dat = c.compress(DAT) + c.flush()
+
+        ret = get_frame_info(dat)
+        self.assertEqual(ret.decompressed_size, None)
+
+        # correct value
+        c = ZstdCompressor(1)
+        c._set_pledged_size(len(DAT))
+
+        chunks = []
+        posi = 0
+        while posi < len(DAT):
+            dat = c.compress(DAT[posi:posi+CHUNK_SIZE])
+            posi += CHUNK_SIZE
+            chunks.append(dat)
+
+        dat = c.flush()
+        chunks.append(dat)
+        chunks = b''.join(chunks)
+
+        ret = get_frame_info(chunks)
+        self.assertEqual(ret.decompressed_size, len(DAT))
+        self.assertEqual(decompress(chunks), DAT)
+
+        c._set_pledged_size(len(DAT)) # the second frame
+        dat = c.compress(DAT) + c.flush()
+
+        ret = get_frame_info(dat)
+        self.assertEqual(ret.decompressed_size, len(DAT))
+        self.assertEqual(decompress(dat), DAT)
+
+        # wrong value
+        c = ZstdCompressor(1)
+        c._set_pledged_size(len(DAT)+1)
+
+        chunks = []
+        posi = 0
+        while posi < len(DAT):
+            dat = c.compress(DAT[posi:posi+CHUNK_SIZE])
+            posi += CHUNK_SIZE
+            chunks.append(dat)
+
+        with self.assertRaises(ZstdError):
+            c.flush()
+
     def test_decompress_1byte(self):
         d = EndlessZstdDecompressor()
 

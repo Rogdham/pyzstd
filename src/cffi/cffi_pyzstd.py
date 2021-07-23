@@ -351,21 +351,23 @@ class ZstdDict:
 class _ErrorType:
     ERR_DECOMPRESS=0
     ERR_COMPRESS=1
+    ERR_SET_PLEDGED_SIZE=2
 
-    ERR_LOAD_D_DICT=2
-    ERR_LOAD_C_DICT=3
+    ERR_LOAD_D_DICT=3
+    ERR_LOAD_C_DICT=4
 
-    ERR_GET_FRAME_SIZE=4
-    ERR_GET_C_BOUNDS=5
-    ERR_GET_D_BOUNDS=6
-    ERR_SET_C_LEVEL=7
+    ERR_GET_FRAME_SIZE=5
+    ERR_GET_C_BOUNDS=6
+    ERR_GET_D_BOUNDS=7
+    ERR_SET_C_LEVEL=8
 
-    ERR_TRAIN_DICT=8
-    ERR_FINALIZE_DICT=9
+    ERR_TRAIN_DICT=9
+    ERR_FINALIZE_DICT=10
 
     _TYPE_MSG = (
         "decompress zstd data",
         "compress zstd data",
+        "set pledged uncompressed content size",
 
         "load zstd dictionary for decompression",
         "load zstd dictionary for compression",
@@ -717,6 +719,44 @@ class ZstdCompressor(_Compressor):
             # Resetting cctx's session never fail
             m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
             raise
+        finally:
+            self._lock.release()
+
+    def _set_pledged_size(self, size):
+        """*This is an undocumented method.*
+
+        Set uncompressed content size of a frame.
+        1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.
+        2, If the actual size doesn't match the value, a ZstdError will be raised, and
+           the last compressed chunk is likely to be lost.
+
+        Arguments
+        size: Uncompressed content size of a frame, None means the size is unknown.
+        """
+        # Get size value
+        if size is None:
+            size = m.ZSTD_CONTENTSIZE_UNKNOWN
+        else:
+            try:
+                if size < 0 or size > 2**64-1:
+                    raise Exception
+            except:
+                msg = "size argument should be 64-bit unsigned integer value."
+                raise ValueError(msg)
+
+        try:
+            self._lock.acquire()
+
+            # Check the current mode
+            if self.__last_mode != m.ZSTD_e_end:
+                msg = ("._set_pledged_size() method must be called when "
+                       "(.last_mode == .FLUSH_FRAME).")
+                raise RuntimeError(msg)
+
+            # Set pledged content size
+            zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(self._cctx, size)
+            if m.ZSTD_isError(zstd_ret):
+                _set_zstd_error(_ErrorType.ERR_SET_PLEDGED_SIZE, zstd_ret)
         finally:
             self._lock.release()
 

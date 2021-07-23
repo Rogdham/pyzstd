@@ -577,6 +577,7 @@ static const char init_twice_msg[] = "__init__ method is called twice.";
 typedef enum {
     ERR_DECOMPRESS,
     ERR_COMPRESS,
+    ERR_SET_PLEDGED_SIZE,
 
     ERR_LOAD_D_DICT,
     ERR_LOAD_C_DICT,
@@ -606,6 +607,9 @@ set_zstd_error(const error_type type, const size_t code)
         break;
     case ERR_COMPRESS:
         type_msg = "compress zstd data";
+        break;
+    case ERR_SET_PLEDGED_SIZE:
+        type_msg = "set pledged uncompressed content size";
         break;
 
     case ERR_LOAD_D_DICT:
@@ -1746,12 +1750,75 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     return ret;
 }
 
+PyDoc_STRVAR(ZstdCompressor_set_pledged_size_doc,
+"_set_pledged_size(size)\n"
+"----\n"
+"*This is an undocumented method.*\n\n"
+"Set uncompressed content size of a frame.\n"
+"1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.\n"
+"2, If the actual size doesn't match the value, a ZstdError will be raised, and\n"
+"   the last compressed chunk is likely to be lost.\n\n"
+"Arguments\n"
+"size: Uncompressed content size of a frame, None means the size is unknown.");
+
+static PyObject *
+ZstdCompressor_set_pledged_size(ZstdCompressor *self, PyObject *size)
+{
+    uint64_t pledged_size;
+    size_t zstd_ret;
+    PyObject *ret;
+
+    /* Get size value */
+    if (size == Py_None) {
+        pledged_size = ZSTD_CONTENTSIZE_UNKNOWN;
+    } else {
+        pledged_size = PyLong_AsUnsignedLongLong(size);
+        if (pledged_size == (uint64_t)-1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_ValueError,
+                            "size argument should be 64-bit unsigned integer value.");
+            return NULL;
+        }
+    }
+
+    /* Thread-safe code */
+    ACQUIRE_LOCK(self);
+
+    /* Check the current mode */
+    if (self->last_mode != ZSTD_e_end) {
+        PyErr_SetString(PyExc_RuntimeError,
+                        "._set_pledged_size() method must be called when "
+                        "(.last_mode == .FLUSH_FRAME).");
+        goto error;
+    }
+
+    /* Set pledged content size */
+    zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self->cctx, pledged_size);
+    if (ZSTD_isError(zstd_ret)) {
+        set_zstd_error(ERR_SET_PLEDGED_SIZE, zstd_ret);
+        goto error;
+    }
+
+    /* Return None */
+    ret = Py_None;
+    Py_INCREF(ret);
+    goto success;
+
+error:
+    ret = NULL;
+success:
+    RELEASE_LOCK(self);
+    return ret;
+}
+
 static PyMethodDef ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)ZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_compress_doc},
 
     {"flush", (PyCFunction)ZstdCompressor_flush,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_flush_doc},
+
+    {"_set_pledged_size", (PyCFunction)ZstdCompressor_set_pledged_size,
+     METH_O, ZstdCompressor_set_pledged_size_doc},
 
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
     METH_NOARGS, reduce_cannot_pickle_doc},
