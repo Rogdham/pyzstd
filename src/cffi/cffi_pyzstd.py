@@ -321,9 +321,7 @@ class ZstdDict:
         raise TypeError(msg)
 
     def _get_cdict(self, level):
-        try:
-            self.__lock.acquire()
-
+        with self.__lock:
             # Already cached
             if level in self.__cdicts:
                 cdict = self.__cdicts[level]
@@ -342,8 +340,6 @@ class ZstdDict:
                                m.ZSTD_sizeof_CDict(cdict))
                 self.__cdicts[level] = cdict
             return cdict
-        finally:
-            self.__lock.release()
 
     def _get_ddict(self):
         return self.__ddict
@@ -677,22 +673,19 @@ class ZstdCompressor(_Compressor):
                    "ZstdCompressor.FLUSH_FRAME.")
             raise ValueError(msg)
 
-        try:
-            self._lock.acquire()
-
-            if self._use_multithread and mode == ZstdCompressor.CONTINUE:
-                ret = self._compress_mt_continue_impl(data)
-            else:
-                ret = self._compress_impl(data, mode, False)
-            self.__last_mode = mode
-            return ret
-        except:
-            self.__last_mode = m.ZSTD_e_end
-            # Resetting cctx's session never fail
-            m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
-            raise
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                if self._use_multithread and mode == ZstdCompressor.CONTINUE:
+                    ret = self._compress_mt_continue_impl(data)
+                else:
+                    ret = self._compress_impl(data, mode, False)
+                self.__last_mode = mode
+                return ret
+            except:
+                self.__last_mode = m.ZSTD_e_end
+                # Resetting cctx's session never fail
+                m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
+                raise
 
     def flush(self, mode=FLUSH_FRAME):
         """Flush any remaining data in internal buffer.
@@ -708,19 +701,16 @@ class ZstdCompressor(_Compressor):
                    "ZstdCompressor.FLUSH_FRAME or ZstdCompressor.FLUSH_BLOCK.")
             raise ValueError(msg)
 
-        try:
-            self._lock.acquire()
-
-            ret = self._compress_impl(b"", mode, False)
-            self.__last_mode = mode
-            return ret
-        except:
-            self.__last_mode = m.ZSTD_e_end
-            # Resetting cctx's session never fail
-            m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
-            raise
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                ret = self._compress_impl(b"", mode, False)
+                self.__last_mode = mode
+                return ret
+            except:
+                self.__last_mode = m.ZSTD_e_end
+                # Resetting cctx's session never fail
+                m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
+                raise
 
     def _set_pledged_size(self, size):
         """*This is an undocumented method.*
@@ -744,9 +734,7 @@ class ZstdCompressor(_Compressor):
                 msg = "size argument should be 64-bit unsigned integer value."
                 raise ValueError(msg)
 
-        try:
-            self._lock.acquire()
-
+        with self._lock:
             # Check the current mode
             if self.__last_mode != m.ZSTD_e_end:
                 msg = ("._set_pledged_size() method must be called when "
@@ -757,8 +745,6 @@ class ZstdCompressor(_Compressor):
             zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(self._cctx, size)
             if m.ZSTD_isError(zstd_ret):
                 _set_zstd_error(_ErrorType.ERR_SET_PLEDGED_SIZE, zstd_ret)
-        finally:
-            self._lock.release()
 
     @property
     def last_mode(self):
@@ -801,17 +787,14 @@ class RichMemZstdCompressor(_Compressor):
         Arguments
         data: A bytes-like object, data to be compressed.
         """
-        try:
-            self._lock.acquire()
-
-            ret = self._compress_impl(data, m.ZSTD_e_end, True)
-            return ret
-        except:
-            # Resetting cctx's session never fail
-            m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
-            raise
-        finally:
-            self._lock.release()
+        with self._lock:
+            try:
+                ret = self._compress_impl(data, m.ZSTD_e_end, True)
+                return ret
+            except:
+                # Resetting cctx's session never fail
+                m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
+                raise
 
 _TYPE_DEC         = 0
 _TYPE_ENDLESS_DEC = 1
@@ -907,9 +890,8 @@ class _Decompressor:
         return out.finish(out_buf)
 
     def _stream_decompress(self, data, max_length=-1):
+        self._lock.acquire()
         try:
-            self._lock.acquire()
-
             initial_buffer_size = -1
 
             in_buf = _new_nonzero("ZSTD_inBuffer *")
@@ -1115,9 +1097,7 @@ class ZstdDecompressor(_Decompressor):
     def unused_data(self):
         """A bytes object. When ZstdDecompressor object stops after a frame is
         decompressed, unused input data after the frame. Otherwise this will be b''."""
-        try:
-            self._lock.acquire()
-
+        with self._lock:
             if not self._eof:
                 return b""
             else:
@@ -1128,8 +1108,6 @@ class ZstdDecompressor(_Decompressor):
                         self._unused_data = \
                             ffi.buffer(self._input_buffer)[self._in_begin:self._in_end]
                 return self._unused_data
-        finally:
-            self._lock.release()
 
 class EndlessZstdDecompressor(_Decompressor):
     """A streaming decompressor, accepts multiple concatenated frames.
