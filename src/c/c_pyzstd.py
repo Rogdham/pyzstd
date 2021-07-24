@@ -34,7 +34,7 @@ _nt_frame_info = namedtuple('frame_info',
 def get_frame_info(frame_buffer):
     """Get zstd frame infomation from a frame header.
 
-    Arguments
+    Argument
     frame_buffer: A bytes-like object. It should starts from the beginning of
                   a frame, and needs to include at least the frame header (6 to
                   18 bytes).
@@ -44,8 +44,8 @@ def get_frame_info(frame_buffer):
     If decompressed_size is None, decompressed size is unknown.
 
     dictionary_id is a 32-bit unsigned integer value. 0 means dictionary ID was
-    not recorded in frame header, the frame may or may not need a dictionary to
-    be decoded, and the ID of such a dictionary is not specified.
+    not recorded in the frame header, the frame may or may not need a dictionary
+    to be decoded, and the ID of such a dictionary is not specified.
 
     It's possible to append more items to the namedtuple in the future."""
 

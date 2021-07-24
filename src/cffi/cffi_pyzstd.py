@@ -693,7 +693,7 @@ class ZstdCompressor(_Compressor):
         Since zstd data consists of one or more independent frames, the compressor
         object can still be used after this method is called.
 
-        Arguments
+        Argument
         mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.
         """
         if mode not in (ZstdCompressor.FLUSH_FRAME, ZstdCompressor.FLUSH_BLOCK):
@@ -713,14 +713,14 @@ class ZstdCompressor(_Compressor):
                 raise
 
     def _set_pledged_size(self, size):
-        """*This is an undocumented method.*
+        """*This is an undocumented method, because it may be used incorrectly.*
 
         Set uncompressed content size of a frame.
         1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.
         2, If the actual size doesn't match the value, a ZstdError will be raised, and
            the last compressed chunk is likely to be lost.
 
-        Arguments
+        Argument
         size: Uncompressed content size of a frame, None means the size is unknown.
         """
         # Get size value
@@ -731,7 +731,8 @@ class ZstdCompressor(_Compressor):
                 if size < 0 or size > 2**64-1:
                     raise Exception
             except:
-                msg = "size argument should be 64-bit unsigned integer value."
+                msg = ("size argument should be 64-bit unsigned integer "
+                       "value, or None.")
                 raise ValueError(msg)
 
         with self._lock:
@@ -784,7 +785,7 @@ class RichMemZstdCompressor(_Compressor):
 
         Compressing b'' will get an empty content frame (9 bytes or more).
 
-        Arguments
+        Argument
         data: A bytes-like object, data to be compressed.
         """
         with self._lock:
@@ -1664,7 +1665,7 @@ _nt_frame_info = namedtuple('frame_info',
 def get_frame_info(frame_buffer):
     """Get zstd frame infomation from a frame header.
 
-    Arguments
+    Argument
     frame_buffer: A bytes-like object. It should starts from the beginning of
                   a frame, and needs to include at least the frame header (6 to
                   18 bytes).
@@ -1674,8 +1675,8 @@ def get_frame_info(frame_buffer):
     If decompressed_size is None, decompressed size is unknown.
 
     dictionary_id is a 32-bit unsigned integer value. 0 means dictionary ID was
-    not recorded in frame header, the frame may or may not need a dictionary to
-    be decoded, and the ID of such a dictionary is not specified.
+    not recorded in the frame header, the frame may or may not need a dictionary
+    to be decoded, and the ID of such a dictionary is not specified.
 
     It's possible to append more items to the namedtuple in the future.
     """
@@ -1704,7 +1705,7 @@ def get_frame_size(frame_buffer):
     It will iterate all blocks' header within a frame, to accumulate the frame
     size.
 
-    Arguments
+    Argument
     frame_buffer: A bytes-like object, it should starts from the beginning of a
                   frame, and contains at least one complete frame.
     """

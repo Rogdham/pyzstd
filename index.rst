@@ -991,6 +991,8 @@ Advanced parameters
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
+        \* :py:class:`ZstdCompressor` has an undocumented method to set the size, ``help(ZstdCompressor._set_pledged_size)`` to see the usage.
+
     .. py:attribute:: checksumFlag
 
         A 4-byte checksum of uncompressed content is written at the end of frame.
@@ -1333,7 +1335,7 @@ Zstd dictionary ID
 
     In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
 
-    In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
+    In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in the frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
 
 
 Build pyzstd module with options
