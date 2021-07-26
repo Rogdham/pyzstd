@@ -2,7 +2,7 @@ import _compression
 import io
 from enum import IntEnum
 from os import PathLike
-from typing import Dict, ByteString, Optional, Union, Callable, \
+from typing import Dict, ByteString, Optional, Union, Callable, Iterable, \
                    ClassVar, Tuple, NamedTuple, BinaryIO, TextIO
 
 __version__: str
