@@ -2,8 +2,9 @@ import _compression
 import io
 from enum import IntEnum
 from os import PathLike
-from typing import Dict, ByteString, Optional, Union, Callable, Iterable, \
-                   ClassVar, Tuple, NamedTuple, BinaryIO, TextIO
+from typing import overload, Dict, ByteString, Optional, Union, Callable, \
+                   Iterable, Literal, ClassVar, Tuple, NamedTuple, BinaryIO, \
+                   TextIO
 
 __version__: str
 zstd_version: str
@@ -202,6 +203,32 @@ class ZstdFile(_compression.BaseStream):
 
     def tell(self) -> int: ...
 
+_BinaryMode = Literal["r", "rb", # read
+                      "w", "wb", "a", "ab", "x", "xb"] # write
+_TextMode = Literal["rt", # read
+                    "wt", "at", "xt"] # write
+
+@overload
+def open(filename: Union[str, bytes, PathLike, BinaryIO],
+         mode: _BinaryMode = "rb",
+         *,
+         level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
+         zstd_dict: Optional[ZstdDict] = None,
+         encoding: None = None,
+         errors: None = None,
+         newline: None = None) -> ZstdFile: ...
+
+@overload
+def open(filename: Union[str, bytes, PathLike, BinaryIO],
+         mode: _TextMode = ...,
+         *,
+         level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
+         zstd_dict: Optional[ZstdDict] = None,
+         encoding: Optional[str] = None,
+         errors: Optional[str] = None,
+         newline: Optional[str] = None) -> TextIO: ...
+
+@overload
 def open(filename: Union[str, bytes, PathLike, BinaryIO],
          mode: str = "rb",
          *,
