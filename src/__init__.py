@@ -462,7 +462,7 @@ class ZstdFile(_compression.BaseStream):
         return self._buffer.readline(size)
 
     def write(self, data):
-        """Write a bytes object to the file.
+        """Write a bytes-like object to the file.
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,

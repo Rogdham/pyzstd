@@ -64,7 +64,7 @@ class ZstdDict:
     dict_id: int
 
     def __init__(self,
-                 dict_content: ByteString,
+                 dict_content,
                  is_raw: bool = False) -> None: ...
 
 class ZstdCompressor:
@@ -79,7 +79,7 @@ class ZstdCompressor:
                  zstd_dict: Optional[ZstdDict] = None) -> None: ...
 
     def compress(self,
-                 data: ByteString,
+                 data,
                  mode: Union[ZstdCompressor.CONTINUE, ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.CONTINUE) -> bytes: ...
 
     def flush(self,
@@ -92,7 +92,7 @@ class RichMemZstdCompressor:
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                  zstd_dict: Optional[ZstdDict] = None) -> None: ...
 
-    def compress(self, data: ByteString) -> bytes: ...
+    def compress(self, data) -> bytes: ...
 
 class ZstdDecompressor:
     needs_input: bool
@@ -122,11 +122,11 @@ class EndlessZstdDecompressor:
 class ZstdError(Exception):
     ...
 
-def compress(data: ByteString,
+def compress(data,
              level_or_option: Union[None, int, Dict[CParameter, int]] = None,
              zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
 
-def richmem_compress(data: ByteString,
+def richmem_compress(data,
                      level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                      zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
 
@@ -147,11 +147,11 @@ def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, Non
                       read_size: int = 131_075, write_size: int = 131_072,
                       callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
-def train_dict(samples: Iterable[ByteString],
+def train_dict(samples: Iterable,
                dict_size: int) -> ZstdDict: ...
 
 def finalize_dict(zstd_dict: ZstdDict,
-                  samples: Iterable[ByteString],
+                  samples: Iterable,
                   dict_size: int,
                   level: int) -> ZstdDict: ...
 
@@ -194,7 +194,7 @@ class ZstdFile(_compression.BaseStream):
 
     def readline(self, size: int = -1) -> bytes: ...
 
-    def write(self, data: ByteString) -> int: ...
+    def write(self, data) -> int: ...
 
     def seek(self,
              offset: int,
