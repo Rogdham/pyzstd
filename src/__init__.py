@@ -276,6 +276,7 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 # Copied from lzma module, except:
+# Add ZstdFile.readinto() method.
 # ZstdFile.__init__():
 #   io.BufferedReader uses 32 KiB buffer size instead of default value
 #   io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
@@ -441,6 +442,14 @@ class ZstdFile(_compression.BaseStream):
         if size < 0:
             size = 32*1024
         return self._buffer.read1(size)
+
+    def readinto(self, b):
+        """Read bytes into b.
+
+        Returns the number of bytes read (0 for EOF).
+        """
+        self._check_can_read()
+        return self._buffer.readinto(b)
 
     def readline(self, size=-1):
         """Read a line of uncompressed bytes from the file.
