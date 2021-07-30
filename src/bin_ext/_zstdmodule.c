@@ -110,6 +110,8 @@ typedef struct {
     PyObject *empty_readonly_memoryview;
     PyObject *str_readinto;
     PyObject *str_write;
+    PyTypeObject *CParameter_type;
+    PyTypeObject *DParameter_type;
 } _zstd_state;
 
 static _zstd_state static_state;
@@ -775,6 +777,14 @@ set_c_parameters(ZstdCompressor *self,
         Py_ssize_t pos = 0;
 
         while (PyDict_Next(level_or_option, &pos, &key, &value)) {
+            /* Check key type */
+            if (Py_TYPE(key) == static_state.DParameter_type) {
+                PyErr_SetString(PyExc_TypeError,
+                                "Key of compression option dict should "
+                                "NOT be DParameter.");
+                return -1;
+            }
+
             /* Both key & value should be 32-bit signed int */
             const int key_v = _PyLong_AsInt(key);
             if (key_v == -1 && PyErr_Occurred()) {
@@ -874,6 +884,14 @@ set_d_parameters(ZSTD_DCtx *dctx, PyObject *option)
 
     pos = 0;
     while (PyDict_Next(option, &pos, &key, &value)) {
+        /* Check key type */
+        if (Py_TYPE(key) == static_state.CParameter_type) {
+            PyErr_SetString(PyExc_TypeError,
+                            "Key of decompression option dict should "
+                            "NOT be CParameter.");
+            return -1;
+        }
+
         /* Both key & value should be 32-bit signed int */
         const int key_v = _PyLong_AsInt(key);
         if (key_v == -1 && PyErr_Occurred()) {
@@ -3674,6 +3692,34 @@ success:
     return ret;
 }
 
+PyDoc_STRVAR(_set_parameter_types_doc,
+"Internal function, set CParameter/DParameter types for validity check.");
+
+static PyObject *
+_set_parameter_types(PyObject *module, PyObject *args)
+{
+    PyObject *c_parameter_type;
+    PyObject *d_parameter_type;
+
+    if (!PyArg_ParseTuple(args, "OO:_set_parameter_types", &c_parameter_type, &d_parameter_type)) {
+        return NULL;
+    }
+
+    if (!PyType_Check(c_parameter_type) || !PyType_Check(d_parameter_type)) {
+        PyErr_SetString(PyExc_ValueError,
+                        "The two arguments should be CParameter and "
+                        "DParameter types.");
+        return NULL;
+    }
+
+    Py_INCREF(c_parameter_type);
+    static_state.CParameter_type = (PyTypeObject*)c_parameter_type;
+    Py_INCREF(d_parameter_type);
+    static_state.DParameter_type = (PyTypeObject*)d_parameter_type;
+
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef _zstd_methods[] = {
     {"decompress", (PyCFunction)decompress, METH_VARARGS|METH_KEYWORDS, decompress_doc},
     {"_train_dict", (PyCFunction)_train_dict, METH_VARARGS, _train_dict_doc},
@@ -3683,6 +3729,7 @@ static PyMethodDef _zstd_methods[] = {
     {"_get_frame_info", (PyCFunction)_get_frame_info, METH_VARARGS, _get_frame_info_doc},
     {"compress_stream", (PyCFunction)compress_stream, METH_VARARGS|METH_KEYWORDS, compress_stream_doc},
     {"decompress_stream", (PyCFunction)decompress_stream, METH_VARARGS|METH_KEYWORDS, decompress_stream_doc},
+    {"_set_parameter_types", (PyCFunction)_set_parameter_types, METH_VARARGS, _set_parameter_types_doc},
     {NULL}
 };
 
@@ -3702,6 +3749,8 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
     Py_VISIT(static_state.empty_readonly_memoryview);
     Py_VISIT(static_state.str_readinto);
     Py_VISIT(static_state.str_write);
+    Py_VISIT(static_state.CParameter_type);
+    Py_VISIT(static_state.DParameter_type);
     return 0;
 }
 
@@ -3718,6 +3767,8 @@ _zstd_clear(PyObject *module)
     Py_CLEAR(static_state.empty_readonly_memoryview);
     Py_CLEAR(static_state.str_readinto);
     Py_CLEAR(static_state.str_write);
+    Py_CLEAR(static_state.CParameter_type);
+    Py_CLEAR(static_state.DParameter_type);
     return 0;
 }
 

@@ -111,3 +111,6 @@ class Strategy(IntEnum):
     btopt    = _zstd._ZSTD_btopt
     btultra  = _zstd._ZSTD_btultra
     btultra2 = _zstd._ZSTD_btultra2
+
+# Set CParameter/DParameter types for validity check
+_zstd._set_parameter_types(CParameter, DParameter)

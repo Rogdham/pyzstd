@@ -2189,20 +2189,13 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "rw")
 
-        # doesn't raise ZstdError, due to:
-        # (DParameter.windowLogMax == CParameter.compressionLevel == 100)
-        if DParameter.windowLogMax == CParameter.compressionLevel:
-            ZstdFile(BytesIO(), "w",
-                     level_or_option={DParameter.windowLogMax:compressionLevel_values.max})
-
-            ZstdFile(BytesIO(), "w",
-                     level_or_option={DParameter.windowLogMax:compressionLevel_values.max+1})
+        with self.assertRaisesRegex(TypeError, r"NOT be CParameter"):
+            ZstdFile(BytesIO(), 'rb', level_or_option={CParameter.compressionLevel:5})
+        with self.assertRaisesRegex(TypeError, r"NOT be DParameter"):
+            ZstdFile(BytesIO(), 'wb', level_or_option={DParameter.windowLogMax:21})
 
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option=12)
-
-        with self.assertRaises(ZstdError):
-            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option={CParameter.checksumFlag:1})
 
     def test_init_bad_check(self):
         with self.assertRaises(TypeError):
