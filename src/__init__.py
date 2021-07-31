@@ -351,7 +351,7 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise TypeError("filename must be a str, bytes, file or PathLike object")
 
-        if self._mode == _MODE_READ:
+        if mode_code == _MODE_READ:
             raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
                                        trailing_error=ZstdError,
                                        zstd_dict=zstd_dict, option=level_or_option)
@@ -372,7 +372,7 @@ class ZstdFile(_compression.BaseStream):
         if self._mode == _MODE_CLOSED:
             return
         try:
-            if self._mode == _MODE_READ and hasattr(self, '_buffer'):
+            if self._mode == _MODE_READ:
                 self._buffer.close()
                 self._buffer = None
             elif self._mode == _MODE_WRITE:

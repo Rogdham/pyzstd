@@ -730,7 +730,7 @@ Module-level variables
 
     A 3-item namedtuple, values defined by the underlying zstd library, see :ref:`compression level<compression_level>` for details.
 
-    ``default`` is default compression level, it is used when compression level is set to ``0``.
+    ``default`` is default compression level, it is used when compression level is set to ``0`` or not set.
 
     ``min``/``max`` are minimum/maximum avaliable values of compression level, both inclusive.
 
@@ -793,7 +793,7 @@ Advanced parameters
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`CParameter` name, the value is a 32-bit signed integer value.
 
-    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
 
     The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
@@ -1063,7 +1063,7 @@ Advanced parameters
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`DParameter` name, the value is a 32-bit signed integer value.
 
-    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
 
     The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
@@ -1139,7 +1139,7 @@ Compression level
     Compression level is an integer:
 
     * ``1`` to ``22`` (currently), regular levels. Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
-    * ``0`` means use default level, which is currently ``3`` defined by the underlying zstd library.
+    * ``0`` means use the default level, which is currently ``3`` defined by the underlying zstd library.
     * ``-131072`` to ``-1``, negative levels extend the range of speed vs ratio preferences. The lower the level, the faster the speed, but at the cost of compression ratio. 131072 = 128*1024.
 
     :py:data:`compressionLevel_values` are some values defined by the underlying zstd library.
@@ -1230,7 +1230,7 @@ Rich memory mode
 
     When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra copy memory for this output buffer size.
+    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
 
     .. sourcecode:: python
 
