@@ -164,7 +164,7 @@ def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 
 def get_frame_size(frame_buffer: ByteString) -> int: ...
 
-class ZstdFile(_compression.BaseStream):
+class ZstdFile(io.BufferedIOBase):
     def __init__(self,
                  filename: Union[str, bytes, PathLike, BinaryIO],
                  mode: str = "r",
