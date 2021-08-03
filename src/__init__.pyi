@@ -1,4 +1,3 @@
-import _compression
 import io
 from enum import IntEnum
 from os import PathLike
@@ -86,7 +85,7 @@ class ZstdCompressor:
     def flush(self,
               mode: Union[ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.FLUSH_FRAME) -> bytes: ...
 
-    def _set_pledged_size(self, size: Optional[int]) -> None: ...
+    def _set_pledged_size(self, size: Union[int, None]) -> None: ...
 
 class RichMemZstdCompressor:
     def __init__(self,

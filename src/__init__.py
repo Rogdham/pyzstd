@@ -37,6 +37,16 @@ Documentation: https://pyzstd.readthedocs.io
 GitHub: https://github.com/animalize/pyzstd
 PyPI: https://pypi.org/project/pyzstd'''
 
+__all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
+           'ZstdDecompressor', 'EndlessZstdDecompressor',
+           'CParameter', 'DParameter', 'Strategy', 'ZstdError',
+           'compress', 'richmem_compress', 'decompress',
+           'compress_stream', 'decompress_stream',
+           'ZstdDict', 'train_dict', 'finalize_dict',
+           'get_frame_info', 'get_frame_size', 'ZstdFile', 'open',
+           'zstd_version', 'zstd_version_info',
+           'zstd_support_multithread', 'compressionLevel_values')
+
 def _nbytes(dat):
     if isinstance(dat, (bytes, bytearray)):
         return len(dat)
@@ -278,8 +288,8 @@ _MODE_WRITE  = 2
 #      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
 #      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
 #      If in _MODE_CLOSED mode, they don't exist or are None.
-#    When not in a mode, perform the corresponding actions will raise
-#    AttributeError. Then ._check_mode() will raise the proper exception.
+#    Then if not in a mode, perform the corresponding actions will raise
+#    AttributeError, and ._check_mode() will raise a proper exception.
 # 3, ZstdFile.__init__():
 #      io.BufferedReader uses 32 KiB buffer size instead of default value
 #      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
@@ -562,7 +572,7 @@ class ZstdFile(io.BufferedIOBase):
         this operation may be extremely slow.
         """
         try:
-            # BufferedReader.seek() checks seekable.
+            # BufferedReader.seek() checks seekable
             return self._buffer.seek(offset, whence)
         except AttributeError:
             self._check_mode(_MODE_READ)
