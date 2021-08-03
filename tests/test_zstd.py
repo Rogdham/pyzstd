@@ -2714,6 +2714,63 @@ class FileTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
+    def test_UnsupportedOperation(self):
+        # 1
+        with ZstdFile(BytesIO(), 'r') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.write(b'1234')
+
+        # 2
+        class T:
+            def read(self, size):
+                return b'a' * size
+
+        with self.assertRaises(AttributeError): # on close
+            with ZstdFile(T(), 'w') as f:
+                with self.assertRaises(AttributeError): # on write
+                    f.write(b'1234')
+
+        # 3
+        with ZstdFile(BytesIO(), 'w') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.read(100)
+            with self.assertRaises(io.UnsupportedOperation):
+                f.seek(100)
+
+        self.assertEqual(f.closed, True)
+        with self.assertRaises(ValueError):
+            f.readable()
+        with self.assertRaises(ValueError):
+            f.tell()
+        with self.assertRaises(ValueError):
+            f.read(100)
+
+    def test_read_readinto_readinto1(self):
+        lst = []
+        with ZstdFile(BytesIO(COMPRESSED_THIS_FILE*5)) as f:
+            while True:
+                method = random.randint(0, 2)
+                size = random.randint(1, 300)
+
+                if method == 0:
+                    dat = f.read(size)
+                    if not dat:
+                        break
+                    lst.append(dat)
+                elif method == 1:
+                    ba = bytearray(size)
+                    read_size = f.readinto(ba)
+                    if read_size == 0:
+                        break
+                    lst.append(bytes(ba[:read_size]))
+                elif method == 2:
+                    ba = bytearray(size)
+                    read_size = f.readinto1(ba)
+                    if read_size == 0:
+                        break
+                    lst.append(bytes(ba[:read_size]))
+        self.assertEqual(b''.join(lst), THIS_FILE_BYTES*5)
+
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):

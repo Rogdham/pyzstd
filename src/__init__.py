@@ -267,8 +267,14 @@ _MODE_READ   = 1
 _MODE_WRITE  = 2
 
 # Copied from Python stdlib (lzma.py), except:
-# 1, Add ZstdFile.readinto() method.
+# 1, Add .readinto()/.readinto1() methods.
 # 2, Remove BaseStream._check_*() overheads.
+#    The implementation needs to ensure:
+#      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
+#      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
+#      If in _MODE_CLOSED mode, they don't exist or are None.
+#    When not in a mode, perform the corresponding actions will raise
+#    AttributeError. Then ._check_mode() will raise the proper exception.
 # 3, ZstdFile.__init__():
 #      io.BufferedReader uses 32 KiB buffer size instead of default value
 #      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
@@ -316,6 +322,7 @@ class ZstdFile(io.BufferedIOBase):
         if not isinstance(zstd_dict, (type(None), ZstdDict)):
             raise TypeError("zstd_dict argument should be a ZstdDict object.")
 
+        # Read or write mode
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
                 msg = ("In read mode (decompression), level_or_option argument "
@@ -334,18 +341,20 @@ class ZstdFile(io.BufferedIOBase):
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
+        # File object
         if isinstance(filename, (str, bytes, PathLike)):
             if "b" not in mode:
                 mode += "b"
             self._fp = io.open(filename, mode)
             self._closefp = True
-            self._mode = mode_code
+            self._mode = mode_code  # Put here for ._closefp in .close()
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
             self._mode = mode_code
         else:
             raise TypeError("filename must be a str, bytes, file or PathLike object")
 
+        # ZstdDecompressReader
         if mode_code == _MODE_READ:
             raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
                                        trailing_error=ZstdError,
@@ -365,12 +374,10 @@ class ZstdFile(io.BufferedIOBase):
 
         # Check _MODE_READ/_MODE_WRITE mode
         if expected_mode == _MODE_READ:
-            # If in _MODE_READ mode, self._buffer is an io.BufferedReader object.
-            if not hasattr(self, '_buffer') or self._buffer is None:
+            if getattr(self, '_buffer', None) is None:
                 raise io.UnsupportedOperation("File not open for reading")
         elif expected_mode == _MODE_WRITE:
-            # If in _MODE_WRITE mode, self._compressor is a ZstdCompressor object.
-            if not hasattr(self, '_compressor') or self._compressor is None:
+            if getattr(self, '_compressor', None) is None:
                 raise io.UnsupportedOperation("File not open for writing")
 
         # Re-raise other exceptions
@@ -484,6 +491,17 @@ class ZstdFile(io.BufferedIOBase):
         """
         try:
             return self._buffer.readinto(b)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
+    def readinto1(self, b):
+        """Read bytes into b, while trying to avoid making multiple reads
+        from the underlying stream.
+
+        Returns the number of bytes read (0 for EOF).
+        """
+        try:
+            return self._buffer.readinto1(b)
         except AttributeError:
             self._check_mode(_MODE_READ)
 
