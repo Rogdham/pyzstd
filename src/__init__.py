@@ -1,7 +1,12 @@
 import _compression
 import io
-from os import PathLike
 from sys import maxsize
+try:
+    from os import PathLike
+except ImportError:
+    # For Python 3.5
+    class PathLike:
+        pass
 
 try:
     # Import C implementation

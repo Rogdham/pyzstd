@@ -169,11 +169,28 @@ jobs:
             python3 setup.py install
             python3 tests/test_zstd.py
 
+  # Test on minimum version of CPython
+  test_on_minimum_cpython:
+    name: Test on minimum version of CPython
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.5'
+
+      - name: Run test
+        run: |
+          python setup.py install
+          python tests/test_zstd.py
+
   # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
     needs: [build_wheels, build_in_manylinux2010, build_arch_wheels,
-            test_on_pypy, test_on_arches]
+            test_on_pypy, test_on_arches, test_on_minimum_cpython]
     runs-on: ubuntu-latest
 
     steps:
