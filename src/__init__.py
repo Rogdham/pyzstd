@@ -362,7 +362,10 @@ class ZstdFile(io.BufferedIOBase):
                 mode += "b"
             self._fp = io.open(filename, mode)
             self._closefp = True
-            self._mode = mode_code  # Put here for ._closefp in .close()
+            # Set ._mode here for ._closefp in .close(). If the following code
+            # fails, IOBase's cleanup code will call .close(), so that ._fp can
+            # be closed.
+            self._mode = mode_code
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
             self._mode = mode_code
@@ -376,36 +379,6 @@ class ZstdFile(io.BufferedIOBase):
                                        zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw, 32*1024)
 
-    # None argument means to check whether the file is closed.
-    def _check_mode(self, expected_mode=None):
-        # Check whether the file is closed
-        if expected_mode is None:
-            if self._mode != _MODE_CLOSED:
-                return
-
-        # If closed, raise ValueError.
-        if self._mode == _MODE_CLOSED:
-            raise ValueError("I/O operation on closed file")
-
-        # Check _MODE_READ/_MODE_WRITE mode
-        if expected_mode == _MODE_READ:
-            if getattr(self, '_buffer', None) is None:
-                raise io.UnsupportedOperation("File not open for reading")
-        elif expected_mode == _MODE_WRITE:
-            if getattr(self, '_compressor', None) is None:
-                raise io.UnsupportedOperation("File not open for writing")
-
-        # Re-raise other exceptions
-        raise
-
-    # Override IOBase.__iter__
-    # https://bugs.python.org/issue43787
-    def __iter__(self):
-        try:
-            return self._buffer.__iter__()
-        except AttributeError:
-            self._check_mode(_MODE_READ)
-
     def close(self):
         """Flush and close the file.
 
@@ -414,6 +387,7 @@ class ZstdFile(io.BufferedIOBase):
         """
         if self._mode == _MODE_CLOSED:
             return
+
         try:
             if self._mode == _MODE_READ:
                 try:
@@ -435,6 +409,36 @@ class ZstdFile(io.BufferedIOBase):
                 self._fp = None
                 self._closefp = False
                 self._mode = _MODE_CLOSED
+
+    # None argument means to check whether the file is closed.
+    def _check_mode(self, expected_mode=None):
+        # Check whether the file is closed
+        if expected_mode is None:
+            if self._mode != _MODE_CLOSED:
+                return
+
+        # If closed, raise ValueError.
+        if self._mode == _MODE_CLOSED:
+            raise ValueError("I/O operation on closed file")
+
+        # Check _MODE_READ/_MODE_WRITE mode
+        if expected_mode == _MODE_READ:
+            if getattr(self, '_buffer', None) is None:
+                raise io.UnsupportedOperation("File not open for reading")
+        elif expected_mode == _MODE_WRITE:
+            if getattr(self, '_compressor', None) is None:
+                raise io.UnsupportedOperation("File not open for writing")
+
+        # Re-raise other AttributeError exception
+        raise
+
+    # Override IOBase.__iter__
+    # https://bugs.python.org/issue43787
+    def __iter__(self):
+        try:
+            return self._buffer.__iter__()
+        except AttributeError:
+            self._check_mode(_MODE_READ)
 
     @property
     def closed(self):

@@ -1276,8 +1276,10 @@ Use with tarfile module
                     raise
 
             def close(self):
-                super().close()
-                self.zstd_file.close()
+                try:
+                    super().close()
+                finally:
+                    self.zstd_file.close()
 
         # write .tar.zst file (compression)
         with ZstdTarFile('archive.tar.zst', mode='w', level_or_option=5) as tar:
