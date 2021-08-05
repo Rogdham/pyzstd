@@ -138,9 +138,7 @@ static const Py_ssize_t BUFFER_BLOCK_SIZE[] =
          The CFFI implementation
          OutputBufferTestCase unittest
        If change the first blocks's size, also change:
-         ZstdDecompressReader.seek() method
-         ZstdFile.__init__() method
-         ZstdFile.read1() method
+         _32_KiB in __init__.py
          FileTestCase.test_decompress_limited() test */
     { 32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
       32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,

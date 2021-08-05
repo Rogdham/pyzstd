@@ -47,10 +47,6 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'zstd_version', 'zstd_version_info',
            'zstd_support_multithread', 'compressionLevel_values')
 
-def _nbytes(dat):
-    if isinstance(dat, (bytes, bytearray)):
-        return len(dat)
-    return memoryview(dat).nbytes
 
 def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
@@ -85,6 +81,12 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     """
     comp = RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
+
+
+def _nbytes(dat):
+    if isinstance(dat, (bytes, bytearray)):
+        return len(dat)
+    return memoryview(dat).nbytes
 
 
 def train_dict(samples, dict_size):
@@ -176,16 +178,18 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     return ZstdDict(dict_content)
 
 
+# In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
+# fast path for this size, if the output data is 32 KiB, it only allocates
+# memory and copies data once.
+_32_KiB = 32*1024
+
 # Copied from Python stdlib (_compression.py), except:
 # 1, ZstdDecompressReader.read():
 #      Uses ZSTD_DStreamInSize() (131,075 in zstd v1.x) instead of
 #      _compression.BUFFER_SIZE (default is 8 KiB) as read size.
 # 2, ZstdDecompressReader.seek():
 #      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as
-#      max_length.
-# In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
-# fast path for this size, if the output data is 32 KiB, it only allocates
-# memory and copies data once.
+#      max_length. See _32_KiB's comment for details.
 class ZstdDecompressReader(_compression.DecompressReader):
     # Add .readall() method for speedup
     # https://bugs.python.org/issue41486
@@ -255,7 +259,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
         elif whence == io.SEEK_END:
             # Seeking relative to EOF - we need to know the file's size.
             if self._size < 0:
-                while self.read(32*1024):
+                while self.read(_32_KiB):
                     pass
             offset = self._size + offset
         else:
@@ -269,7 +273,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
         # Read and discard data until we reach the desired position.
         while offset > 0:
-            data = self.read(min(32*1024, offset))
+            data = self.read(min(_32_KiB, offset))
             if not data:
                 break
             offset -= len(data)
@@ -293,12 +297,10 @@ _MODE_WRITE  = 2
 # 3, ZstdFile.__init__():
 #      io.BufferedReader uses 32 KiB buffer size instead of default value
 #      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+#      See _32_KiB's comment for details.
 # 4, ZstdFile.read1():
-#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB),
-#      consistent with ZstdFile.__init__().
-# In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
-# fast path for this size, if the output data is 32 KiB, it only allocates
-# memory and copies data once.
+#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+#      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
     """A file object providing transparent zstd (de)compression.
 
@@ -377,7 +379,7 @@ class ZstdFile(io.BufferedIOBase):
             raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
                                        trailing_error=ZstdError,
                                        zstd_dict=zstd_dict, option=level_or_option)
-            self._buffer = io.BufferedReader(raw, 32*1024)
+            self._buffer = io.BufferedReader(raw, _32_KiB)
 
     def close(self):
         """Flush and close the file.
@@ -496,7 +498,7 @@ class ZstdFile(io.BufferedIOBase):
         Returns b"" if the file is at EOF.
         """
         if size < 0:
-            size = 32*1024
+            size = _32_KiB
 
         try:
             return self._buffer.read1(size)
