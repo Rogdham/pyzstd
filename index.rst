@@ -172,7 +172,7 @@ Streaming compression
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
+    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into the frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -991,7 +991,7 @@ Advanced parameters
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
-        \* :py:class:`ZstdCompressor` has an undocumented method to set the size, ``help(ZstdCompressor._set_pledged_size)`` to see the usage.
+        \* :py:class:`ZstdCompressor` has an undocumented method to set the size, ``help(ZstdCompressor._set_pledged_input_size)`` to see the usage.
 
     .. py:attribute:: checksumFlag
 

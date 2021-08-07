@@ -577,7 +577,7 @@ static const char init_twice_msg[] = "__init__ method is called twice.";
 typedef enum {
     ERR_DECOMPRESS,
     ERR_COMPRESS,
-    ERR_SET_PLEDGED_SIZE,
+    ERR_SET_PLEDGED_INPUT_SIZE,
 
     ERR_LOAD_D_DICT,
     ERR_LOAD_C_DICT,
@@ -607,7 +607,7 @@ set_zstd_error(const error_type type, const size_t code)
     case ERR_COMPRESS:
         type_msg = "compress zstd data";
         break;
-    case ERR_SET_PLEDGED_SIZE:
+    case ERR_SET_PLEDGED_INPUT_SIZE:
         type_msg = "set pledged uncompressed content size";
         break;
 
@@ -1765,11 +1765,12 @@ ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     return ret;
 }
 
-PyDoc_STRVAR(ZstdCompressor_set_pledged_size_doc,
-"_set_pledged_size(size)\n"
+PyDoc_STRVAR(ZstdCompressor_set_pledged_input_size_doc,
+"_set_pledged_input_size(size)\n"
 "----\n"
 "*This is an undocumented method, because it may be used incorrectly.*\n\n"
-"Set uncompressed content size of a frame.\n"
+"Set uncompressed content size of a frame, the size will be written into the\n"
+"frame header.\n"
 "1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.\n"
 "2, If the actual size doesn't match the value, a ZstdError will be raised, and\n"
 "   the last compressed chunk is likely to be lost.\n\n"
@@ -1777,7 +1778,7 @@ PyDoc_STRVAR(ZstdCompressor_set_pledged_size_doc,
 "size: Uncompressed content size of a frame, None means the size is unknown.");
 
 static PyObject *
-ZstdCompressor_set_pledged_size(ZstdCompressor *self, PyObject *size)
+ZstdCompressor_set_pledged_input_size(ZstdCompressor *self, PyObject *size)
 {
     uint64_t pledged_size;
     size_t zstd_ret;
@@ -1802,15 +1803,15 @@ ZstdCompressor_set_pledged_size(ZstdCompressor *self, PyObject *size)
     /* Check the current mode */
     if (self->last_mode != ZSTD_e_end) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "._set_pledged_size() method must be called when "
-                        "(.last_mode == .FLUSH_FRAME).");
+                        "._set_pledged_input_size() method must be called "
+                        "when (.last_mode == .FLUSH_FRAME).");
         goto error;
     }
 
     /* Set pledged content size */
     zstd_ret = ZSTD_CCtx_setPledgedSrcSize(self->cctx, pledged_size);
     if (ZSTD_isError(zstd_ret)) {
-        set_zstd_error(ERR_SET_PLEDGED_SIZE, zstd_ret);
+        set_zstd_error(ERR_SET_PLEDGED_INPUT_SIZE, zstd_ret);
         goto error;
     }
 
@@ -1833,8 +1834,8 @@ static PyMethodDef ZstdCompressor_methods[] = {
     {"flush", (PyCFunction)ZstdCompressor_flush,
      METH_VARARGS|METH_KEYWORDS, ZstdCompressor_flush_doc},
 
-    {"_set_pledged_size", (PyCFunction)ZstdCompressor_set_pledged_size,
-     METH_O, ZstdCompressor_set_pledged_size_doc},
+    {"_set_pledged_input_size", (PyCFunction)ZstdCompressor_set_pledged_input_size,
+     METH_O, ZstdCompressor_set_pledged_input_size_doc},
 
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
     METH_NOARGS, reduce_cannot_pickle_doc},
@@ -3177,8 +3178,8 @@ PyDoc_STRVAR(compress_stream_doc,
 "    parameters.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "pledged_input_size: If set this argument to the size of input data, the size\n"
-"    will be written into frame header. If the actual input data doesn't match\n"
-"    it, a ZstdError will be raised.\n"
+"    will be written into the frame header. If the actual input data doesn't\n"
+"    match it, a ZstdError will be raised.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"

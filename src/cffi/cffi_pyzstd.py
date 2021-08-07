@@ -345,7 +345,7 @@ class ZstdDict:
 class _ErrorType:
     ERR_DECOMPRESS=0
     ERR_COMPRESS=1
-    ERR_SET_PLEDGED_SIZE=2
+    ERR_SET_PLEDGED_INPUT_SIZE=2
 
     ERR_LOAD_D_DICT=3
     ERR_LOAD_C_DICT=4
@@ -722,10 +722,11 @@ class ZstdCompressor(_Compressor):
                 m.ZSTD_CCtx_reset(self._cctx, m.ZSTD_reset_session_only)
                 raise
 
-    def _set_pledged_size(self, size):
+    def _set_pledged_input_size(self, size):
         """*This is an undocumented method, because it may be used incorrectly.*
 
-        Set uncompressed content size of a frame.
+        Set uncompressed content size of a frame, the size will be written into the
+        frame header.
         1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.
         2, If the actual size doesn't match the value, a ZstdError will be raised, and
            the last compressed chunk is likely to be lost.
@@ -748,14 +749,14 @@ class ZstdCompressor(_Compressor):
         with self._lock:
             # Check the current mode
             if self.__last_mode != m.ZSTD_e_end:
-                msg = ("._set_pledged_size() method must be called when "
-                       "(.last_mode == .FLUSH_FRAME).")
+                msg = ("._set_pledged_input_size() method must be called "
+                       "when (.last_mode == .FLUSH_FRAME).")
                 raise RuntimeError(msg)
 
             # Set pledged content size
             zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(self._cctx, size)
             if m.ZSTD_isError(zstd_ret):
-                _set_zstd_error(_ErrorType.ERR_SET_PLEDGED_SIZE, zstd_ret)
+                _set_zstd_error(_ErrorType.ERR_SET_PLEDGED_INPUT_SIZE, zstd_ret)
 
     @property
     def last_mode(self):
@@ -1262,8 +1263,8 @@ def compress_stream(input_stream, output_stream, *,
         parameters.
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
     pledged_input_size: If set this argument to the size of input data, the size
-        will be written into frame header. If the actual input data doesn't match
-        it, a ZstdError will be raised.
+        will be written into the frame header. If the actual input data doesn't
+        match it, a ZstdError will be raised.
     read_size: Input buffer size, in bytes.
     write_size: Output buffer size, in bytes.
     callback: A callback function that accepts four parameters:
