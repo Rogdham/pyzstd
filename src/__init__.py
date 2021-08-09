@@ -546,19 +546,25 @@ class ZstdFile(io.BufferedIOBase):
         the file on disk may not reflect the data written until close()
         is called.
         """
+        # Get the length of uncompressed data
         if isinstance(data, (bytes, bytearray)):
             length = len(data)
         else:
-            # accept any data that supports the buffer protocol
+            # Accept any data that supports the buffer protocol
             data = memoryview(data)
             length = data.nbytes
 
+        # Compress
         try:
             compressed = self._compressor.compress(data)
         except AttributeError:
             self._check_mode(_MODE_WRITE)
 
-        self._fp.write(compressed)
+        # Write to file. If haven't gathered enough uncompressed data for one
+        # zstd block (128 KiB at most), `compressed` is b''.
+        if compressed:
+            self._fp.write(compressed)
+
         self._pos += length
         return length
 
