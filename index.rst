@@ -43,8 +43,8 @@ Simple compression/decompression
     .. hint::
         If there are a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
-        * compression: :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
-        * decompression: :py:class:`EndlessZstdDecompressor`.
+        * :py:class:`ZstdCompressor`
+        * :py:class:`RichMemZstdCompressor`
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -80,7 +80,7 @@ Simple compression/decompression
 
     Decompress *data*, return the decompressed data.
 
-    Support multiple concatenated frames.
+    Support multiple concatenated :ref:`frames<frame_block>`.
 
     :param data: Data to be decompressed.
     :type data: bytes-like object
@@ -314,7 +314,7 @@ Streaming decompression
 
     A fast and convenient function, decompresses *input_stream* and writes the decompressed data to *output_stream*, it doesn't close the streams.
 
-    Supports multiple concatenated frames.
+    Supports multiple concatenated :ref:`frames<frame_block>`.
 
     This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
 
@@ -444,10 +444,9 @@ Streaming decompression
 
 .. py:class:: EndlessZstdDecompressor
 
-    It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used in these scenarios:
+    A streaming decompressor.
 
-        * Streaming decompression for multiple concatenated frames.
-        * Reuse for big number of same type individual data. (Compared to :py:func:`decompress` function, significantly faster on Windows, no significant improvement on Linux.)
+    It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used to decompress multiple concatenated frames.
 
     Thread-safe at method level.
 
@@ -497,19 +496,6 @@ Streaming decompression
 
             chunk = d2.decompress(dat, 10*1024*1024) # limit output buffer to 10 MiB
             write_output(chunk)
-
-        # --- reuse for same type individual data ---
-
-        # reuse an object may eliminate the small overhead of creating
-        # context / setting parameters / loading dictionary.
-        d3 = EndlessZstdDecompressor()
-        for compressed_data in data_source():
-            decompressed_data = d3.decompress(compressed_data)
-
-            # check data integrity
-            if not d3.at_frame_edge:
-                decompressed_data = None  # decompressed data is incomplete
-                d3 = EndlessZstdDecompressor() # reset decompressor
 
     .. hint:: Why :py:class:`EndlessZstdDecompressor` doesn't stop at frame edges?
 
@@ -747,22 +733,46 @@ ZstdFile class and open() function
 
     Open a zstd-compressed file in binary mode.
 
-    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. You may read their documentation.
+    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library.
 
-    This class can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
+    Like BZ2File/GzipFile/LZMAFile classes, ZstdFile is not thread-safe, so if you need to use a single ZstdFile object from multiple threads, it is necessary to protect it with a lock.
+
+    It can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
 
     .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
-        When using read mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+        The *filename* argument can be an existing file object to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
+
+        The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
+
+        If in reading mode (decompression):
+
+            * The *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+            * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
+
+    In reading mode (decompression), these methods are available: `.read(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read>`_, `.read1(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read1>`_, `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_, `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_, `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_, `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_. Note that if ``.seek()`` to "previous position" or "position relative to EOF (the first time)", the decompression has to be restarted from zero.
+
+    In writing mode (compression), this method is available: `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_.
+
+    In both reading and writing modes, these methods are available: `.close() <https://docs.python.org/3/library/io.html#io.IOBase.close>`_, `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_, `.fileno() <https://docs.python.org/3/library/io.html#io.IOBase.fileno>`_, `.readable() <https://docs.python.org/3/library/io.html#io.IOBase.readable>`_, `.writable() <https://docs.python.org/3/library/io.html#io.IOBase.writable>`_, `.seekable() <https://docs.python.org/3/library/io.html#io.IOBase.seekable>`_, and has a property attribute `.closed <https://docs.python.org/3/library/io.html#io.IOBase.closed>`_.
+
+    Iteration and the ``with`` statement are supported.
 
 .. py:function:: open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
 
-    Open a zstd-compressed file in binary or text mode, returning a file object (:py:class:`ZstdFile` or `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_).
+    Open a zstd-compressed file in binary or text mode, returning a file object.
 
-    This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library. You may read their documentation.
+    This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library.
 
-    When using read mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+    The *filename* argument can be an existing file object to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
 
+    The *mode* argument can be any of "r", "rb", "w", "wb", "x", "xb", "a" or "ab" for binary mode, or "rt", "wt", "xt", or "at" for text mode. The default is "rb".
+
+    If in reading mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+
+    In binary mode, a :py:class:`ZstdFile` object is returned.
+
+    In text mode, a :py:class:`ZstdFile` object is created, and wrapped in an `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_ object with the specified encoding, error handling behavior, and line ending(s).
 
 Advanced parameters
 -------------------
