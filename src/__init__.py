@@ -591,10 +591,13 @@ class ZstdFile(io.BufferedIOBase):
 
     def tell(self):
         """Return the current file position."""
-        self._check_mode()
         if self._mode == _MODE_READ:
             return self._buffer.tell()
-        return self._pos
+        elif self._mode == _MODE_WRITE:
+            return self._pos
+
+        # Closed, raise ValueError.
+        self._check_mode()
 
 
 # Copied from lzma module
