@@ -750,13 +750,30 @@ ZstdFile class and open() function
             * The *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
             * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
 
-    In reading mode (decompression), these methods are available: `.read(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read>`_, `.read1(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read1>`_, `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_, `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_, `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_, `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_. Note that if ``.seek()`` to "previous position" or "position relative to EOF (the first time)", the decompression has to be restarted from zero.
+    In writing mode (compression), this method is available:
 
-    In writing mode (compression), this method is available: `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_.
+        * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
 
-    In both reading and writing modes, these methods are available: `.close() <https://docs.python.org/3/library/io.html#io.IOBase.close>`_, `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_, `.fileno() <https://docs.python.org/3/library/io.html#io.IOBase.fileno>`_, `.readable() <https://docs.python.org/3/library/io.html#io.IOBase.readable>`_, `.writable() <https://docs.python.org/3/library/io.html#io.IOBase.writable>`_, `.seekable() <https://docs.python.org/3/library/io.html#io.IOBase.seekable>`_, and has a property attribute `.closed <https://docs.python.org/3/library/io.html#io.IOBase.closed>`_.
+    In reading mode (decompression), these methods and statement are available:
 
-    Iteration and the ``with`` statement are supported.
+        * `.read(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read>`_
+        * `.read1(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read1>`_
+        * `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_
+        * `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_
+        * `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_
+        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if ``.seek()`` to "previous position" or "position relative to EOF (the first time)", the decompression has to be restarted from zero.
+        * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
+        * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
+
+    In both reading and writing modes, these methods and property are available:
+
+        * `.close() <https://docs.python.org/3/library/io.html#io.IOBase.close>`_
+        * `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_
+        * `.fileno() <https://docs.python.org/3/library/io.html#io.IOBase.fileno>`_
+        * `.closed <https://docs.python.org/3/library/io.html#io.IOBase.closed>`_ (a property attribute)
+        * `.writable() <https://docs.python.org/3/library/io.html#io.IOBase.writable>`_
+        * `.readable() <https://docs.python.org/3/library/io.html#io.IOBase.readable>`_
+        * `.seekable() <https://docs.python.org/3/library/io.html#io.IOBase.seekable>`_
 
 .. py:function:: open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
 

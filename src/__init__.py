@@ -434,50 +434,35 @@ class ZstdFile(io.BufferedIOBase):
         # Re-raise other AttributeError exception
         raise
 
-    # Override IOBase.__iter__
-    # https://bugs.python.org/issue43787
-    def __iter__(self):
-        try:
-            return self._buffer.__iter__()
-        except AttributeError:
-            self._check_mode(_MODE_READ)
+    def write(self, data):
+        """Write a bytes-like object to the file.
 
-    @property
-    def closed(self):
-        """True if this file is closed."""
-        return self._mode == _MODE_CLOSED
-
-    def fileno(self):
-        """Return the file descriptor for the underlying file."""
-        self._check_mode()
-        return self._fp.fileno()
-
-    def seekable(self):
-        """Return whether the file supports seeking."""
-        return self.readable() and self._buffer.seekable()
-
-    def readable(self):
-        """Return whether the file was opened for reading."""
-        self._check_mode()
-        return self._mode == _MODE_READ
-
-    def writable(self):
-        """Return whether the file was opened for writing."""
-        self._check_mode()
-        return self._mode == _MODE_WRITE
-
-    def peek(self, size=-1):
-        """Return buffered data without advancing the file position.
-
-        Always returns at least one byte of data, unless at EOF.
-        The exact number of bytes returned is unspecified.
+        Returns the number of uncompressed bytes written, which is
+        always the length of data in bytes. Note that due to buffering,
+        the file on disk may not reflect the data written until close()
+        is called.
         """
-        # Relies on the undocumented fact that BufferedReader.peek() always
-        # returns at least one byte (except at EOF)
+        # Get the length of uncompressed data
+        if isinstance(data, (bytes, bytearray)):
+            length = len(data)
+        else:
+            # Accept any data that supports the buffer protocol
+            data = memoryview(data)
+            length = data.nbytes
+
+        # Compress
         try:
-            return self._buffer.peek(size)
+            compressed = self._compressor.compress(data)
         except AttributeError:
-            self._check_mode(_MODE_READ)
+            self._check_mode(_MODE_WRITE)
+
+        # Write to file. If haven't gathered enough uncompressed data for one
+        # zstd block (128 KiB at most), `compressed` is b''.
+        if compressed:
+            self._fp.write(compressed)
+
+        self._pos += length
+        return length
 
     def read(self, size=-1):
         """Read up to size uncompressed bytes from the file.
@@ -538,36 +523,6 @@ class ZstdFile(io.BufferedIOBase):
         except AttributeError:
             self._check_mode(_MODE_READ)
 
-    def write(self, data):
-        """Write a bytes-like object to the file.
-
-        Returns the number of uncompressed bytes written, which is
-        always the length of data in bytes. Note that due to buffering,
-        the file on disk may not reflect the data written until close()
-        is called.
-        """
-        # Get the length of uncompressed data
-        if isinstance(data, (bytes, bytearray)):
-            length = len(data)
-        else:
-            # Accept any data that supports the buffer protocol
-            data = memoryview(data)
-            length = data.nbytes
-
-        # Compress
-        try:
-            compressed = self._compressor.compress(data)
-        except AttributeError:
-            self._check_mode(_MODE_WRITE)
-
-        # Write to file. If haven't gathered enough uncompressed data for one
-        # zstd block (128 KiB at most), `compressed` is b''.
-        if compressed:
-            self._fp.write(compressed)
-
-        self._pos += length
-        return length
-
     def seek(self, offset, whence=io.SEEK_SET):
         """Change the file position.
 
@@ -589,6 +544,27 @@ class ZstdFile(io.BufferedIOBase):
         except AttributeError:
             self._check_mode(_MODE_READ)
 
+    def peek(self, size=-1):
+        """Return buffered data without advancing the file position.
+
+        Always returns at least one byte of data, unless at EOF.
+        The exact number of bytes returned is unspecified.
+        """
+        # Relies on the undocumented fact that BufferedReader.peek() always
+        # returns at least one byte (except at EOF)
+        try:
+            return self._buffer.peek(size)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
+    # Override IOBase.__iter__
+    # https://bugs.python.org/issue43787
+    def __iter__(self):
+        try:
+            return self._buffer.__iter__()
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
     def tell(self):
         """Return the current file position."""
         if self._mode == _MODE_READ:
@@ -598,6 +574,30 @@ class ZstdFile(io.BufferedIOBase):
 
         # Closed, raise ValueError.
         self._check_mode()
+
+    def fileno(self):
+        """Return the file descriptor for the underlying file."""
+        self._check_mode()
+        return self._fp.fileno()
+
+    @property
+    def closed(self):
+        """True if this file is closed."""
+        return self._mode == _MODE_CLOSED
+
+    def writable(self):
+        """Return whether the file was opened for writing."""
+        self._check_mode()
+        return self._mode == _MODE_WRITE
+
+    def readable(self):
+        """Return whether the file was opened for reading."""
+        self._check_mode()
+        return self._mode == _MODE_READ
+
+    def seekable(self):
+        """Return whether the file supports seeking."""
+        return self.readable() and self._buffer.seekable()
 
 
 # Copied from lzma module
