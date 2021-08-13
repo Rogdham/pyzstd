@@ -268,7 +268,7 @@ Streaming compression
 
         Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
-        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception.
+        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, returns ``b''``.
 
         **Note**: Abuse of this mode will reduce compression ratio. Use it only when necessary.
 
@@ -530,8 +530,12 @@ Dictionary
 
     Zstd training mode can be used to tune the algorithm for a selected type of data. Training is achieved by providing it with a few samples (one file per sample). The result of this training is stored in a file called "dictionary", which must be loaded before compression and decompression.
 
-    See the FAQ in `this file <https://github.com/facebook/zstd/blob/release/lib/zdict.h>`_ for details.
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/dev/lib/zdict.h>`_ for details.
 
+    **Advanced dictionary training**
+    Pyzstd module only uses zstd library's stable API. The stable API only exposes two dictionary training functions that corresponding to :py:func:`train_dict` and :py:func:`finalize_dict`.
+
+    If want to adjust advanced training parameters, you may use zstd's CLI program, it has entries to zstd library's experimental API.
 
 .. py:class:: ZstdDict
 
