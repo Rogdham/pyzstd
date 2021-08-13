@@ -268,7 +268,7 @@ Streaming compression
 
         Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
-        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, returns ``b''``.
+        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, no block is created.
 
         **Note**: Abuse of this mode will reduce compression ratio. Use it only when necessary.
 
@@ -745,7 +745,7 @@ ZstdFile class and open() function
 
     .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
-        The *filename* argument can be an existing file object to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
+        The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
 
         The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
 
@@ -757,6 +757,7 @@ ZstdFile class and open() function
     In writing mode (compression), this method is available:
 
         * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
+        * `.flush() <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream, using :py:attr:`ZstdCompressor.FLUSH_BLOCK` mode. (implemented in pyzstd 0.15.1)
 
     In reading mode (decompression), these methods and statement are available:
 
@@ -785,7 +786,7 @@ ZstdFile class and open() function
 
     This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library.
 
-    The *filename* argument can be an existing file object to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
+    The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
 
     The *mode* argument can be any of "r", "rb", "w", "wb", "x", "xb", "a" or "ab" for binary mode, or "rt", "wt", "xt", or "at" for text mode. The default is "rb".
 

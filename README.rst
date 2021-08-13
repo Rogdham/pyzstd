@@ -30,6 +30,8 @@ Release note
 
 #. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
 
+#. Implement ``ZstdFile.flush()`` method, it overrides ``IOBase.flush()`` that does nothing.
+
 **0.15.0  (May 18, 2021)**
 
 #. Update zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.

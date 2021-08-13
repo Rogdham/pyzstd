@@ -287,18 +287,19 @@ _MODE_WRITE  = 2
 
 # Copied from Python stdlib (lzma.py), except:
 # 1, Add .readinto()/.readinto1() methods.
-# 2, Remove BaseStream._check_*() overheads.
+# 2, Implement .flush() method.
+# 3, Remove BaseStream._check_*() overheads.
 #    The implementation needs to ensure:
 #      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
 #      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
 #      If in _MODE_CLOSED mode, they don't exist or are None.
 #    Then if not in a mode, perform the corresponding actions will raise
 #    AttributeError, and ._check_mode() will raise a proper exception.
-# 3, ZstdFile.__init__():
+# 4, ZstdFile.__init__():
 #      io.BufferedReader uses 32 KiB buffer size instead of default value
 #      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
 #      See _32_KiB's comment for details.
-# 4, ZstdFile.read1():
+# 5, ZstdFile.read1():
 #      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
 #      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
@@ -463,6 +464,36 @@ class ZstdFile(io.BufferedIOBase):
 
         self._pos += length
         return length
+
+    def flush(self):
+        """Flush remaining data to the underlying stream.
+
+        If the program is interrupted afterwards, all data can be recovered.
+
+        It uses ZstdCompressor.FLUSH_BLOCK mode. Abuse of this method will
+        reduce compression ratio, use it only when necessary.
+
+        This does nothing in reading mode.
+        """
+        # Like IOBase.flush(), do nothing in reading mode.
+        # TextIOWrapper.close() relies on this behavior.
+        if self._mode == _MODE_READ:
+            return
+
+        # Flush zstd block
+        try:
+            compressed = self._compressor.flush(ZstdCompressor.FLUSH_BLOCK)
+        except AttributeError:
+            # Closed, raise ValueError.
+            self._check_mode()
+
+        # Write to file
+        if compressed:
+            self._fp.write(compressed)
+
+        # Flush the file. Some file-like objects don't have .flush() method.
+        if hasattr(self._fp, "flush"):
+            self._fp.flush()
 
     def read(self, size=-1):
         """Read up to size uncompressed bytes from the file.

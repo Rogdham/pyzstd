@@ -478,8 +478,8 @@ def _set_c_parameters(cctx, level_or_option):
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             # Check key type
             if type(key) == DParameter:
-                raise TypeError(("Key of compression option dict should "
-                                 "NOT be DParameter."))
+                raise TypeError("Key of compression option dict should "
+                                "NOT be DParameter.")
 
             # Both key & value should be 32-bit signed int
             _check_int32_value(key, "Key of option dict")
@@ -507,8 +507,8 @@ def _set_d_parameters(dctx, option):
     for posi, (key, value) in enumerate(option.items(), 1):
         # Check key type
         if type(key) == CParameter:
-            raise TypeError(("Key of decompression option dict should "
-                             "NOT be CParameter."))
+            raise TypeError("Key of decompression option dict should "
+                            "NOT be CParameter.")
 
         # Both key & value should be 32-bit signed int
         _check_int32_value(key, "Key of option dict")

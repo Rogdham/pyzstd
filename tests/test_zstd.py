@@ -2789,6 +2789,46 @@ class FileTestCase(unittest.TestCase):
                     lst.append(bytes(ba[:read_size]))
         self.assertEqual(b''.join(lst), THIS_FILE_BYTES*5)
 
+    def test_zstdfile_flush(self):
+        # closed
+        f = ZstdFile(BytesIO(), 'w')
+        f.close()
+        with self.assertRaises(ValueError):
+            f.flush()
+
+        # read
+        with ZstdFile(BytesIO(), 'r') as f:
+            # does nothing for read-only stream
+            f.flush()
+
+        # write
+        DAT = b'abcd'
+        bi = BytesIO()
+        with ZstdFile(bi, 'w') as f:
+            self.assertEqual(f.write(DAT), len(DAT))
+            self.assertEqual(f.tell(), len(DAT))
+            self.assertEqual(bi.tell(), 0) # not enough for a block
+
+            self.assertEqual(f.flush(), None)
+            self.assertEqual(f.tell(), len(DAT))
+            self.assertGreater(bi.tell(), 0) # flushed
+
+        # write, no .flush() method
+        class C:
+            def write(self, b):
+                pass
+        with ZstdFile(C(), 'w') as f:
+            self.assertEqual(f.write(DAT), len(DAT))
+            self.assertEqual(f.tell(), len(DAT))
+
+            self.assertEqual(f.flush(), None)
+            self.assertEqual(f.tell(), len(DAT))
+
+    def test_zstdfile_truncate(self):
+        with ZstdFile(BytesIO(), 'w') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.truncate(200)
+
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
