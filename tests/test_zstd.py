@@ -2306,6 +2306,14 @@ class FileTestCase(unittest.TestCase):
 
         os.remove(filename)
 
+        # 3, no .fileno() method
+        class C:
+            def read(self, size=-1):
+                return b'123'
+        with ZstdFile(C(), 'rb') as f:
+            with self.assertRaisesRegex(AttributeError, r'fileno'):
+                f.fileno()
+
     def test_seekable(self):
         f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
         try:

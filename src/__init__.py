@@ -292,7 +292,7 @@ _MODE_WRITE  = 2
 #    The implementation needs to ensure:
 #      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
 #      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
-#      If in _MODE_CLOSED mode, they don't exist or are None.
+#      If in _MODE_CLOSED mode, they and ._fp don't exist or are None.
 #    Then if not in a mode, perform the corresponding actions will raise
 #    AttributeError, and ._check_mode() will raise a proper exception.
 # 4, ZstdFile.__init__():
@@ -413,23 +413,18 @@ class ZstdFile(io.BufferedIOBase):
                 self._closefp = False
                 self._mode = _MODE_CLOSED
 
-    # None argument means to check whether the file is closed.
+    # None argument means the file should be closed
     def _check_mode(self, expected_mode=None):
-        # Check whether the file is closed
-        if expected_mode is None:
-            if self._mode != _MODE_CLOSED:
-                return
-
         # If closed, raise ValueError.
         if self._mode == _MODE_CLOSED:
             raise ValueError("I/O operation on closed file")
 
         # Check _MODE_READ/_MODE_WRITE mode
         if expected_mode == _MODE_READ:
-            if getattr(self, '_buffer', None) is None:
+            if self._mode != _MODE_READ:
                 raise io.UnsupportedOperation("File not open for reading")
         elif expected_mode == _MODE_WRITE:
-            if getattr(self, '_compressor', None) is None:
+            if self._mode != _MODE_WRITE:
                 raise io.UnsupportedOperation("File not open for writing")
 
         # Re-raise other AttributeError exception
@@ -468,10 +463,11 @@ class ZstdFile(io.BufferedIOBase):
     def flush(self):
         """Flush remaining data to the underlying stream.
 
-        If the program is interrupted afterwards, all data can be recovered.
-
         It uses ZstdCompressor.FLUSH_BLOCK mode. Abuse of this method will
         reduce compression ratio, use it only when necessary.
+
+        If the program is interrupted afterwards, all data can be recovered.
+        To ensure saving to disk, also need to use os.fsync(fd).
 
         This does nothing in reading mode.
         """
@@ -608,8 +604,11 @@ class ZstdFile(io.BufferedIOBase):
 
     def fileno(self):
         """Return the file descriptor for the underlying file."""
-        self._check_mode()
-        return self._fp.fileno()
+        try:
+            return self._fp.fileno()
+        except AttributeError:
+            # Closed, raise ValueError.
+            self._check_mode()
 
     @property
     def closed(self):
@@ -618,17 +617,33 @@ class ZstdFile(io.BufferedIOBase):
 
     def writable(self):
         """Return whether the file was opened for writing."""
+        if self._mode == _MODE_WRITE:
+            return True
+        elif self._mode == _MODE_READ:
+            return False
+
+        # Closed, raise ValueError.
         self._check_mode()
-        return self._mode == _MODE_WRITE
 
     def readable(self):
         """Return whether the file was opened for reading."""
+        if self._mode == _MODE_READ:
+            return True
+        elif self._mode == _MODE_WRITE:
+            return False
+
+        # Closed, raise ValueError.
         self._check_mode()
-        return self._mode == _MODE_READ
 
     def seekable(self):
         """Return whether the file supports seeking."""
-        return self.readable() and self._buffer.seekable()
+        if self._mode == _MODE_READ:
+            return self._buffer.seekable()
+        elif self._mode == _MODE_WRITE:
+            return False
+
+        # Closed, raise ValueError.
+        self._check_mode()
 
 
 # Copied from lzma module

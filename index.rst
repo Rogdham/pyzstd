@@ -754,10 +754,10 @@ ZstdFile class and open() function
             * The *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
             * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
 
-    In writing mode (compression), this method is available:
+    In writing mode (compression), these methods are available:
 
         * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
-        * `.flush() <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream, using :py:attr:`ZstdCompressor.FLUSH_BLOCK` mode. (implemented in pyzstd 0.15.1)
+        * `.flush() <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. It uses :py:attr:`ZstdCompressor.FLUSH_BLOCK` mode, abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Implemented in version 0.15.1*)
 
     In reading mode (decompression), these methods and statement are available:
 
