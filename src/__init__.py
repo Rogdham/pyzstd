@@ -392,7 +392,9 @@ class ZstdFile(io.BufferedIOBase):
             return
 
         try:
-            if self._mode == _MODE_READ:
+            # In .__init__ method, if fails after setting ._mode to _MODE_READ,
+            # ._buffer doesn't exist.
+            if hasattr(self, "_buffer"):
                 try:
                     self._buffer.close()
                 finally:
