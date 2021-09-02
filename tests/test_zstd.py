@@ -2855,16 +2855,16 @@ class OpenTestCase(unittest.TestCase):
     def test_text_modes(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
-        with open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
+        with open(BytesIO(COMPRESSED_THIS_FILE), "rt", encoding="utf-8") as f:
             self.assertEqual(f.read(), uncompressed)
 
         with BytesIO() as bio:
-            with open(bio, "wt") as f:
+            with open(bio, "wt", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
 
-            with open(bio, "at") as f:
+            with open(bio, "at", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed * 2)
@@ -2922,10 +2922,10 @@ class OpenTestCase(unittest.TestCase):
         # Test with explicit newline (universal newline mode disabled).
         text = THIS_FILE_STR.replace(os.linesep, "\n")
         with BytesIO() as bio:
-            with open(bio, "wt", newline="\n") as f:
+            with open(bio, "wt", encoding="utf-8", newline="\n") as f:
                 f.write(text)
             bio.seek(0)
-            with open(bio, "rt", newline="\r") as f:
+            with open(bio, "rt", encoding="utf-8", newline="\r") as f:
                 self.assertEqual(f.readlines(), [text])
 
     def test_x_mode(self):
@@ -2938,7 +2938,11 @@ class OpenTestCase(unittest.TestCase):
         for mode in ("x", "xb", "xt"):
             os.remove(TESTFN)
 
-            with open(TESTFN, mode):
+            if mode == "xt":
+                encoding = "utf-8"
+            else:
+                encoding = None
+            with open(TESTFN, mode, encoding=encoding):
                 pass
             with self.assertRaises(FileExistsError):
                 with open(TESTFN, mode):
