@@ -17,8 +17,8 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
 
     env:
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux_2_24
+      CIBW_MANYLINUX_I686_IMAGE: manylinux_2_24
       CIBW_ARCHS_MACOS: "x86_64 arm64"
 
     steps:
@@ -43,7 +43,7 @@ jobs:
           name: pyzstd-files
           path: wheelhouse/*.whl
 
-  # Build source distribution & manylinux1_x86_64
+  # Build source distribution & manylinux1_x86_64 wheel
   build_in_manylinux2010:
     name: Build in manylinux2010 environment
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
