@@ -12,8 +12,6 @@ import pickle
 import random
 import tempfile
 import unittest
-from unittest import skipIf
-from test.support import run_unittest
 
 import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
@@ -545,8 +543,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         d2[DParameter.windowLogMax] = 32
         self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
 
-    @skipIf(not zstd_support_multithread,
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_zstd_multithread_compress(self):
         size = 40*1024*1024
         b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
@@ -580,8 +578,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
-    @skipIf(not zstd_support_multithread,
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_rich_mem_compress_warn(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
@@ -1768,7 +1766,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
-    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_train_dict_c(self):
         # argument wrong type
         with self.assertRaises(TypeError):
@@ -1786,7 +1784,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
-    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_finalize_dict_c(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
@@ -3058,8 +3056,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         self.assertEqual(in_dat, THIS_FILE_BYTES)
         self.assertEqual(decompress(out_dat), THIS_FILE_BYTES)
 
-    @skipIf(not zstd_support_multithread,
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_compress_stream_multi_thread(self):
         size = 40*1024*1024
         b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
@@ -3207,17 +3205,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
             decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
 def test_main():
-    run_unittest(
-        FunctionsTestCase,
-        ClassShapeTestCase,
-        CompressorDecompressorTestCase,
-        DecompressorFlagsTestCase,
-        ZstdDictTestCase,
-        OutputBufferTestCase,
-        FileTestCase,
-        OpenTestCase,
-        StreamFunctionsTestCase,
-    )
+    unittest.main()
 
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
