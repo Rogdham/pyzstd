@@ -1,4 +1,4 @@
-.. title:: pyzstd moudle
+.. title:: pyzstd module
 
 Introduction
 ------------
