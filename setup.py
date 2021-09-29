@@ -24,13 +24,19 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     module_version = m.group(2)
 
 # -------- binary extension --------
-def get_zstd_c_files_list():
+def get_zstd_files_list():
+    # Currently Linux/macOS can use assembly implementation
+    if 'linux' in sys.platform or 'darwin' in sys.platform:
+        ZSTD_FILE_EXTENSION = '*.[cCsS]'
+    else:
+        ZSTD_FILE_EXTENSION = '*.[cC]'
+
     lst = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
         directory = 'lib/' + sub_dir + '/'
         l = [directory + fn
                for fn in os.listdir(directory)
-               if fnmatch.fnmatch(fn, '*.[cC]')]
+               if fnmatch.fnmatch(fn, ZSTD_FILE_EXTENSION)]
         lst.extend(l)
     return lst
 
@@ -59,7 +65,7 @@ else:  # statically link to zstd lib
         'include_dirs': ['lib', 'lib/dictBuilder'],
         'library_dirs': [],
         'libraries': [],
-        'sources': get_zstd_c_files_list(),
+        'sources': get_zstd_files_list(),
         'define_macros': [('ZSTD_MULTITHREAD', None)]
     }
 
@@ -86,6 +92,9 @@ else:  # C implementation
 
 class build_ext_compiler_check(build_ext):
     def build_extensions(self):
+        # Accept assembly files
+        self.compiler.src_extensions.extend(['.s', '.S'])
+
         for extension in self.extensions:
             if self.compiler.compiler_type.lower() in ('unix', 'mingw32'):
                 if WARNING_AS_ERROR:
