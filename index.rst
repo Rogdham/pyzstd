@@ -268,7 +268,7 @@ Streaming compression
 
         Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
-        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, no block is created.
+        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, no block is created, return ``b''``.
 
         **Note**: Abuse of this mode will reduce compression ratio. Use it only when necessary.
 
@@ -533,6 +533,7 @@ Dictionary
     See the FAQ in `this file <https://github.com/facebook/zstd/blob/dev/lib/zdict.h>`_ for details.
 
     **Advanced dictionary training**
+
     Pyzstd module only uses zstd library's stable API. The stable API only exposes two dictionary training functions that corresponding to :py:func:`train_dict` and :py:func:`finalize_dict`.
 
     If want to adjust advanced training parameters, you may use zstd's CLI program, it has entries to zstd library's experimental API.
@@ -799,7 +800,7 @@ ZstdFile class and open() function
 Advanced parameters
 -------------------
 
-    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclass of IntEnum, used for setting advanced parameters.
+    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclasses of ``IntEnum``, used for setting advanced parameters.
 
     :py:class:`CParameter` class' attributes:
 
@@ -1043,7 +1044,7 @@ Advanced parameters
 
         Select how many threads will be spawned to compress in parallel.
 
-        When nbWorkers >= ``1``, enables multi-threaded compression. See :ref:`zstd multi-threaded compression<mt_compression>` for details.
+        When nbWorkers >= ``1``, enables multi-threaded compression, ``1`` means "1-thread multi-threaded mode". See :ref:`zstd multi-threaded compression<mt_compression>` for details.
 
         * More workers improve speed, but also increase memory usage.
         * If :py:data:`zstd_support_multithread` is ``False``, setting to non-zero value will raise a :py:class:`ZstdError` exception.
@@ -1202,7 +1203,7 @@ Frame and block
 
     A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (3 bytes block header + 128 KiB), the actual maximum size depends on frame parameters.
 
-    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need later blocks. So flushing block may be used in communication scenarios, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
+    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need the following blocks, a complete block can be fully decompressed. So flushing block may be used in communication scenarios, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
 
     .. attention::
 
@@ -1216,7 +1217,7 @@ Multi-threaded compression
 
 .. note:: Multi-threaded compression
 
-    Zstd library supports multi-threaded compression, set :py:attr:`CParameter.nbWorkers` parameter >= ``1`` to enable multi-threaded compression.
+    Zstd library supports multi-threaded compression. Set :py:attr:`CParameter.nbWorkers` parameter >= ``1`` to enable multi-threaded compression, ``1`` means "1-thread multi-threaded mode".
 
     The threads are spawned by the underlying zstd library, not by pyzstd module.
 

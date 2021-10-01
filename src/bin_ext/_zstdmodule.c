@@ -3953,6 +3953,9 @@ PyInit__zstd(void)
         goto error;
     }
 
+    static_state.CParameter_type = NULL;
+    static_state.DParameter_type = NULL;
+
     /* Constants */
     if (add_constants(module) < 0) {
         goto error;
