@@ -32,6 +32,8 @@ Release note
 
 #. Implement ``ZstdFile.flush()`` method, it overrides ``IOBase.flush()`` that does nothing.
 
+#. Add a setup.py option ``--avx2``, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+
 **0.15.0  (May 18, 2021)**
 
 #. Update zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.

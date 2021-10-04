@@ -1378,11 +1378,18 @@ Build pyzstd module with options
 
 .. _build_pyzstd:
 
-.. versionadded:: 0.14.4
-
 .. note:: Build pyzstd module with options
 
-    Pyzstd module supports:
+    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement.
+
+    .. sourcecode:: shell
+
+        # build and install
+        pip install --install-option="--avx2" -v pyzstd-0.15.1.tar.gz
+        # build a redistributable wheel
+        pip wheel --build-option="--avx2" pyzstd-0.15.1.tar.gz
+
+    2️⃣ Pyzstd module supports:
 
         * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
@@ -1408,7 +1415,7 @@ Build pyzstd module with options
 
         # build and install
         sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
-        # build a distributable wheel
+        # build a redistributable wheel
         pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:

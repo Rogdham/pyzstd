@@ -47,6 +47,8 @@ def has_option(option):
     else:
         return False
 
+# setup.py options
+AVX2 = has_option('--avx2')
 WARNING_AS_ERROR = has_option('--warning-as-error')
 DYNAMIC_LINK = has_option('--dynamic-link-zstd')
 CFFI = has_option('--cffi') or \
@@ -97,6 +99,9 @@ class build_ext_compiler_check(build_ext):
 
         for extension in self.extensions:
             if self.compiler.compiler_type.lower() in ('unix', 'mingw32'):
+                if AVX2:
+                    instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
+                    extension.extra_compile_args.extend(instrs)
                 if WARNING_AS_ERROR:
                     extension.extra_compile_args.append('-Werror')
             elif self.compiler.compiler_type.lower() == 'msvc':
@@ -104,6 +109,8 @@ class build_ext_compiler_check(build_ext):
                 # /GF eliminates duplicate strings
                 # /Gy does function level linking
                 more_options = ['/Ob3', '/GF', '/Gy']
+                if AVX2:
+                    more_options.append('/arch:AVX2')
                 if WARNING_AS_ERROR:
                     more_options.append('/WX')
                 extension.extra_compile_args.extend(more_options)
