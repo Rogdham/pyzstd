@@ -5,7 +5,7 @@ Introduction
 
 pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib module.
+The API is similar to Python's bz2/lzma/zlib modules.
 
 Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
 
@@ -1380,7 +1380,7 @@ Build pyzstd module with options
 
 .. note:: Build pyzstd module with options
 
-    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement.
+    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
 
     .. sourcecode:: shell
 

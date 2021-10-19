@@ -26,7 +26,7 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
 # -------- binary extension --------
 def get_zstd_files_list():
     # Currently Linux/macOS can use assembly implementation
-    if 'linux' in sys.platform or 'darwin' in sys.platform:
+    if sys.platform != 'win32':
         ZSTD_FILE_EXTENSION = '*.[cCsS]'
     else:
         ZSTD_FILE_EXTENSION = '*.[cC]'
