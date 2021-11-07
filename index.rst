@@ -704,10 +704,9 @@ Module-level variables
 
     Whether the underlying zstd library was compiled with :ref:`multi-threaded compression<mt_compression>` support.
 
-    If it's ``False``, setting :py:attr:`CParameter.nbWorkers`, :py:attr:`CParameter.jobSize`, :py:attr:`CParameter.overlapLog` to non-zero value will raise a :py:class:`ZstdError` exception.
+    You can assume that it's ``True``.
 
-    * When statically linked to zstd library, it's always ``True``. (PyPI wheels)
-    * When dynamically linked to zstd library, zstd v1.5.0+ enabled multi-threaded compression by default, zstd v1.4.x- disabled it by default.
+    It may be ``False`` only when dynamically linked to zstd library.
 
 .. versionadded:: 0.15.1
 
@@ -1046,8 +1045,7 @@ Advanced parameters
 
         When nbWorkers >= ``1``, enables multi-threaded compression, ``1`` means "1-thread multi-threaded mode". See :ref:`zstd multi-threaded compression<mt_compression>` for details.
 
-        * More workers improve speed, but also increase memory usage.
-        * If :py:data:`zstd_support_multithread` is ``False``, setting to non-zero value will raise a :py:class:`ZstdError` exception.
+        More workers improve speed, but also increase memory usage.
 
         ``0`` (default) means "single-threaded mode", no worker is spawned, compression is performed inside caller's thread.
 
@@ -1232,15 +1230,6 @@ Multi-threaded compression
     The multi-threaded output will be different than the single-threaded output. However, both are deterministic, and the multi-threaded output produces the same compressed data no matter how many threads used.
 
     The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MiB data, single-threaded output is 273.55 MiB, multi-threaded output is 274.33 MiB.
-
-    There is a small possibility that the underlying zstd library doesn't support multi-threaded compression (as time goes on, the possibility becomes less and less). Check the :py:data:`zstd_support_multithread` variable to avoid throwing a :py:class:`ZstdError` exception:
-
-    .. sourcecode:: python
-
-        option = {CParameter.nbWorkers  : 4 if zstd_support_multithread else 0,
-                  CParameter.jobSize    : 50*1024*1024 if zstd_support_multithread else 0,
-                  CParameter.overlapLog : 5 if zstd_support_multithread else 0}
-        compressed_dat = compress(raw_dat, option)
 
 
 Rich memory mode
