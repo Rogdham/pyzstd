@@ -123,17 +123,17 @@ size_t ZSTD_DStreamOutSize(void);
 ZSTD_CDict* ZSTD_createCDict(const void* dictBuffer, size_t dictSize,
                              int compressionLevel);
 size_t ZSTD_CCtx_refCDict(ZSTD_CCtx* cctx, const ZSTD_CDict* cdict);
-size_t      ZSTD_freeCDict(ZSTD_CDict* CDict);
+size_t ZSTD_freeCDict(ZSTD_CDict* CDict);
 size_t ZSTD_sizeof_CDict(const ZSTD_CDict* cdict);
 
 ZSTD_DDict* ZSTD_createDDict(const void* dictBuffer, size_t dictSize);
 size_t ZSTD_DCtx_refDDict(ZSTD_DCtx* dctx, const ZSTD_DDict* ddict);
-size_t      ZSTD_freeDDict(ZSTD_DDict* ddict);
+size_t ZSTD_freeDDict(ZSTD_DDict* ddict);
 size_t ZSTD_sizeof_DDict(const ZSTD_DDict* ddict);
 unsigned ZSTD_getDictID_fromDDict(const ZSTD_DDict* ddict);
 
 ZSTD_CCtx* ZSTD_createCCtx(void);
-size_t     ZSTD_freeCCtx(ZSTD_CCtx* cctx);
+size_t ZSTD_freeCCtx(ZSTD_CCtx* cctx);
 size_t ZSTD_CCtx_reset(ZSTD_CCtx* cctx, ZSTD_ResetDirective reset);
 size_t ZSTD_sizeof_CCtx(const ZSTD_CCtx* cctx);
 size_t ZSTD_CCtx_setPledgedSrcSize(ZSTD_CCtx* cctx, unsigned long long pledgedSrcSize);
@@ -143,7 +143,7 @@ size_t ZSTD_compressStream2(ZSTD_CCtx* cctx,
                             ZSTD_EndDirective endOp);
 
 ZSTD_DCtx* ZSTD_createDCtx(void);
-size_t     ZSTD_freeDCtx(ZSTD_DCtx* dctx);
+size_t ZSTD_freeDCtx(ZSTD_DCtx* dctx);
 size_t ZSTD_DCtx_reset(ZSTD_DCtx* dctx, ZSTD_ResetDirective reset);
 size_t ZSTD_sizeof_DCtx(const ZSTD_DCtx* dctx);
 size_t ZSTD_decompressStream(ZSTD_DCtx* dctx,

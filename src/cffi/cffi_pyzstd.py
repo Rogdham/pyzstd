@@ -877,7 +877,7 @@ class _Decompressor:
                     break
             else:
                 # EndlessZstdDecompressor class supports multiple frames
-                self._at_frame_edge = True if (zstd_ret == 0) else False
+                self._at_frame_edge = (zstd_ret == 0)
 
                 # The second AFE check for setting .at_frame_edge flag, search
                 # "AFE" in _zstdmodule.c to see details.
@@ -1526,7 +1526,7 @@ def decompress_stream(input_stream, output_stream, *,
                     _set_zstd_error(_ErrorType.ERR_DECOMPRESS, zstd_ret)
 
                 # Set .af_frame_edge flag
-                at_frame_edge = True if (zstd_ret == 0) else False
+                at_frame_edge = (zstd_ret == 0)
 
                 # Accumulate output bytes
                 total_output_size += out_buf.pos
