@@ -3,7 +3,7 @@
 Introduction
 ------------
 
-pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+Pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
 The API is similar to Python's bz2/lzma/zlib modules.
 
@@ -160,7 +160,7 @@ Streaming compression
 
     If input stream is ``b''``, nothing will be written to output stream.
 
-    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
+    This function tries to zero-copy as much as possible. If the OS has read prefetching and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -316,7 +316,7 @@ Streaming decompression
 
     Supports multiple concatenated :ref:`frames<frame_block>`.
 
-    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
+    This function tries to zero-copy as much as possible. If the OS has read prefetching and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
@@ -472,7 +472,7 @@ Streaming decompression
 
     .. sourcecode:: python
 
-        # --- streaming decomression, unlimited output ---
+        # --- streaming decompression, unlimited output ---
         d1 = EndlessZstdDecompressor()
 
         decompressed_dat1 = d1.decompress(dat1)
@@ -481,7 +481,7 @@ Streaming decompression
 
         assert d1.at_frame_edge, 'data ends in an incomplete frame.'
 
-        # --- streaming decomression, limited output ---
+        # --- streaming decompression, limited output ---
         d2 = EndlessZstdDecompressor()
 
         while True:
@@ -625,12 +625,12 @@ Module-level functions
 
     This section contains:
 
-        * function :py:func:`get_frame_info`, get frame infomation from a frame header.
+        * function :py:func:`get_frame_info`, get frame information from a frame header.
         * function :py:func:`get_frame_size`, get a frame's size.
 
 .. py:function:: get_frame_info(frame_buffer)
 
-    Get zstd frame infomation from a frame header.
+    Get zstd frame information from a frame header.
 
     Return a 2-item namedtuple: (decompressed_size, dictionary_id)
 
@@ -677,8 +677,8 @@ Module-level variables
 
         * :py:data:`zstd_version`, a ``str``.
         * :py:data:`zstd_version_info`, a ``tuple``.
-        * :py:data:`zstd_support_multithread`, whether the underlying zstd library supports multi-threaded compression.
         * :py:data:`compressionLevel_values`, some values defined by the underlying zstd library.
+        * :py:data:`zstd_support_multithread`, whether the underlying zstd library supports multi-threaded compression.
 
 .. py:data:: zstd_version
 
@@ -700,13 +700,27 @@ Module-level variables
     (1, 4, 5)
 
 
+.. py:data:: compressionLevel_values
+
+    A 3-item namedtuple, values defined by the underlying zstd library, see :ref:`compression level<compression_level>` for details.
+
+    ``default`` is default compression level, it is used when compression level is set to ``0`` or not set.
+
+    ``min``/``max`` are minimum/maximum available values of compression level, both inclusive.
+
+.. sourcecode:: python
+
+    >>> pyzstd.compressionLevel_values  # 131072 = 128*1024
+    values(default=3, min=-131072, max=22)
+
+
 .. py:data:: zstd_support_multithread
 
     Whether the underlying zstd library was compiled with :ref:`multi-threaded compression<mt_compression>` support.
 
-    You can assume that it's ``True``.
+    It's almost always ``True``.
 
-    It may be ``False`` only when dynamically linked to zstd library.
+    It's ``False`` when dynamically linked to zstd library that compiled without multi-threaded support. Ordinary users will not meet this situation.
 
 .. versionadded:: 0.15.1
 
@@ -714,20 +728,6 @@ Module-level variables
 
     >>> pyzstd.zstd_support_multithread
     True
-
-
-.. py:data:: compressionLevel_values
-
-    A 3-item namedtuple, values defined by the underlying zstd library, see :ref:`compression level<compression_level>` for details.
-
-    ``default`` is default compression level, it is used when compression level is set to ``0`` or not set.
-
-    ``min``/``max`` are minimum/maximum avaliable values of compression level, both inclusive.
-
-.. sourcecode:: python
-
-    >>> pyzstd.compressionLevel_values  # 131072 = 128*1024
-    values(default=3, min=-131072, max=22)
 
 
 ZstdFile class and open() function
@@ -1177,7 +1177,7 @@ Compression level
 
     **For advanced user**
 
-    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
+    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some information, such as data size, using dictionary or not.
 
     Setting a compression level does not set all other :ref:`compression parameters<CParameter>` to default. Setting this will dynamically impact the compression parameters which have not been manually set, the manually set ones will "stick".
 
@@ -1396,7 +1396,8 @@ Build pyzstd module with options
 
         * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
         * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API if possible.)
+        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``lib`` folder.
+        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
 
     On Linux, dynamically link to zstd library provided by system:
 

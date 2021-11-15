@@ -85,13 +85,13 @@ typedef struct {
     /* 0 if decompressor has (or may has) unconsumed input data, 0 or 1. */
     char needs_input;
 
-    /* For EndlessZstdDecomprssor, 0 or 1.
+    /* For EndlessZstdDecompressor, 0 or 1.
        1 when both input and output streams are at a frame edge, means a
        frame is completely decoded and fully flushed, or the decompressor
        just be initialized. */
     char at_frame_edge;
 
-    /* For ZstdDecomprssor, 0 or 1.
+    /* For ZstdDecompressor, 0 or 1.
        1 means the end of the first frame has been reached. */
     char eof;
 
@@ -2803,7 +2803,7 @@ success:
 }
 
 PyDoc_STRVAR(_get_param_bounds_doc,
-"Internal funciton, get CParameter/DParameter bounds.");
+"Internal function, get CParameter/DParameter bounds.");
 
 static PyObject *
 _get_param_bounds(PyObject *module, PyObject *args)
