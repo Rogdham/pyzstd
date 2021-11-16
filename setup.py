@@ -80,8 +80,7 @@ if CFFI:
 
     sys.path.append('src/bin_ext')
     import build_cffi
-    build_cffi.set_kwargs(**kwargs)
-    binary_extension = build_cffi.ffibuilder.distutils_extension()
+    binary_extension = build_cffi.get_extension(**kwargs)
 else:  # C implementation
     # packages
     packages = ['pyzstd', 'pyzstd.c']
@@ -119,7 +118,7 @@ class build_ext_compiler_check(build_ext):
 setup(
     name='pyzstd',
     version=module_version,
-    description="Python bindings to Zstandard (zstd) compression library, the API is similar to Python's bz2/lzma/zlib module.",
+    description="Python bindings to Zstandard (zstd) compression library, the API is similar to Python's bz2/lzma/zlib modules.",
     long_description=long_description,
     long_description_content_type='text/x-rst',
     author='Ma Lin',

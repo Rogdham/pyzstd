@@ -200,5 +200,6 @@ int ZSTD_defaultCLevel(void)
 #endif
 """
 
-def set_kwargs(**kwargs):
+def get_extension(**kwargs):
     ffibuilder.set_source(source=source, **kwargs)
+    return ffibuilder.distutils_extension()
