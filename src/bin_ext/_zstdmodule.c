@@ -1773,9 +1773,10 @@ PyDoc_STRVAR(ZstdCompressor_set_pledged_input_size_doc,
 "frame header.\n"
 "1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.\n"
 "2, If the actual size doesn't match the value, a ZstdError will be raised, and\n"
-"   the last compressed chunk is likely to be lost.\n\n"
+"   the last compressed chunk is likely to be lost.\n"
+"3, The size is only valid for one frame, then it restores to \"unknown size\".\n\n"
 "Argument\n"
-"size: Uncompressed content size of a frame, None means the size is unknown.");
+"size: Uncompressed content size of a frame, None means \"unknown size\".");
 
 static PyObject *
 ZstdCompressor_set_pledged_input_size(ZstdCompressor *self, PyObject *size)

@@ -730,9 +730,10 @@ class ZstdCompressor(_Compressor):
         1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.
         2, If the actual size doesn't match the value, a ZstdError will be raised, and
            the last compressed chunk is likely to be lost.
+        3, The size is only valid for one frame, then it restores to "unknown size".
 
         Argument
-        size: Uncompressed content size of a frame, None means the size is unknown.
+        size: Uncompressed content size of a frame, None means "unknown size".
         """
         # Get size value
         if size is None:
