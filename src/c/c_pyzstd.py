@@ -34,7 +34,7 @@ _nt_frame_info = namedtuple('frame_info',
 def get_frame_info(frame_buffer):
     """Get zstd frame infomation from a frame header.
 
-    Argument
+    Parameter
     frame_buffer: A bytes-like object. It should starts from the beginning of
                   a frame, and needs to include at least the frame header (6 to
                   18 bytes).

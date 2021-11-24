@@ -167,12 +167,12 @@ Streaming compression
     .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this parameter can be ``None``.
     :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into the frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
+    :param pledged_input_size: If set this parameter to the size of input data, the :ref:`size<content_size>` will be written into the frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
@@ -258,13 +258,13 @@ Streaming compression
 
     .. py:attribute:: CONTINUE
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress` method.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress` method.
 
         Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for traditional streaming compression.
 
     .. py:attribute:: FLUSH_BLOCK
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
         Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
@@ -274,7 +274,7 @@ Streaming compression
 
     .. py:attribute:: FLUSH_FRAME
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
         Flush any remaining data, and close current :ref:`frame<frame_block>`. Usually used for traditional flush.
 
@@ -323,7 +323,7 @@ Streaming decompression
     .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this parameter can be ``None``.
     :param zstd_dict: Pre-trained dictionary for decompression.
     :type zstd_dict: ZstdDict
     :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
@@ -745,13 +745,13 @@ ZstdFile class and open() function
 
     .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
-        The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
+        The *filename* parameter can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
 
-        The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
+        The *mode* parameter can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
 
         If in reading mode (decompression):
 
-            * The *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+            * The *level_or_option* parameter can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
             * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
 
     In writing mode (compression), these methods are available:
@@ -786,11 +786,11 @@ ZstdFile class and open() function
 
     This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library.
 
-    The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
+    The *filename* parameter can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
 
-    The *mode* argument can be any of "r", "rb", "w", "wb", "x", "xb", "a" or "ab" for binary mode, or "rt", "wt", "xt", or "at" for text mode. The default is "rb".
+    The *mode* parameter can be any of "r", "rb", "w", "wb", "x", "xb", "a" or "ab" for binary mode, or "rt", "wt", "xt", or "at" for text mode. The default is "rb".
 
-    If in reading mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+    If in reading mode (decompression), the *level_or_option* parameter can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
 
     In binary mode, a :py:class:`ZstdFile` object is returned.
 
@@ -1019,7 +1019,7 @@ Advanced parameters
             * :py:func:`richmem_compress` function
             * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
             * :py:class:`RichMemZstdCompressor` class
-            * :py:func:`compress_stream` function setting *pledged_input_size* argument
+            * :py:func:`compress_stream` function setting *pledged_input_size* parameter
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
@@ -1282,7 +1282,7 @@ Use with tarfile module
 
         import tarfile
 
-        # when using read mode (decompression), the level_or_option argument
+        # when using read mode (decompression), the level_or_option parameter
         # can only be a dict object, that represents decompression option. It
         # doesn't support int type compression level in this case.
 

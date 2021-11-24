@@ -53,7 +53,7 @@ def compress(data, level_or_option=None, zstd_dict=None):
 
     Compressing b'' will get an empty content frame (9 bytes or more).
 
-    Arguments
+    Parameters
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
                      When it's a dict object, it contains advanced compression
@@ -72,7 +72,7 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
 
     Compressing b'' will get an empty content frame (9 bytes or more).
 
-    Arguments
+    Parameters
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
                      When it's a dict object, it contains advanced compression
@@ -92,12 +92,12 @@ def _nbytes(dat):
 def train_dict(samples, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
-    Arguments
+    Parameters
     samples:   An iterable of samples, a sample is a bytes-like object
                represents a file.
     dict_size: The dictionary's maximum size, in bytes.
     """
-    # Check parameter's type
+    # Check argument's type
     if not isinstance(dict_size, int):
         raise TypeError('dict_size argument should be an int object.')
 
@@ -129,10 +129,10 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
 
     You may compose an effective dictionary content by hand, which is used as
     basis dictionary, and use some samples to finalize a dictionary. The basis
-    dictionary can be a "raw content" dictionary, see is_raw argument in
+    dictionary can be a "raw content" dictionary, see is_raw parameter in
     ZstdDict.__init__ method.
 
-    Arguments
+    Parameters
     zstd_dict: A ZstdDict object, basis dictionary.
     samples:   An iterable of samples, a sample is a bytes-like object
                represents a file.
@@ -147,7 +147,7 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
                "the current underlying zstd library's version is v%s.") % zstd_version
         raise NotImplementedError(msg)
 
-    # Check parameters' type
+    # Check arguments' type
     if not isinstance(zstd_dict, ZstdDict):
         raise TypeError('zstd_dict argument should be a ZstdDict object.')
     if not isinstance(dict_size, int):
@@ -324,7 +324,7 @@ class ZstdFile(io.BufferedIOBase):
         creating exclusively, or "a" for appending. These can equivalently be
         given as "rb", "wb", "xb" and "ab" respectively.
 
-        Arguments
+        Parameters
         level_or_option: When it's an int object, it represents compression
             level. When it's a dict object, it contains advanced compression
             parameters. Note, in read mode (decompression), it can only be a
@@ -564,7 +564,7 @@ class ZstdFile(io.BufferedIOBase):
 
         Returns the new file position.
 
-        Note that seeking is emulated, so depending on the parameters,
+        Note that seeking is emulated, so depending on the arguments,
         this operation may be extremely slow.
         """
         try:
@@ -657,19 +657,19 @@ def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
     PathLike object), in which case the named file is opened, or it can be an
     existing file object to read from or write to.
 
-    The mode argument can be "r", "rb" (default), "w", "wb", "x", "xb", "a",
+    The mode parameter can be "r", "rb" (default), "w", "wb", "x", "xb", "a",
     "ab" for binary mode, or "rt", "wt", "xt", "at" for text mode.
 
-    The level_or_option and zstd_dict arguments specify the settings, as for
+    The level_or_option and zstd_dict parameters specify the settings, as for
     ZstdCompressor, ZstdDecompressor and ZstdFile.
 
-    When using read mode (decompression), the level_or_option argument can only
-    be a dict object, that represents decompression option. It doesn't support
-    int type compression level in this case.
+    When using read mode (decompression), the level_or_option parameter can
+    only be a dict object, that represents decompression option. It doesn't
+    support int type compression level in this case.
 
     For binary mode, this function is equivalent to the ZstdFile constructor:
     ZstdFile(filename, mode, ...). In this case, the encoding, errors and
-    newline arguments must not be provided.
+    newline parameters must not be provided.
 
     For text mode, an ZstdFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error handling

@@ -1077,12 +1077,12 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
 
     /* Check validity for ordinary dictionary */
     if (!is_raw && self->dict_id == 0) {
-        char *msg = "The \"dict_content\" argument is not a valid zstd "
+        char *msg = "The dict_content argument is not a valid zstd "
                     "dictionary. The first 4 bytes of a valid zstd dictionary "
                     "should be a magic number: b'\\x37\\xA4\\x30\\xEC'.\n"
                     "If you are an advanced user, and can be sure that "
-                    "\"dict_content\" is a \"raw content\" zstd dictionary, "
-                    "set \"is_raw\" argument to True.";
+                    "dict_content argument is a \"raw content\" zstd "
+                    "dictionary, set is_raw parameter to True.";
         PyErr_SetString(PyExc_ValueError, msg);
         return -1;
     }
@@ -1114,7 +1114,7 @@ PyDoc_STRVAR(ZstdDict_dict_doc,
 "ZstdDict.__init__(self, dict_content, is_raw=False)\n"
 "----\n"
 "Initialize a ZstdDict object.\n\n"
-"Arguments\n"
+"Parameters\n"
 "dict_content: A bytes-like object, dictionary's content.\n"
 "is_raw:       This parameter is for advanced user. True means dict_content\n"
 "              argument is a \"raw content\" dictionary, free of any format\n"
@@ -1193,7 +1193,7 @@ _train_dict(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Check parameters */
+    /* Check arguments */
     if (dict_size <= 0) {
         PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
         return NULL;
@@ -1318,7 +1318,7 @@ _finalize_dict(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Check parameters */
+    /* Check arguments */
     if (dict_size <= 0) {
         PyErr_SetString(PyExc_ValueError, "dict_size argument should be positive number.");
         return NULL;
@@ -1473,7 +1473,7 @@ PyDoc_STRVAR(ZstdCompressor_doc,
 "ZstdCompressor.__init__(self, level_or_option=None, zstd_dict=None)\n"
 "----\n"
 "Initialize a ZstdCompressor object.\n\n"
-"Arguments\n"
+"Parameters\n"
 "level_or_option: When it's an int object, it represents the compression level.\n"
 "                 When it's a dict object, it contains advanced compression\n"
 "                 parameters.\n"
@@ -1660,7 +1660,7 @@ PyDoc_STRVAR(ZstdCompressor_compress_doc,
 "----\n"
 "Provide data to the compressor object.\n"
 "Return a chunk of compressed data if possible, or b'' otherwise.\n\n"
-"Arguments\n"
+"Parameters\n"
 "data: A bytes-like object, data to be compressed.\n"
 "mode: Can be these 3 values: .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.");
 
@@ -1722,7 +1722,7 @@ PyDoc_STRVAR(ZstdCompressor_flush_doc,
 "Flush any remaining data in internal buffer.\n\n"
 "Since zstd data consists of one or more independent frames, the compressor\n"
 "object can still be used after this method is called.\n\n"
-"Argument\n"
+"Parameter\n"
 "mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.");
 
 static PyObject *
@@ -1775,7 +1775,7 @@ PyDoc_STRVAR(ZstdCompressor_set_pledged_input_size_doc,
 "2, If the actual size doesn't match the value, a ZstdError will be raised, and\n"
 "   the last compressed chunk is likely to be lost.\n"
 "3, The size is only valid for one frame, then it restores to \"unknown size\".\n\n"
-"Argument\n"
+"Parameter\n"
 "size: Uncompressed content size of a frame, None means \"unknown size\".");
 
 static PyObject *
@@ -1935,7 +1935,7 @@ PyDoc_STRVAR(RichMemZstdCompressor_compress_doc,
 "----\n"
 "Compress data using rich memory mode, return a single zstd frame.\n\n"
 "Compressing b'' will get an empty content frame (9 bytes or more).\n\n"
-"Argument\n"
+"Parameter\n"
 "data: A bytes-like object, data to be compressed.");
 
 static PyObject *
@@ -1983,7 +1983,7 @@ PyDoc_STRVAR(RichMemZstdCompressor_doc,
 "RichMemZstdCompressor.__init__(self, level_or_option=None, zstd_dict=None)\n"
 "----\n"
 "Initialize a RichMemZstdCompressor object.\n\n"
-"Arguments\n"
+"Parameters\n"
 "level_or_option: When it's an int object, it represents the compression level.\n"
 "                 When it's a dict object, it contains advanced compression\n"
 "                 parameters.\n"
@@ -2475,7 +2475,7 @@ PyDoc_STRVAR(ZstdDecompressor_doc,
 "ZstdDecompressor.__init__(self, zstd_dict=None, option=None)\n"
 "----\n"
 "Initialize a ZstdDecompressor object.\n\n"
-"Arguments\n"
+"Parameters\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option:    A dict object that contains advanced decompression parameters.");
 
@@ -2555,7 +2555,7 @@ PyDoc_STRVAR(ZstdDecompressor_decompress_doc,
 "Decompress data, return a chunk of decompressed data if possible, or b''\n"
 "otherwise.\n\n"
 "It stops after a frame is decompressed.\n\n"
-"Arguments\n"
+"Parameters\n"
 "data:       A bytes-like object, zstd data to be decompressed.\n"
 "max_length: Maximum size of returned data. When it is negative, the size of\n"
 "            output buffer is unlimited. When it is nonnegative, returns at\n"
@@ -2634,7 +2634,7 @@ PyDoc_STRVAR(EndlessZstdDecompressor_doc,
 "EndlessZstdDecompressor.__init__(self, zstd_dict=None, option=None)\n"
 "----\n"
 "Initialize an EndlessZstdDecompressor object.\n\n"
-"Arguments\n"
+"Parameters\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option:    A dict object that contains advanced decompression parameters.");
 
@@ -2643,7 +2643,7 @@ PyDoc_STRVAR(EndlessZstdDecompressor_decompress_doc,
 "----\n"
 "Decompress data, return a chunk of decompressed data if possible, or b''\n"
 "otherwise.\n\n"
-"Arguments\n"
+"Parameters\n"
 "data:       A bytes-like object, zstd data to be decompressed.\n"
 "max_length: Maximum size of returned data. When it is negative, the size of\n"
 "            output buffer is unlimited. When it is nonnegative, returns at\n"
@@ -2706,7 +2706,7 @@ PyDoc_STRVAR(decompress_doc,
 "----\n"
 "Decompress a zstd data, return a bytes object.\n\n"
 "Support multiple concatenated frames.\n\n"
-"Arguments\n"
+"Parameters\n"
 "data:      A bytes-like object, compressed zstd data.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option:    A dict object, contains advanced decompression parameters.");
@@ -2863,7 +2863,7 @@ PyDoc_STRVAR(get_frame_size_doc,
 "has.\n\n"
 "It will iterate all blocks' header within a frame, to accumulate the frame\n"
 "size.\n\n"
-"Argument\n"
+"Parameter\n"
 "frame_buffer: A bytes-like object, it should starts from the beginning of a\n"
 "              frame, and contains at least one complete frame.");
 
@@ -3119,7 +3119,7 @@ invoke_callback(PyObject *callback,
     /* memoryview object was referenced in callback function */
     if (cb_referenced) {
         PyErr_SetString(PyExc_RuntimeError,
-                        "The third and fourth parameters of callback function "
+                        "The third and fourth arguments of callback function "
                         "are memoryview objects. If want to reference them "
                         "outside the callback function, convert them to bytes "
                         "object using bytes() function.");
@@ -3170,17 +3170,17 @@ PyDoc_STRVAR(compress_stream_doc,
 "doesn't close the streams.\n\n"
 "If input stream is b'', nothing will be written to output stream.\n\n"
 "Return a tuple, (total_input, total_output), the items are int objects.\n\n"
-"Arguments\n"
+"Parameters\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
 "output_stream: Output stream that has a .write(b) method. If use callback\n"
-"    function, this argument can be None.\n"
+"    function, this parameter can be None.\n"
 "level_or_option: When it's an int object, it represents the compression\n"
 "    level. When it's a dict object, it contains advanced compression\n"
 "    parameters.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
-"pledged_input_size: If set this argument to the size of input data, the size\n"
-"    will be written into the frame header. If the actual input data doesn't\n"
-"    match it, a ZstdError will be raised.\n"
+"pledged_input_size: If set this parameter to the size of input data, the\n"
+"    size will be written into the frame header. If the actual input data\n"
+"    doesn't match it, a ZstdError will be raised.\n"
 "read_size: Input buffer size, in bytes.\n"
 "write_size: Output buffer size, in bytes.\n"
 "callback: A callback function that accepts four parameters:\n"
@@ -3229,7 +3229,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    /* Check parameters */
+    /* Check arguments */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
         PyErr_SetString(PyExc_TypeError,
                         "input_stream argument should have a .readinto(b) method.");
@@ -3444,10 +3444,10 @@ PyDoc_STRVAR(decompress_stream_doc,
 "it doesn't close the streams.\n\n"
 "Supports multiple concatenated frames.\n\n"
 "Return a tuple, (total_input, total_output), the items are int objects.\n\n"
-"Arguments\n"
+"Parameters\n"
 "input_stream: Input stream that has a .readinto(b) method.\n"
 "output_stream: Output stream that has a .write(b) method. If use callback\n"
-"    function, this argument can be None.\n"
+"    function, this parameter can be None.\n"
 "zstd_dict: A ZstdDict object, pre-trained zstd dictionary.\n"
 "option: A dict object, contains advanced decompression parameters.\n"
 "read_size: Input buffer size, in bytes.\n"
@@ -3495,7 +3495,7 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         return NULL;
     }
 
-    /* Check parameters */
+    /* Check arguments */
     if (!PyObject_HasAttr(input_stream, static_state.str_readinto)) {
         PyErr_SetString(PyExc_TypeError,
                         "input_stream argument should have a .readinto(b) method.");

@@ -239,7 +239,7 @@ class ZstdDict:
     def __init__(self, dict_content, is_raw=False) -> None:
         """Initialize a ZstdDict object.
 
-        Arguments
+        Parameters
         dict_content: A bytes-like object, dictionary's content.
         is_raw:       This parameter is for advanced user. True means dict_content
                       argument is a "raw content" dictionary, free of any format
@@ -280,12 +280,12 @@ class ZstdDict:
 
         # Check validity for ordinary dictionary
         if not is_raw and self.__dict_id == 0:
-            msg = ('The "dict_content" argument is not a valid zstd '
+            msg = ('The dict_content argument is not a valid zstd '
                    'dictionary. The first 4 bytes of a valid zstd dictionary '
                    'should be a magic number: b"\\x37\\xA4\\x30\\xEC".\n'
                    'If you are an advanced user, and can be sure that '
-                   '"dict_content" is a "raw content" zstd dictionary, '
-                   'set "is_raw" argument to True.')
+                   'dict_content argument is a "raw content" zstd '
+                   'dictionary, set is_raw parameter to True.')
             raise ValueError(msg)
 
     @property
@@ -658,7 +658,7 @@ class ZstdCompressor(_Compressor):
     def __init__(self, level_or_option=None, zstd_dict=None):
         """Initialize a ZstdCompressor object.
 
-        Arguments
+        Parameters
         level_or_option: When it's an int object, it represents the compression level.
                          When it's a dict object, it contains advanced compression
                          parameters.
@@ -671,7 +671,7 @@ class ZstdCompressor(_Compressor):
         """Provide data to the compressor object.
         Return a chunk of compressed data if possible, or b'' otherwise.
 
-        Arguments
+        Parameters
         data: A bytes-like object, data to be compressed.
         mode: Can be these 3 values: .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.
         """
@@ -703,7 +703,7 @@ class ZstdCompressor(_Compressor):
         Since zstd data consists of one or more independent frames, the compressor
         object can still be used after this method is called.
 
-        Argument
+        Parameter
         mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.
         """
         if mode not in (ZstdCompressor.FLUSH_FRAME, ZstdCompressor.FLUSH_BLOCK):
@@ -732,7 +732,7 @@ class ZstdCompressor(_Compressor):
            the last compressed chunk is likely to be lost.
         3, The size is only valid for one frame, then it restores to "unknown size".
 
-        Argument
+        Parameter
         size: Uncompressed content size of a frame, None means "unknown size".
         """
         # Get size value
@@ -777,7 +777,7 @@ class RichMemZstdCompressor(_Compressor):
     def __init__(self, level_or_option=None, zstd_dict=None):
         """Initialize a RichMemZstdCompressor object.
 
-        Arguments
+        Parameters
         level_or_option: When it's an int object, it represents the compression level.
                          When it's a dict object, it contains advanced compression
                          parameters.
@@ -797,7 +797,7 @@ class RichMemZstdCompressor(_Compressor):
 
         Compressing b'' will get an empty content frame (9 bytes or more).
 
-        Argument
+        Parameter
         data: A bytes-like object, data to be compressed.
         """
         with self._lock:
@@ -1077,7 +1077,7 @@ class ZstdDecompressor(_Decompressor):
     def __init__(self, zstd_dict=None, option=None):
         """Initialize a ZstdDecompressor object.
 
-        Arguments
+        Parameters
         zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
         option:    A dict object that contains advanced decompression parameters.
         """
@@ -1092,7 +1092,7 @@ class ZstdDecompressor(_Decompressor):
 
         It stops after a frame is decompressed.
 
-        Arguments
+        Parameters
         data:       A bytes-like object, zstd data to be decompressed.
         max_length: Maximum size of returned data. When it is negative, the size of
                     output buffer is unlimited. When it is nonnegative, returns at
@@ -1129,7 +1129,7 @@ class EndlessZstdDecompressor(_Decompressor):
     def __init__(self, zstd_dict=None, option=None):
         """Initialize an EndlessZstdDecompressor object.
 
-        Arguments
+        Parameters
         zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
         option:    A dict object that contains advanced decompression parameters.
         """
@@ -1141,7 +1141,7 @@ class EndlessZstdDecompressor(_Decompressor):
         """Decompress data, return a chunk of decompressed data if possible, or b''
         otherwise.
 
-        Arguments
+        Parameters
         data:       A bytes-like object, zstd data to be decompressed.
         max_length: Maximum size of returned data. When it is negative, the size of
                     output buffer is unlimited. When it is nonnegative, returns at
@@ -1164,7 +1164,7 @@ def decompress(data, zstd_dict=None, option=None):
 
     Support multiple concatenated frames.
 
-    Arguments
+    Parameters
     data:      A bytes-like object, compressed zstd data.
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
     option:    A dict object, contains advanced decompression parameters.
@@ -1255,17 +1255,17 @@ def compress_stream(input_stream, output_stream, *,
 
     Return a tuple, (total_input, total_output), the items are int objects.
 
-    Arguments
+    Parameters
     input_stream: Input stream that has a .readinto(b) method.
     output_stream: Output stream that has a .write(b) method. If use callback
-        function, this argument can be None.
+        function, this parameter can be None.
     level_or_option: When it's an int object, it represents the compression
         level. When it's a dict object, it contains advanced compression
         parameters.
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
-    pledged_input_size: If set this argument to the size of input data, the size
-        will be written into the frame header. If the actual input data doesn't
-        match it, a ZstdError will be raised.
+    pledged_input_size: If set this parameter to the size of input data, the
+        size will be written into the frame header. If the actual input data
+        doesn't match it, a ZstdError will be raised.
     read_size: Input buffer size, in bytes.
     write_size: Output buffer size, in bytes.
     callback: A callback function that accepts four parameters:
@@ -1277,7 +1277,7 @@ def compress_stream(input_stream, output_stream, *,
     total_input_size = 0
     total_output_size = 0
 
-    # Check parameters
+    # Check arguments
     if not hasattr(input_stream, "readinto"):
         raise TypeError("input_stream argument should have a .readinto(b) method.")
     if output_stream is not None:
@@ -1426,10 +1426,10 @@ def decompress_stream(input_stream, output_stream, *,
 
     Return a tuple, (total_input, total_output), the items are int objects.
 
-    Arguments
+    Parameters
     input_stream: Input stream that has a .readinto(b) method.
     output_stream: Output stream that has a .write(b) method. If use callback
-        function, this argument can be None.
+        function, this parameter can be None.
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
     option: A dict object, contains advanced decompression parameters.
     read_size: Input buffer size, in bytes.
@@ -1442,7 +1442,7 @@ def decompress_stream(input_stream, output_stream, *,
     total_input_size = 0
     total_output_size = 0
 
-    # Check parameters
+    # Check arguments
     if not hasattr(input_stream, "readinto"):
         raise TypeError("input_stream argument should have a .readinto(b) method.")
     if output_stream is not None:
@@ -1677,7 +1677,7 @@ _nt_frame_info = namedtuple('frame_info',
 def get_frame_info(frame_buffer):
     """Get zstd frame infomation from a frame header.
 
-    Argument
+    Parameter
     frame_buffer: A bytes-like object. It should starts from the beginning of
                   a frame, and needs to include at least the frame header (6 to
                   18 bytes).
@@ -1717,7 +1717,7 @@ def get_frame_size(frame_buffer):
     It will iterate all blocks' header within a frame, to accumulate the frame
     size.
 
-    Argument
+    Parameter
     frame_buffer: A bytes-like object, it should starts from the beginning of a
                   frame, and contains at least one complete frame.
     """
