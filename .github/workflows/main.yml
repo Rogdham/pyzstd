@@ -11,7 +11,7 @@ env:
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
   run_test:
-    name: Run test on ${{ matrix.platform }}
+    name: Test on ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
@@ -24,7 +24,7 @@ jobs:
 
       - name: Run test
         run: |
-          python setup.py install
+          python setup.py install --warning-as-error
           python tests/test_zstd.py
 
   # Run test on PyPy for every commit
@@ -34,7 +34,7 @@ jobs:
 
     strategy:
       matrix:
-        py: ['pypy-3.6', 'pypy-3.7']
+        py: ['pypy-3.6', 'pypy-3.7', 'pypy-3.8']
 
     steps:
       - uses: actions/checkout@v2
@@ -126,14 +126,11 @@ jobs:
     strategy:
       matrix:
         arch: [aarch64, ppc64le, s390x]
+        skip_image: ["*musllinux*", "*manylinux*"]
 
     env:
-      # generate manylinux2014 wheels
-      CIBW_MANYLINUX_AARCH64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_PYPY_AARCH64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_PPC64LE_IMAGE: manylinux2014
-      CIBW_MANYLINUX_S390X_IMAGE: manylinux2014
       CIBW_ARCHS: ${{ matrix.arch }}
+      CIBW_SKIP:  ${{ matrix.skip_image }}
 
     steps:
       - uses: actions/checkout@v2
@@ -181,7 +178,7 @@ jobs:
           run: |
             python3 -c "import platform;print('Machine type:', platform.machine())"
             python3 -m pip install -U setuptools
-            python3 setup.py install
+            python3 setup.py install --warning-as-error
             python3 tests/test_zstd.py
 
   # If the head commit message contains '<more-tests>', test on
@@ -199,7 +196,7 @@ jobs:
 
       - name: Run test
         run: |
-          python setup.py install
+          python setup.py install --warning-as-error
           python tests/test_zstd.py
 
   # Upload to PyPI
