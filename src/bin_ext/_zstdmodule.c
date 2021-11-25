@@ -1662,7 +1662,7 @@ PyDoc_STRVAR(ZstdCompressor_compress_doc,
 "Return a chunk of compressed data if possible, or b'' otherwise.\n\n"
 "Parameters\n"
 "data: A bytes-like object, data to be compressed.\n"
-"mode: Can be these 3 values: .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.");
+"mode: Can be these 3 values .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.");
 
 static PyObject *
 ZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
@@ -1723,7 +1723,7 @@ PyDoc_STRVAR(ZstdCompressor_flush_doc,
 "Since zstd data consists of one or more independent frames, the compressor\n"
 "object can still be used after this method is called.\n\n"
 "Parameter\n"
-"mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.");
+"mode: Can be these 2 values .FLUSH_FRAME, .FLUSH_BLOCK.");
 
 static PyObject *
 ZstdCompressor_flush(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
@@ -1847,8 +1847,8 @@ static PyMethodDef ZstdCompressor_methods[] = {
 PyDoc_STRVAR(ZstdCompressor_last_mode_doc,
 "The last mode used to this compressor object, its value can be .CONTINUE,\n"
 ".FLUSH_BLOCK, .FLUSH_FRAME. Initialized to .FLUSH_FRAME.\n\n"
-"It can be used to get the current state of a compressor, such as, a block\n"
-"ends, a frame ends.");
+"It can be used to get the current state of a compressor, such as, data flushed,\n"
+"a frame ended.");
 
 static PyMemberDef ZstdCompressor_members[] = {
     {"last_mode", T_INT, offsetof(ZstdCompressor, last_mode),
@@ -2861,8 +2861,7 @@ PyDoc_STRVAR(get_frame_size_doc,
 "----\n"
 "Get the size of a zstd frame, including frame header and 4-byte checksum if it\n"
 "has.\n\n"
-"It will iterate all blocks' header within a frame, to accumulate the frame\n"
-"size.\n\n"
+"It will iterate all blocks' header within a frame, to accumulate the frame size.\n\n"
 "Parameter\n"
 "frame_buffer: A bytes-like object, it should starts from the beginning of a\n"
 "              frame, and contains at least one complete frame.");

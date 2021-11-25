@@ -471,7 +471,7 @@ class ZstdFile(io.BufferedIOBase):
         If the program is interrupted afterwards, all data can be recovered.
         To ensure saving to disk, also need to use os.fsync(fd).
 
-        This does nothing in reading mode.
+        This method does nothing in reading mode.
         """
         # Like IOBase.flush(), do nothing in reading mode.
         # TextIOWrapper.close() relies on this behavior.

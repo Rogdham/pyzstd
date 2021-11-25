@@ -254,7 +254,7 @@ Streaming compression
 
         The last mode used to this compressor, its value can be :py:attr:`~ZstdCompressor.CONTINUE`, :py:attr:`~ZstdCompressor.FLUSH_BLOCK`, :py:attr:`~ZstdCompressor.FLUSH_FRAME`. Initialized to :py:attr:`~ZstdCompressor.FLUSH_FRAME`.
 
-        It can be used to get the current state of a compressor, such as, a block ends, a frame ends.
+        It can be used to get the current state of a compressor, such as, data flushed, a frame ended.
 
     .. py:attribute:: CONTINUE
 
@@ -266,7 +266,7 @@ Streaming compression
 
         Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
-        Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
+        Flush any remaining data, but don't close the current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
         If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, no block is created, return ``b''``.
 
@@ -276,7 +276,7 @@ Streaming compression
 
         Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
-        Flush any remaining data, and close current :ref:`frame<frame_block>`. Usually used for traditional flush.
+        Flush any remaining data, and close the current :ref:`frame<frame_block>`. Usually used for traditional flush.
 
         Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed.
 

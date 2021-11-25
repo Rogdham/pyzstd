@@ -80,7 +80,7 @@ class CParameter(IntEnum):
     overlapLog                 = _zstd._ZSTD_c_overlapLog
 
     def bounds(self):
-        """Return lower and upper bounds of a parameter, both inclusive."""
+        """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
         return _zstd._get_param_bounds(1, self.value)
 
@@ -91,7 +91,7 @@ class DParameter(IntEnum):
     windowLogMax = _zstd._ZSTD_d_windowLogMax
 
     def bounds(self):
-        """Return lower and upper bounds of a parameter, both inclusive."""
+        """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter
         return _zstd._get_param_bounds(0, self.value)
 

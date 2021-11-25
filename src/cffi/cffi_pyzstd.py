@@ -77,7 +77,7 @@ class CParameter(IntEnum):
     overlapLog                 = m.ZSTD_c_overlapLog
 
     def bounds(self):
-        """Return lower and upper bounds of a parameter, both inclusive."""
+        """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
         return _get_param_bounds(1, self.value)
 
@@ -89,7 +89,7 @@ class DParameter(IntEnum):
     windowLogMax = m.ZSTD_d_windowLogMax
 
     def bounds(self):
-        """Return lower and upper bounds of a parameter, both inclusive."""
+        """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter
         return _get_param_bounds(0, self.value)
 
@@ -651,9 +651,39 @@ class _Compressor:
 
 class ZstdCompressor(_Compressor):
     """A streaming compressor. Thread-safe at method level."""
+
     CONTINUE = m.ZSTD_e_continue
+    """Used for mode parameter in .compress() method.
+
+    Collect more data, encoder decides when to output compressed result, for optimal
+    compression ratio. Usually used for traditional streaming compression.
+    """
+
     FLUSH_BLOCK = m.ZSTD_e_flush
+    """Used for mode parameter in .compress(), .flush() methods.
+
+    Flush any remaining data, but don't close the current frame. Usually used for
+    communication scenarios.
+
+    If there is data, it creates at least one new block, that can be decoded
+    immediately on reception. If no remaining data, no block is created, return b''.
+
+    Note: Abuse of this mode will reduce compression ratio. Use it only when
+    necessary.
+    """
+
     FLUSH_FRAME = m.ZSTD_e_end
+    """Used for mode parameter in .compress(), .flush() methods.
+
+    Flush any remaining data, and close the current frame. Usually used for
+    traditional flush.
+
+    Since zstd data consists of one or more independent frames, data can still be
+    provided after a frame is closed.
+
+    Note: Abuse of this mode will reduce compression ratio, and some programs can
+    only decompress single frame data. Use it only when necessary.
+    """
 
     def __init__(self, level_or_option=None, zstd_dict=None):
         """Initialize a ZstdCompressor object.
@@ -673,7 +703,7 @@ class ZstdCompressor(_Compressor):
 
         Parameters
         data: A bytes-like object, data to be compressed.
-        mode: Can be these 3 values: .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.
+        mode: Can be these 3 values .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.
         """
         if mode not in (ZstdCompressor.CONTINUE,
                         ZstdCompressor.FLUSH_BLOCK,
@@ -704,7 +734,7 @@ class ZstdCompressor(_Compressor):
         object can still be used after this method is called.
 
         Parameter
-        mode: Can be these 2 values: .FLUSH_FRAME, .FLUSH_BLOCK.
+        mode: Can be these 2 values .FLUSH_FRAME, .FLUSH_BLOCK.
         """
         if mode not in (ZstdCompressor.FLUSH_FRAME, ZstdCompressor.FLUSH_BLOCK):
             msg = ("mode argument wrong value, it should be "
@@ -764,8 +794,8 @@ class ZstdCompressor(_Compressor):
         """The last mode used to this compressor object, its value can be .CONTINUE,
         .FLUSH_BLOCK, .FLUSH_FRAME. Initialized to .FLUSH_FRAME.
 
-        It can be used to get the current state of a compressor, such as, a block
-        ends, a frame ends.
+        It can be used to get the current state of a compressor, such as, data flushed,
+        a frame ended.
         """
         return self.__last_mode
 
@@ -1714,8 +1744,7 @@ def get_frame_size(frame_buffer):
     """Get the size of a zstd frame, including frame header and 4-byte checksum if it
     has.
 
-    It will iterate all blocks' header within a frame, to accumulate the frame
-    size.
+    It will iterate all blocks' header within a frame, to accumulate the frame size.
 
     Parameter
     frame_buffer: A bytes-like object, it should starts from the beginning of a
