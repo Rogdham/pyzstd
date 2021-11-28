@@ -586,14 +586,6 @@ class ZstdFile(io.BufferedIOBase):
         except AttributeError:
             self._check_mode(_MODE_READ)
 
-    # Override IOBase.__iter__
-    # https://bugs.python.org/issue43787
-    def __iter__(self):
-        try:
-            return self._buffer.__iter__()
-        except AttributeError:
-            self._check_mode(_MODE_READ)
-
     def tell(self):
         """Return the current file position."""
         if self._mode == _MODE_READ:

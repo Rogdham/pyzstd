@@ -2835,6 +2835,10 @@ class FileTestCase(unittest.TestCase):
             with self.assertRaises(io.UnsupportedOperation):
                 f.truncate(200)
 
+    def test_zstdfile_iter_issue45475(self):
+        lines = [l for l in ZstdFile(BytesIO(COMPRESSED_THIS_FILE))]
+        self.assertGreater(len(lines), 0)
+
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
