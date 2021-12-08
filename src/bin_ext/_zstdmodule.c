@@ -3025,11 +3025,6 @@ write_to_output(PyObject *output_stream, ZSTD_outBuffer *out)
             /* The raw stream is set not to block and no single
                byte could be readily written to it */
             Py_DECREF(write_ret);
-
-            /* Check signal, prevent loop infinitely. */
-            if (PyErr_CheckSignals()) {
-                goto error;
-            }
             continue;
         } else {
             /* Get write length value */
@@ -3320,11 +3315,6 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         size_t callback_read_pos;
         ZSTD_EndDirective end_directive;
 
-        /* Interrupted by a signal, put here for .readinto() returning None. */
-        if (PyErr_CheckSignals()) {
-            goto error;
-        }
-
         /* Invoke .readinto() method */
         temp = PyObject_CallMethodObjArgs(input_stream,
                                           static_state.str_readinto,
@@ -3567,11 +3557,6 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     while (1) {
         Py_ssize_t read_bytes;
         size_t callback_read_pos;
-
-        /* Interrupted by a signal, put here for .readinto() returning None. */
-        if (PyErr_CheckSignals()) {
-            goto error;
-        }
 
         /* Invoke .readinto() method */
         temp = PyObject_CallMethodObjArgs(input_stream,
