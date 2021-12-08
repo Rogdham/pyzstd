@@ -5,7 +5,7 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
-  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-*
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
