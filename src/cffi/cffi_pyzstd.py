@@ -263,20 +263,15 @@ class ZstdDict:
 
         # Create ZSTD_DDict instance from dictionary content, also check content
         # integrity to some degree.
-        ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
-                                   len(self.__dict_content))
-        if ddict == ffi.NULL:
+        self.__ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
+                                          len(self.__dict_content))
+        if self.__ddict == ffi.NULL:
             msg = ("Failed to get ZSTD_DDict instance from zstd "
                    "dictionary content. Maybe the content is corrupted.")
             raise ZstdError(msg)
 
-        # Call ZSTD_freeDDict() when GC
-        self.__ddict = ffi.gc(ddict,
-                              m.ZSTD_freeDDict,
-                              m.ZSTD_sizeof_DDict(ddict))
-
         # Get dict_id, 0 means "raw content" dictionary.
-        self.__dict_id = m.ZSTD_getDictID_fromDDict(ddict)
+        self.__dict_id = m.ZSTD_getDictID_fromDDict(self.__ddict)
 
         # Check validity for ordinary dictionary
         if not is_raw and self.__dict_id == 0:
@@ -287,6 +282,20 @@ class ZstdDict:
                    'dict_content argument is a "raw content" zstd '
                    'dictionary, set is_raw parameter to True.')
             raise ValueError(msg)
+
+    def __del__(self):
+        try:
+            for level, cdict in self.__cdicts.items():
+                m.ZSTD_freeCDict(cdict)
+                self.__cdicts[level] = ffi.NULL
+        except AttributeError:
+            pass
+
+        try:
+            m.ZSTD_freeDDict(self.__ddict)
+            self.__ddict = ffi.NULL
+        except AttributeError:
+            pass
 
     @property
     def dict_content(self):
@@ -331,11 +340,6 @@ class ZstdDict:
                     msg = ("Failed to get ZSTD_CDict instance from zstd "
                            "dictionary content.")
                     raise ZstdError(msg)
-
-                # Call ZSTD_freeCDict() when GC
-                cdict = ffi.gc(cdict,
-                               m.ZSTD_freeCDict,
-                               m.ZSTD_sizeof_CDict(cdict))
                 self.__cdicts[level] = cdict
             return cdict
 
@@ -552,13 +556,9 @@ class _Compressor:
         level = 0  # 0 means use zstd's default compression level
 
         # Compression context
-        cctx = m.ZSTD_createCCtx()
-        if cctx == ffi.NULL:
+        self._cctx = m.ZSTD_createCCtx()
+        if self._cctx == ffi.NULL:
             raise ZstdError("Unable to create ZSTD_CCtx instance.")
-        # Call ZSTD_freeCCtx() when GC
-        self._cctx = ffi.gc(cctx,
-                            m.ZSTD_freeCCtx,
-                            m.ZSTD_sizeof_CCtx(cctx))
 
         # Set compressLevel/option to compression context
         if level_or_option is not None:
@@ -569,6 +569,13 @@ class _Compressor:
         if zstd_dict is not None:
             _load_c_dict(self._cctx, zstd_dict, level)
             self.__dict = zstd_dict
+
+    def __del__(self):
+        try:
+            m.ZSTD_freeCCtx(self._cctx)
+            self._cctx = ffi.NULL
+        except AttributeError:
+            pass
 
     def _compress_impl(self, data, end_directive, rich_mem):
         # Input buffer
@@ -852,13 +859,9 @@ class _Decompressor:
         self._in_end = 0
 
         # Decompression context
-        dctx = m.ZSTD_createDCtx()
-        if dctx == ffi.NULL:
+        self._dctx = m.ZSTD_createDCtx()
+        if self._dctx == ffi.NULL:
             raise ZstdError("Unable to create ZSTD_DCtx instance.")
-        # Call ZSTD_freeDCtx() when GC
-        self._dctx = ffi.gc(dctx,
-                            m.ZSTD_freeDCtx,
-                            m.ZSTD_sizeof_DCtx(dctx))
 
         # Load dictionary to compression context
         if zstd_dict is not None:
@@ -868,6 +871,13 @@ class _Decompressor:
         # Set compressLevel/option to compression context
         if option is not None:
             _set_d_parameters(self._dctx, option)
+
+    def __del__(self):
+        try:
+            m.ZSTD_freeDCtx(self._dctx)
+            self._dctx = ffi.NULL
+        except AttributeError:
+            pass
 
     @property
     def needs_input(self):
