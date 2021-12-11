@@ -36,7 +36,7 @@ Release note
 
 **0.15.0  (May 18, 2021)**
 
-#. Update zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
+#. Update bundled zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
 
 #. Some improvements, no API changes.
 
@@ -48,7 +48,7 @@ Release note
 
 **0.14.3  (Mar 4, 2021)**
 
-Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
+Update bundled zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
 
 **0.14.2  (Feb 24, 2021)**
 
@@ -58,7 +58,7 @@ Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd
 
 **0.14.1  (Dec 19, 2020)**
 
-#. Update zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
+#. Update bundled zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
 
     * v1.4.6 is a non-public release for Linux kernel.
 

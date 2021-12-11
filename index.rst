@@ -205,14 +205,17 @@ Streaming compression
                 compress_stream(ifh, bo)
                 compressed_dat = bo.getvalue()
 
-        # with callback function
-        def func(total_input, total_output, read_data, write_data):
-            percent = 100 * total_input / input_file_size
-            print(f'Progress: {percent:.1f}%')
+        # Print progress using callback function
+        def compress_print_progress(input_file_path, output_file_path):
+            input_file_size = os.path.getsize(input_file_path)
 
-        with io.open(input_file_path, 'rb') as ifh:
-            with io.open(output_file_path, 'wb') as ofh:
-                compress_stream(ifh, ofh, callback=func)
+            def func(total_input, total_output, read_data, write_data):
+                percent = 100 * total_input / input_file_size
+                print(f'Progress: {percent:.1f}%', end='\r')
+
+            with io.open(input_file_path, 'rb') as ifh:
+                with io.open(output_file_path, 'wb') as ofh:
+                    compress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdCompressor
@@ -360,14 +363,17 @@ Streaming decompression
                 decompress_stream(ifh, bo)
                 decompressed_dat = bo.getvalue()
 
-        # with callback function
-        def func(total_input, total_output, read_data, write_data):
-            percent = 100 * total_input / input_file_size
-            print(f'Progress: {percent:.1f}%')
+        # Print progress using callback function
+        def decompress_print_progress(input_file_path, output_file_path):
+            input_file_size = os.path.getsize(input_file_path)
 
-        with io.open(input_file_path, 'rb') as ifh:
-            with io.open(output_file_path, 'wb') as ofh:
-                decompress_stream(ifh, ofh, callback=func)
+            def func(total_input, total_output, read_data, write_data):
+                percent = 100 * total_input / input_file_size
+                print(f'Progress: {percent:.1f}%', end='\r')
+
+            with io.open(input_file_path, 'rb') as ifh:
+                with io.open(output_file_path, 'wb') as ofh:
+                    decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdDecompressor
@@ -1311,7 +1317,7 @@ Use with tarfile module
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
 
-    When the above code is in read mode (decompression), ``TarFile`` may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and operate on it. This code encapsulates the process:
+    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and read from it. This code encapsulates the process:
 
     .. sourcecode:: python
 
