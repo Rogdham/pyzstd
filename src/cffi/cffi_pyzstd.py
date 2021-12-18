@@ -1239,7 +1239,8 @@ def decompress(data, zstd_dict=None, option=None):
     if not decomp._at_frame_edge:
         extra_msg = "." if (len(ret) == 0) \
                         else (", if want to output these decompressed data, use "
-                              "an EndlessZstdDecompressor object to decompress.")
+                              "decompress_stream function or "
+                              "EndlessZstdDecompressor class to decompress.")
         msg = ("Decompression failed: zstd data ends in an incomplete "
                "frame, maybe the input data was truncated. Decompressed "
                "data is %d bytes%s") % (len(ret), extra_msg)

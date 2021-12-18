@@ -2782,7 +2782,8 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
     if (self.at_frame_edge == 0) {
         char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
                           ", if want to output these decompressed data, use "
-                          "an EndlessZstdDecompressor object to decompress.";
+                          "decompress_stream function or "
+                          "EndlessZstdDecompressor class to decompress.";
         PyErr_Format(static_state.ZstdError,
                      "Decompression failed: zstd data ends in an incomplete "
                      "frame, maybe the input data was truncated. Decompressed "
