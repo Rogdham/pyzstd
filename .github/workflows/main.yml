@@ -177,7 +177,6 @@ jobs:
 
           run: |
             python3 -c "import platform;print('Machine type:', platform.machine())"
-            python3 -m pip install -U setuptools
             python3 setup.py install --warning-as-error
             python3 tests/test_zstd.py
 
