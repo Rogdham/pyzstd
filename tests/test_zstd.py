@@ -3208,6 +3208,14 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
             decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
+    def test_empty_input_no_callback(self):
+        def cb(a,b,c,d):
+            self.fail('callback function should not be called')
+        # callback function will not be called for empty input,
+        # it's a promised behavior.
+        compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+        decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+
 def test_main():
     unittest.main()
 

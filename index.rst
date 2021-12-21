@@ -178,7 +178,7 @@ Streaming compression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
@@ -210,6 +210,8 @@ Streaming compression
             input_file_size = os.path.getsize(input_file_path)
 
             def func(total_input, total_output, read_data, write_data):
+                # If input stream is empty, the callback function
+                # will not be called. So no ZeroDivisionError here.
                 percent = 100 * total_input / input_file_size
                 print(f'Progress: {percent:.1f}%', end='\r')
 
@@ -335,7 +337,7 @@ Streaming decompression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.
@@ -368,6 +370,8 @@ Streaming decompression
             input_file_size = os.path.getsize(input_file_path)
 
             def func(total_input, total_output, read_data, write_data):
+                # If input stream is empty, the callback function
+                # will not be called. So no ZeroDivisionError here.
                 percent = 100 * total_input / input_file_size
                 print(f'Progress: {percent:.1f}%', end='\r')
 
@@ -831,10 +835,6 @@ Advanced parameters
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`CParameter` name, the value is a 32-bit signed integer value.
 
-    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
-
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
-
     .. sourcecode:: python
 
         option = {CParameter.compressionLevel : 10,
@@ -847,6 +847,10 @@ Advanced parameters
         c = ZstdCompressor(level_or_option=option)
         compressed_dat1 = c.compress(raw_dat)
         compressed_dat2 = c.flush()
+
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be clamped silently.
+
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. py:method:: bounds(self)
 
@@ -873,11 +877,11 @@ Advanced parameters
 
         Larger values requiring more memory and typically compressing more.
 
-        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.5.0, means 128 MiB (1 << 27).
+        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.2+, means 128 MiB (1 << 27).
 
         Must be clamped between ``ZSTD_WINDOWLOG_MIN`` and ``ZSTD_WINDOWLOG_MAX``.
 
-        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: hashLog
 
@@ -887,7 +891,7 @@ Advanced parameters
 
         Larger tables improve compression ratio of strategies <= :py:attr:`~Strategy.dfast`, and improve speed of strategies > :py:attr:`~Strategy.dfast`.
 
-        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: chainLog
 
@@ -901,7 +905,7 @@ Advanced parameters
 
         It's still useful when using :py:attr:`~Strategy.dfast` strategy, in which case it defines a secondary probe table.
 
-        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: searchLog
 
@@ -911,7 +915,7 @@ Advanced parameters
 
         This parameter is useless for :py:attr:`~Strategy.fast` and :py:attr:`~Strategy.dfast` strategies.
 
-        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: minMatch
 
@@ -925,7 +929,7 @@ Advanced parameters
 
         Note that currently, for all strategies < :py:attr:`~Strategy.btopt`, effective minimum is ``4``, for all strategies > :py:attr:`~Strategy.fast`, effective maximum is ``6``.
 
-        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: targetLength
 
@@ -943,7 +947,7 @@ Advanced parameters
 
             Larger values make compression faster, and weaker.
 
-        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: strategy
 
@@ -951,7 +955,7 @@ Advanced parameters
 
         The higher the value of selected strategy, the more complex it is, resulting in stronger and slower compression.
 
-        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_.
+        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: enableLongDistanceMatching
 
@@ -1100,10 +1104,6 @@ Advanced parameters
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`DParameter` name, the value is a 32-bit signed integer value.
 
-    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
-
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
-
     .. sourcecode:: python
 
         # set memory allocation limit to 16 MiB (1 << 24)
@@ -1115,6 +1115,10 @@ Advanced parameters
         # used with ZstdDecompressor object
         d = ZstdDecompressor(option=option)
         decompressed_dat = d.decompress(dat)
+
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be clamped silently.
+
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. py:method:: bounds(self)
 
@@ -1133,7 +1137,7 @@ Advanced parameters
 
         This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode. :py:func:`decompress` function may use streaming mode or single-pass mode.
 
-        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.5.0, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
+        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.2+, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
 
         Special: value ``0`` means "use default maximum windowLog".
 
@@ -1183,7 +1187,7 @@ Compression level
 
     **For advanced user**
 
-    Compression levels are just numbers that map to a set of compression parameters, see this `v1.5.0 table <https://github.com/facebook/zstd/blob/v1.5.0/lib/compress/zstd_compress.c#L6149-L6254>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some information, such as data size, using dictionary or not.
+    Compression levels are just numbers that map to a set of compression parameters, see `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some information, such as data size, using dictionary or not.
 
     Setting a compression level does not set all other :ref:`compression parameters<CParameter>` to default. Setting this will dynamically impact the compression parameters which have not been manually set, the manually set ones will "stick".
 
