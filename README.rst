@@ -5,7 +5,7 @@ Pyzstd module provides classes and functions for compressing and decompressing d
 
 The API is similar to Python's bz2/lzma/zlib modules.
 
-Includes zstd v1.5.0 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
+Includes zstd v1.5.1 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
 
 
 Links
@@ -18,7 +18,9 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.15.1  (next release)**
+**0.15.1  (Dec 25, 2021)**
+
+#. Update bundled zstd source code from v1.5.0 to `v1.5.1 <https://github.com/facebook/zstd/releases/tag/v1.5.1>`_.
 
 #. Fix ``ZstdFile.write()`` / ``train_dict()`` / ``finalize_dict()`` may use wrong length for some buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
 
@@ -29,8 +31,6 @@ Release note
     * If the underlying zstd library doesn't support multi-threaded compression, no longer automatically fallback to "single-threaded mode", now raise a ``ZstdError`` exception.
 
 #. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
-
-#. Implement ``ZstdFile.flush()`` method, it overrides ``IOBase.flush()`` that does nothing.
 
 #. Add a setup.py option ``--avx2``, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 
