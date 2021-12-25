@@ -1,7 +1,12 @@
 import _compression
 import io
-from os import PathLike
 from sys import maxsize
+try:
+    from os import PathLike
+except ImportError:
+    # For Python 3.5
+    class PathLike:
+        pass
 
 try:
     # Import C implementation
@@ -22,15 +27,25 @@ except ImportError:
             "library, make sure not to remove zstd library, and the run-time "
             "zstd library's version can't be lower than that at compile-time.")
 
-__version__ = '0.15.0'
+__version__ = '0.15.1'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API is similar to
-Python's bz2/lzma/zlib module.
+Python's bz2/lzma/zlib modules.
 
 Documentation: https://pyzstd.readthedocs.io
 GitHub: https://github.com/animalize/pyzstd
 PyPI: https://pypi.org/project/pyzstd'''
+
+__all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
+           'ZstdDecompressor', 'EndlessZstdDecompressor',
+           'CParameter', 'DParameter', 'Strategy', 'ZstdError',
+           'compress', 'richmem_compress', 'decompress',
+           'compress_stream', 'decompress_stream',
+           'ZstdDict', 'train_dict', 'finalize_dict',
+           'get_frame_info', 'get_frame_size', 'ZstdFile', 'open',
+           'zstd_version', 'zstd_version_info',
+           'zstd_support_multithread', 'compressionLevel_values')
 
 
 def compress(data, level_or_option=None, zstd_dict=None):
@@ -38,7 +53,7 @@ def compress(data, level_or_option=None, zstd_dict=None):
 
     Compressing b'' will get an empty content frame (9 bytes or more).
 
-    Arguments
+    Parameters
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
                      When it's a dict object, it contains advanced compression
@@ -57,7 +72,7 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
 
     Compressing b'' will get an empty content frame (9 bytes or more).
 
-    Arguments
+    Parameters
     data:            A bytes-like object, data to be compressed.
     level_or_option: When it's an int object, it represents compression level.
                      When it's a dict object, it contains advanced compression
@@ -68,15 +83,21 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
     return comp.compress(data)
 
 
+def _nbytes(dat):
+    if isinstance(dat, (bytes, bytearray)):
+        return len(dat)
+    return memoryview(dat).nbytes
+
+
 def train_dict(samples, dict_size):
     """Train a zstd dictionary, return a ZstdDict object.
 
-    Arguments
+    Parameters
     samples:   An iterable of samples, a sample is a bytes-like object
                represents a file.
     dict_size: The dictionary's maximum size, in bytes.
     """
-    # Check parameter's type
+    # Check argument's type
     if not isinstance(dict_size, int):
         raise TypeError('dict_size argument should be an int object.')
 
@@ -85,7 +106,7 @@ def train_dict(samples, dict_size):
     chunk_sizes = []
     for chunk in samples:
         chunks.append(chunk)
-        chunk_sizes.append(len(chunk))
+        chunk_sizes.append(_nbytes(chunk))
 
     chunks = b''.join(chunks)
     if not chunks:
@@ -108,10 +129,10 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
 
     You may compose an effective dictionary content by hand, which is used as
     basis dictionary, and use some samples to finalize a dictionary. The basis
-    dictionary can be a "raw content" dictionary, see is_raw argument in
+    dictionary can be a "raw content" dictionary, see is_raw parameter in
     ZstdDict.__init__ method.
 
-    Arguments
+    Parameters
     zstd_dict: A ZstdDict object, basis dictionary.
     samples:   An iterable of samples, a sample is a bytes-like object
                represents a file.
@@ -126,7 +147,7 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
                "the current underlying zstd library's version is v%s.") % zstd_version
         raise NotImplementedError(msg)
 
-    # Check parameters' type
+    # Check arguments' type
     if not isinstance(zstd_dict, ZstdDict):
         raise TypeError('zstd_dict argument should be a ZstdDict object.')
     if not isinstance(dict_size, int):
@@ -139,7 +160,7 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     chunk_sizes = []
     for chunk in samples:
         chunks.append(chunk)
-        chunk_sizes.append(len(chunk))
+        chunk_sizes.append(_nbytes(chunk))
 
     chunks = b''.join(chunks)
     if not chunks:
@@ -157,25 +178,18 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
     return ZstdDict(dict_content)
 
 
-# Below code were copied from Python stdlib (_compression.py, lzma.py), except:
-#
-# ZstdDecompressReader.read():
-#     Uses ZSTD_DStreamInSize() (131,075 in zstd v1.x) instead of
-#     _compression.BUFFER_SIZE (default is 8 KiB) as read size.
-# ZstdDecompressReader.seek():
-#     Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as
-#     max_length.
-# ZstdFile.__init__():
-#     io.BufferedReader uses 32 KiB buffer size instead of default value
-#     io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
-# ZstdFile.read1():
-#     Use 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB),
-#     consistent with ZstdFile.__init__().
-#
 # In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
 # fast path for this size, if the output data is 32 KiB, it only allocates
 # memory and copies data once.
+_32_KiB = 32*1024
 
+# Copied from Python stdlib (_compression.py), except:
+# 1, ZstdDecompressReader.read():
+#      Uses ZSTD_DStreamInSize() (131,075 in zstd v1.x) instead of
+#      _compression.BUFFER_SIZE (default is 8 KiB) as read size.
+# 2, ZstdDecompressReader.seek():
+#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as
+#      max_length. See _32_KiB's comment for details.
 class ZstdDecompressReader(_compression.DecompressReader):
     # Add .readall() method for speedup
     # https://bugs.python.org/issue41486
@@ -245,7 +259,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
         elif whence == io.SEEK_END:
             # Seeking relative to EOF - we need to know the file's size.
             if self._size < 0:
-                while self.read(32*1024):
+                while self.read(_32_KiB):
                     pass
             offset = self._size + offset
         else:
@@ -259,7 +273,7 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
         # Read and discard data until we reach the desired position.
         while offset > 0:
-            data = self.read(min(32*1024, offset))
+            data = self.read(min(_32_KiB, offset))
             if not data:
                 break
             offset -= len(data)
@@ -271,14 +285,24 @@ _MODE_CLOSED = 0
 _MODE_READ   = 1
 _MODE_WRITE  = 2
 
-# Copied from lzma module, except:
-# ZstdFile.__init__():
-#   io.BufferedReader uses 32 KiB buffer size instead of default value
-#   io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
-# ZstdFile.read1():
-#   Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB),
-#   consistent with ZstdFile.__init__().
-class ZstdFile(_compression.BaseStream):
+# Copied from Python stdlib (lzma.py), except:
+# 1, Add .readinto()/.readinto1() methods.
+# 2, Implement .flush() method.
+# 3, Remove BaseStream._check_*() overheads.
+#    The implementation needs to ensure:
+#      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
+#      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
+#      If in _MODE_CLOSED mode, they and ._fp don't exist or are None.
+#    Then if not in a mode, perform the corresponding actions will raise
+#    AttributeError, and ._check_mode() will raise a proper exception.
+# 4, ZstdFile.__init__():
+#      io.BufferedReader uses 32 KiB buffer size instead of default value
+#      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+#      See _32_KiB's comment for details.
+# 5, ZstdFile.read1():
+#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
+#      Consistent with ZstdFile.__init__().
+class ZstdFile(io.BufferedIOBase):
     """A file object providing transparent zstd (de)compression.
 
     A ZstdFile can act as a wrapper for an existing file object, or refer
@@ -300,7 +324,7 @@ class ZstdFile(_compression.BaseStream):
         creating exclusively, or "a" for appending. These can equivalently be
         given as "rb", "wb", "xb" and "ab" respectively.
 
-        Arguments
+        Parameters
         level_or_option: When it's an int object, it represents compression
             level. When it's a dict object, it contains advanced compression
             parameters. Note, in read mode (decompression), it can only be a
@@ -316,6 +340,7 @@ class ZstdFile(_compression.BaseStream):
         if not isinstance(zstd_dict, (type(None), ZstdDict)):
             raise TypeError("zstd_dict argument should be a ZstdDict object.")
 
+        # Read or write mode
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
                 msg = ("In read mode (decompression), level_or_option argument "
@@ -334,11 +359,15 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
+        # File object
         if isinstance(filename, (str, bytes, PathLike)):
             if "b" not in mode:
                 mode += "b"
             self._fp = io.open(filename, mode)
             self._closefp = True
+            # Set ._mode here for ._closefp in .close(). If the following code
+            # fails, IOBase's cleanup code will call .close(), so that ._fp can
+            # be closed.
             self._mode = mode_code
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
@@ -346,17 +375,12 @@ class ZstdFile(_compression.BaseStream):
         else:
             raise TypeError("filename must be a str, bytes, file or PathLike object")
 
-        if self._mode == _MODE_READ:
+        # ZstdDecompressReader
+        if mode_code == _MODE_READ:
             raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
                                        trailing_error=ZstdError,
                                        zstd_dict=zstd_dict, option=level_or_option)
-            self._buffer = io.BufferedReader(raw, 32*1024)
-
-    # Override IOBase.__iter__
-    # https://bugs.python.org/issue43787
-    def __iter__(self):
-        self._check_can_read()
-        return self._buffer.__iter__()
+            self._buffer = io.BufferedReader(raw, _32_KiB)
 
     def close(self):
         """Flush and close the file.
@@ -366,13 +390,22 @@ class ZstdFile(_compression.BaseStream):
         """
         if self._mode == _MODE_CLOSED:
             return
+
         try:
-            if self._mode == _MODE_READ and hasattr(self, '_buffer'):
-                self._buffer.close()
-                self._buffer = None
+            # In .__init__ method, if fails after setting ._mode to _MODE_READ,
+            # ._buffer doesn't exist.
+            if hasattr(self, "_buffer"):
+                try:
+                    self._buffer.close()
+                finally:
+                    # Set to None for ._check_mode()
+                    self._buffer = None
             elif self._mode == _MODE_WRITE:
-                self._fp.write(self._compressor.flush())
-                self._compressor = None
+                try:
+                    self._fp.write(self._compressor.flush())
+                finally:
+                    # Set to None for ._check_mode()
+                    self._compressor = None
         finally:
             try:
                 if self._closefp:
@@ -382,40 +415,83 @@ class ZstdFile(_compression.BaseStream):
                 self._closefp = False
                 self._mode = _MODE_CLOSED
 
-    @property
-    def closed(self):
-        """True if this file is closed."""
-        return self._mode == _MODE_CLOSED
+    # None argument means the file should be closed
+    def _check_mode(self, expected_mode=None):
+        # If closed, raise ValueError.
+        if self._mode == _MODE_CLOSED:
+            raise ValueError("I/O operation on closed file")
 
-    def fileno(self):
-        """Return the file descriptor for the underlying file."""
-        self._check_not_closed()
-        return self._fp.fileno()
+        # Check _MODE_READ/_MODE_WRITE mode
+        if expected_mode == _MODE_READ:
+            if self._mode != _MODE_READ:
+                raise io.UnsupportedOperation("File not open for reading")
+        elif expected_mode == _MODE_WRITE:
+            if self._mode != _MODE_WRITE:
+                raise io.UnsupportedOperation("File not open for writing")
 
-    def seekable(self):
-        """Return whether the file supports seeking."""
-        return self.readable() and self._buffer.seekable()
+        # Re-raise other AttributeError exception
+        raise
 
-    def readable(self):
-        """Return whether the file was opened for reading."""
-        self._check_not_closed()
-        return self._mode == _MODE_READ
+    def write(self, data):
+        """Write a bytes-like object to the file.
 
-    def writable(self):
-        """Return whether the file was opened for writing."""
-        self._check_not_closed()
-        return self._mode == _MODE_WRITE
-
-    def peek(self, size=-1):
-        """Return buffered data without advancing the file position.
-
-        Always returns at least one byte of data, unless at EOF.
-        The exact number of bytes returned is unspecified.
+        Returns the number of uncompressed bytes written, which is
+        always the length of data in bytes. Note that due to buffering,
+        the file on disk may not reflect the data written until close()
+        is called.
         """
-        self._check_can_read()
-        # Relies on the undocumented fact that BufferedReader.peek() always
-        # returns at least one byte (except at EOF)
-        return self._buffer.peek(size)
+        # Get the length of uncompressed data
+        if isinstance(data, (bytes, bytearray)):
+            length = len(data)
+        else:
+            # Accept any data that supports the buffer protocol
+            data = memoryview(data)
+            length = data.nbytes
+
+        # Compress
+        try:
+            compressed = self._compressor.compress(data)
+        except AttributeError:
+            self._check_mode(_MODE_WRITE)
+
+        # Write to file. If haven't gathered enough uncompressed data for one
+        # zstd block (128 KiB at most), `compressed` is b''.
+        if compressed:
+            self._fp.write(compressed)
+
+        self._pos += length
+        return length
+
+    def flush(self):
+        """Flush remaining data to the underlying stream.
+
+        It uses ZstdCompressor.FLUSH_BLOCK mode. Abuse of this method will
+        reduce compression ratio, use it only when necessary.
+
+        If the program is interrupted afterwards, all data can be recovered.
+        To ensure saving to disk, also need to use os.fsync(fd).
+
+        This method does nothing in reading mode.
+        """
+        # Like IOBase.flush(), do nothing in reading mode.
+        # TextIOWrapper.close() relies on this behavior.
+        if self._mode == _MODE_READ:
+            return
+
+        # Flush zstd block
+        try:
+            compressed = self._compressor.flush(ZstdCompressor.FLUSH_BLOCK)
+        except AttributeError:
+            # Closed, raise ValueError.
+            self._check_mode()
+
+        # Write to file
+        if compressed:
+            self._fp.write(compressed)
+
+        # Flush the file. Some file-like objects don't have .flush() method.
+        if hasattr(self._fp, "flush"):
+            self._fp.flush()
 
     def read(self, size=-1):
         """Read up to size uncompressed bytes from the file.
@@ -423,8 +499,10 @@ class ZstdFile(_compression.BaseStream):
         If size is negative or omitted, read until EOF is reached.
         Returns b"" if the file is already at EOF.
         """
-        self._check_can_read()
-        return self._buffer.read(size)
+        try:
+            return self._buffer.read(size)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
 
     def read1(self, size=-1):
         """Read up to size uncompressed bytes, while trying to avoid
@@ -433,10 +511,34 @@ class ZstdFile(_compression.BaseStream):
 
         Returns b"" if the file is at EOF.
         """
-        self._check_can_read()
         if size < 0:
-            size = 32*1024
-        return self._buffer.read1(size)
+            size = _32_KiB
+
+        try:
+            return self._buffer.read1(size)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
+    def readinto(self, b):
+        """Read bytes into b.
+
+        Returns the number of bytes read (0 for EOF).
+        """
+        try:
+            return self._buffer.readinto(b)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
+    def readinto1(self, b):
+        """Read bytes into b, while trying to avoid making multiple reads
+        from the underlying stream.
+
+        Returns the number of bytes read (0 for EOF).
+        """
+        try:
+            return self._buffer.readinto1(b)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
 
     def readline(self, size=-1):
         """Read a line of uncompressed bytes from the file.
@@ -445,21 +547,10 @@ class ZstdFile(_compression.BaseStream):
         non-negative, no more than size bytes will be read (in which
         case the line may be incomplete). Returns b'' if already at EOF.
         """
-        self._check_can_read()
-        return self._buffer.readline(size)
-
-    def write(self, data):
-        """Write a bytes object to the file.
-
-        Returns the number of uncompressed bytes written, which is
-        always len(data). Note that due to buffering, the file on disk
-        may not reflect the data written until close() is called.
-        """
-        self._check_can_write()
-        compressed = self._compressor.compress(data)
-        self._fp.write(compressed)
-        self._pos += len(data)
-        return len(data)
+        try:
+            return self._buffer.readline(size)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
 
     def seek(self, offset, whence=io.SEEK_SET):
         """Change the file position.
@@ -473,18 +564,80 @@ class ZstdFile(_compression.BaseStream):
 
         Returns the new file position.
 
-        Note that seeking is emulated, so depending on the parameters,
+        Note that seeking is emulated, so depending on the arguments,
         this operation may be extremely slow.
         """
-        self._check_can_seek()
-        return self._buffer.seek(offset, whence)
+        try:
+            # BufferedReader.seek() checks seekable
+            return self._buffer.seek(offset, whence)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+
+    def peek(self, size=-1):
+        """Return buffered data without advancing the file position.
+
+        Always returns at least one byte of data, unless at EOF.
+        The exact number of bytes returned is unspecified.
+        """
+        # Relies on the undocumented fact that BufferedReader.peek() always
+        # returns at least one byte (except at EOF)
+        try:
+            return self._buffer.peek(size)
+        except AttributeError:
+            self._check_mode(_MODE_READ)
 
     def tell(self):
         """Return the current file position."""
-        self._check_not_closed()
         if self._mode == _MODE_READ:
             return self._buffer.tell()
-        return self._pos
+        elif self._mode == _MODE_WRITE:
+            return self._pos
+
+        # Closed, raise ValueError.
+        self._check_mode()
+
+    def fileno(self):
+        """Return the file descriptor for the underlying file."""
+        try:
+            return self._fp.fileno()
+        except AttributeError:
+            # Closed, raise ValueError.
+            self._check_mode()
+
+    @property
+    def closed(self):
+        """True if this file is closed."""
+        return self._mode == _MODE_CLOSED
+
+    def writable(self):
+        """Return whether the file was opened for writing."""
+        if self._mode == _MODE_WRITE:
+            return True
+        elif self._mode == _MODE_READ:
+            return False
+
+        # Closed, raise ValueError.
+        self._check_mode()
+
+    def readable(self):
+        """Return whether the file was opened for reading."""
+        if self._mode == _MODE_READ:
+            return True
+        elif self._mode == _MODE_WRITE:
+            return False
+
+        # Closed, raise ValueError.
+        self._check_mode()
+
+    def seekable(self):
+        """Return whether the file supports seeking."""
+        if self._mode == _MODE_READ:
+            return self._buffer.seekable()
+        elif self._mode == _MODE_WRITE:
+            return False
+
+        # Closed, raise ValueError.
+        self._check_mode()
 
 
 # Copied from lzma module
@@ -496,19 +649,19 @@ def open(filename, mode="rb", *, level_or_option=None, zstd_dict=None,
     PathLike object), in which case the named file is opened, or it can be an
     existing file object to read from or write to.
 
-    The mode argument can be "r", "rb" (default), "w", "wb", "x", "xb", "a",
+    The mode parameter can be "r", "rb" (default), "w", "wb", "x", "xb", "a",
     "ab" for binary mode, or "rt", "wt", "xt", "at" for text mode.
 
-    The level_or_option and zstd_dict arguments specify the settings, as for
+    The level_or_option and zstd_dict parameters specify the settings, as for
     ZstdCompressor, ZstdDecompressor and ZstdFile.
 
-    When using read mode (decompression), the level_or_option argument can only
-    be a dict object, that represents decompression option. It doesn't support
-    int type compression level in this case.
+    When using read mode (decompression), the level_or_option parameter can
+    only be a dict object, that represents decompression option. It doesn't
+    support int type compression level in this case.
 
     For binary mode, this function is equivalent to the ZstdFile constructor:
     ZstdFile(filename, mode, ...). In this case, the encoding, errors and
-    newline arguments must not be provided.
+    newline parameters must not be provided.
 
     For text mode, an ZstdFile object is created, and wrapped in an
     io.TextIOWrapper instance with the specified encoding, error handling

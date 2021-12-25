@@ -1,11 +1,11 @@
 Introduction
 ------------
 
-``pyzstd`` module provides classes and functions for compressing and decompressing data, using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+Pyzstd module provides classes and functions for compressing and decompressing data, using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib module.
+The API is similar to Python's bz2/lzma/zlib modules.
 
-Includes zstd v1.5.0 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
+Includes zstd v1.5.1 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
 
 
 Links
@@ -18,9 +18,25 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.1  (Dec 25, 2021)**
+
+#. Update bundled zstd source code from v1.5.0 to `v1.5.1 <https://github.com/facebook/zstd/releases/tag/v1.5.1>`_.
+
+#. Fix ``ZstdFile.write()`` / ``train_dict()`` / ``finalize_dict()`` may use wrong length for some buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
+
+#. Two behavior changes:
+
+    * Setting ``CParameter.nbWorkers`` to ``1`` now means "1-thread multi-threaded mode", rather than "single-threaded mode".
+
+    * If the underlying zstd library doesn't support multi-threaded compression, no longer automatically fallback to "single-threaded mode", now raise a ``ZstdError`` exception.
+
+#. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
+
+#. Add a setup.py option ``--avx2``, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+
 **0.15.0  (May 18, 2021)**
 
-#. Update zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
+#. Update bundled zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
 
 #. Some improvements, no API changes.
 
@@ -32,7 +48,7 @@ Release note
 
 **0.14.3  (Mar 4, 2021)**
 
-Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
+Update bundled zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
 
 **0.14.2  (Feb 24, 2021)**
 
@@ -42,7 +58,7 @@ Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd
 
 **0.14.1  (Dec 19, 2020)**
 
-#. Update zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
+#. Update bundled zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
 
     * v1.4.6 is a non-public release for Linux kernel.
 
@@ -54,7 +70,7 @@ Update zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd
 
 #. ``ZstdDecompressor`` class: now it has the same API and behavior as BZ2Decompressor / LZMADecompressor classes in Python standard library, it stops after a frame is decompressed.
 
-#. Add an ``EndlessZstdDecompressor`` class, it accepts multiple concatenated frames. It is renamed from previous ``ZstdDecompressor`` class, but ``.at_frame_edge`` is ``True`` when both input and output streams are at a frame edge.
+#. Add an ``EndlessZstdDecompressor`` class, it accepts multiple concatenated frames. It is renamed from previous ``ZstdDecompressor`` class, but ``.at_frame_edge`` is ``True`` when both the input and output streams are at a frame edge.
 
 #. Rename ``zstd_open()`` function to ``open()``, consistent with Python standard library.
 

@@ -6,16 +6,12 @@ import io
 import os
 import re
 import sys
+import array
 import pathlib
 import pickle
 import random
 import tempfile
 import unittest
-from unittest import skipIf
-
-from test.support import (  # type: ignore
-    _1G, bigmemtest, run_unittest
-)
 
 import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
@@ -24,8 +20,8 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    compress, compress_stream, richmem_compress, \
                    decompress, decompress_stream, \
                    ZstdDict, train_dict, finalize_dict, \
-                   zstd_version, zstd_version_info, compressionLevel_values, \
-                   get_frame_info, get_frame_size, \
+                   zstd_version, zstd_version_info, zstd_support_multithread, \
+                   compressionLevel_values, get_frame_info, get_frame_size, \
                    ZstdFile, open
 
 if not hasattr(pyzstd, 'CFFI_PYZSTD'):
@@ -49,7 +45,8 @@ SAMPLES = None
 
 TRAINED_DICT = None
 
-MULTITHREADED = None
+KB = 1024
+MB = 1024*1024
 
 def setUpModule():
     global DECOMPRESSED_DAT
@@ -97,9 +94,6 @@ def setUpModule():
 
     global TRAINED_DICT
     TRAINED_DICT = train_dict(SAMPLES, 200*1024)
-
-    global MULTITHREADED
-    MULTITHREADED = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class FunctionsTestCase(unittest.TestCase):
 
@@ -497,9 +491,9 @@ class CompressorDecompressorTestCase(unittest.TestCase):
              CParameter.checksumFlag : 1,
              CParameter.dictIDFlag : 0,
 
-             CParameter.nbWorkers : 2 if MULTITHREADED else 0,
-             CParameter.jobSize : 50_000 if MULTITHREADED else 0,
-             CParameter.overlapLog : 9 if MULTITHREADED else 0,
+             CParameter.nbWorkers : 2 if zstd_support_multithread else 0,
+             CParameter.jobSize : 5*MB if zstd_support_multithread else 0,
+             CParameter.overlapLog : 9 if zstd_support_multithread else 0,
              }
         ZstdCompressor(level_or_option=d)
 
@@ -521,11 +515,19 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         compress(b'', {CParameter.compressionLevel:compressionLevel_values.min-1})
 
         # zstd lib doesn't support MT compression
-        if not MULTITHREADED:
-            with self.assertWarnsRegex(RuntimeWarning, r'multi-threaded'):
+        if not zstd_support_multithread:
+            with self.assertRaises(ZstdError):
                 ZstdCompressor({CParameter.nbWorkers:4})
-            ZstdCompressor({CParameter.jobSize:4})
-            ZstdCompressor({CParameter.overlapLog:4})
+            with self.assertRaises(ZstdError):
+                ZstdCompressor({CParameter.jobSize:4})
+            with self.assertRaises(ZstdError):
+                ZstdCompressor({CParameter.overlapLog:4})
+
+        # unknown parameter
+        with self.assertRaisesRegex(ZstdError,
+                      r'the 2th parameter \(key 654321\).*?invalid. \(zstd v'):
+            ZstdCompressor({CParameter.compressionLevel:3,
+                            654321:-12345})
 
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
@@ -541,8 +543,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         d2[DParameter.windowLogMax] = 32
         self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_zstd_multithread_compress(self):
         size = 40*1024*1024
         b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
@@ -576,8 +578,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_rich_mem_compress_warn(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
@@ -587,6 +589,70 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
+
+    def test_set_pledged_input_size(self):
+        DAT = DECOMPRESSED_100_PLUS_32KB
+        CHUNK_SIZE = len(DAT) // 3
+
+        # wrong value
+        c = ZstdCompressor()
+        with self.assertRaisesRegex(ValueError, r'64-bit unsigned integer'):
+            c._set_pledged_input_size(-300)
+
+        # wrong mode
+        c = ZstdCompressor(1)
+        c.compress(b'123456')
+        self.assertEqual(c.last_mode, c.CONTINUE)
+        with self.assertRaisesRegex(RuntimeError, r'\.last_mode == \.FLUSH_FRAME'):
+            c._set_pledged_input_size(300)
+
+        # None value
+        c = ZstdCompressor(1)
+        c._set_pledged_input_size(None)
+        dat = c.compress(DAT) + c.flush()
+
+        ret = get_frame_info(dat)
+        self.assertEqual(ret.decompressed_size, None)
+
+        # correct value
+        c = ZstdCompressor(1)
+        c._set_pledged_input_size(len(DAT))
+
+        chunks = []
+        posi = 0
+        while posi < len(DAT):
+            dat = c.compress(DAT[posi:posi+CHUNK_SIZE])
+            posi += CHUNK_SIZE
+            chunks.append(dat)
+
+        dat = c.flush()
+        chunks.append(dat)
+        chunks = b''.join(chunks)
+
+        ret = get_frame_info(chunks)
+        self.assertEqual(ret.decompressed_size, len(DAT))
+        self.assertEqual(decompress(chunks), DAT)
+
+        c._set_pledged_input_size(len(DAT)) # the second frame
+        dat = c.compress(DAT) + c.flush()
+
+        ret = get_frame_info(dat)
+        self.assertEqual(ret.decompressed_size, len(DAT))
+        self.assertEqual(decompress(dat), DAT)
+
+        # wrong value
+        c = ZstdCompressor(1)
+        c._set_pledged_input_size(len(DAT)+1)
+
+        chunks = []
+        posi = 0
+        while posi < len(DAT):
+            dat = c.compress(DAT[posi:posi+CHUNK_SIZE])
+            posi += CHUNK_SIZE
+            chunks.append(dat)
+
+        with self.assertRaises(ZstdError):
+            c.flush()
 
     def test_decompress_1byte(self):
         d = EndlessZstdDecompressor()
@@ -1671,7 +1737,7 @@ class ZstdDictTestCase(unittest.TestCase):
 
     def test_train_dict_arguments(self):
         with self.assertRaises(ValueError):
-            train_dict([], 100_000)
+            train_dict([], 100*KB)
 
         with self.assertRaises(ValueError):
             train_dict(SAMPLES, -100)
@@ -1682,17 +1748,17 @@ class ZstdDictTestCase(unittest.TestCase):
     def test_finalize_dict_arguments(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
-                finalize_dict({1:2}, [b'aaa', b'bbb'], 100_000, 2)
+                finalize_dict({1:2}, [b'aaa', b'bbb'], 100*KB, 2)
             return
 
         try:
-            finalize_dict(TRAINED_DICT, SAMPLES, 1_000_000, 2)
+            finalize_dict(TRAINED_DICT, SAMPLES, 1*MB, 2)
         except NotImplementedError:
             # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
             return
 
         with self.assertRaises(ValueError):
-            finalize_dict(TRAINED_DICT, [], 100_000, 2)
+            finalize_dict(TRAINED_DICT, [], 100*KB, 2)
 
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, -100, 2)
@@ -1700,7 +1766,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
-    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_train_dict_c(self):
         # argument wrong type
         with self.assertRaises(TypeError):
@@ -1718,7 +1784,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
-    @skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
     def test_finalize_dict_c(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
@@ -1726,7 +1792,7 @@ class ZstdDictTestCase(unittest.TestCase):
             return
 
         try:
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'123', [3,], 1_000_000, 5)
+            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'123', [3,], 1*MB, 5)
         except NotImplementedError:
             # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
             return
@@ -1750,6 +1816,45 @@ class ZstdDictTestCase(unittest.TestCase):
         # dict_size <= 0
         with self.assertRaises(ValueError):
             _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
+
+    def test_train_buffer_protocal_samples(self):
+        def _nbytes(dat):
+            if isinstance(dat, (bytes, bytearray)):
+                return len(dat)
+            return memoryview(dat).nbytes
+
+        # prepare samples
+        chunk_lst = []
+        wrong_size_lst = []
+        correct_size_lst = []
+        for _ in range(300):
+            arr = array.array('Q', [random.randint(0, 20) for i in range(20)])
+            chunk_lst.append(arr)
+            correct_size_lst.append(_nbytes(arr))
+            wrong_size_lst.append(len(arr))
+        concatenation = b''.join(chunk_lst)
+
+        # wrong size list
+        with self.assertRaisesRegex(ValueError,
+                "The samples size list doesn't match the concatenation's size"):
+            pyzstd._train_dict(concatenation, wrong_size_lst, 100*1024)
+
+        # correct size list
+        pyzstd._train_dict(concatenation, correct_size_lst, 100*1024)
+
+        # test _finalize_dict
+        if zstd_version_info < (1, 4, 5):
+            return
+
+        # wrong size list
+        with self.assertRaisesRegex(ValueError,
+                "The samples size list doesn't match the concatenation's size"):
+            pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+                                  concatenation, wrong_size_lst, 300*1024, 5)
+
+        # correct size list
+        pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+                              concatenation, correct_size_lst, 300*1024, 5)
 
 class OutputBufferTestCase(unittest.TestCase):
 
@@ -1914,7 +2019,7 @@ class OutputBufferTestCase(unittest.TestCase):
         # only decompress() function supports first frame with known size
 
         # 1 frame, the decompressed size is known
-        SIZE1 = 123_456
+        SIZE1 = 123456
         known_size = compress(b'a' * SIZE1)
 
         dat = decompress(known_size)
@@ -1928,19 +2033,21 @@ class OutputBufferTestCase(unittest.TestCase):
             dat = decompress(known_size + unkown_size)
             self.assertEqual(len(dat), SIZE1 + SIZE2)
 
-    @bigmemtest(size = 2*_1G, memuse = 2)
-    @skipIf(sys.maxsize <= 2**32, '64-bit build test')
-    def test_large_output(self, size):
-        SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
-        dat1 = self.compress_unknown_size(SIZE)
+    # def test_large_output(self):
+    #     SIZE = self.ACCUMULATED_SIZE[-1] + self.BLOCK_SIZE[-1] + 100_000
+    #     dat1 = self.compress_unknown_size(SIZE)
 
-        dat2 = decompress(dat1)
-        leng_dat2 = len(dat2)
-        del dat2
-        self.assertEqual(leng_dat2, SIZE)
+    #     try:
+    #         dat2 = decompress(dat1)
+    #     except MemoryError:
+    #         return
+
+    #     leng_dat2 = len(dat2)
+    #     del dat2
+    #     self.assertEqual(leng_dat2, SIZE)
 
     def test_endless_maxlength(self):
-        DECOMPRESSED_SIZE = 100_000
+        DECOMPRESSED_SIZE = 100*KB
         dat1 = compress(b'a' * DECOMPRESSED_SIZE, -3)
 
         # -1
@@ -2004,7 +2111,10 @@ class FileTestCase(unittest.TestCase):
 
     def test_init_with_PathLike_filename(self):
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            filename = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
 
         with ZstdFile(filename, "a") as f:
             f.write(DECOMPRESSED_100_PLUS_32KB)
@@ -2020,7 +2130,10 @@ class FileTestCase(unittest.TestCase):
 
     def test_init_with_filename(self):
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            filename = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
 
         with ZstdFile(filename) as f:
             pass
@@ -2049,7 +2162,10 @@ class FileTestCase(unittest.TestCase):
 
     def test_init_with_x_mode(self):
         with tempfile.NamedTemporaryFile() as tmp_f:
-            filename = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
 
         for mode in ("x", "xb"):
             with ZstdFile(filename, mode):
@@ -2083,20 +2199,13 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "rw")
 
-        # doesn't raise ZstdError, due to:
-        # (DParameter.windowLogMax == CParameter.compressionLevel == 100)
-        if DParameter.windowLogMax == CParameter.compressionLevel:
-            ZstdFile(BytesIO(), "w",
-                     level_or_option={DParameter.windowLogMax:compressionLevel_values.max})
-
-            ZstdFile(BytesIO(), "w",
-                     level_or_option={DParameter.windowLogMax:compressionLevel_values.max+1})
+        with self.assertRaisesRegex(TypeError, r"NOT be CParameter"):
+            ZstdFile(BytesIO(), 'rb', level_or_option={CParameter.compressionLevel:5})
+        with self.assertRaisesRegex(TypeError, r"NOT be DParameter"):
+            ZstdFile(BytesIO(), 'wb', level_or_option={DParameter.windowLogMax:21})
 
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option=12)
-
-        with self.assertRaises(ZstdError):
-            ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option={CParameter.checksumFlag:1})
 
     def test_init_bad_check(self):
         with self.assertRaises(TypeError):
@@ -2137,7 +2246,10 @@ class FileTestCase(unittest.TestCase):
 
         # Test with a real file on disk, opened directly by LZMAFile.
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            filename = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
 
         f = ZstdFile(filename)
         fp = f._fp
@@ -2177,7 +2289,10 @@ class FileTestCase(unittest.TestCase):
 
         # 2
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            filename = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
 
         f = ZstdFile(filename)
         try:
@@ -2188,6 +2303,14 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.fileno)
 
         os.remove(filename)
+
+        # 3, no .fileno() method
+        class C:
+            def read(self, size=-1):
+                return b'123'
+        with ZstdFile(C(), 'rb') as f:
+            with self.assertRaisesRegex(AttributeError, r'fileno'):
+                f.fileno()
 
     def test_seekable(self):
         f = ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB))
@@ -2615,6 +2738,107 @@ class FileTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
+    def test_UnsupportedOperation(self):
+        # 1
+        with ZstdFile(BytesIO(), 'r') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.write(b'1234')
+
+        # 2
+        class T:
+            def read(self, size):
+                return b'a' * size
+
+        with self.assertRaises(AttributeError): # on close
+            with ZstdFile(T(), 'w') as f:
+                with self.assertRaises(AttributeError): # on write
+                    f.write(b'1234')
+
+        # 3
+        with ZstdFile(BytesIO(), 'w') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.read(100)
+            with self.assertRaises(io.UnsupportedOperation):
+                f.seek(100)
+
+        self.assertEqual(f.closed, True)
+        with self.assertRaises(ValueError):
+            f.readable()
+        with self.assertRaises(ValueError):
+            f.tell()
+        with self.assertRaises(ValueError):
+            f.read(100)
+
+    def test_read_readinto_readinto1(self):
+        lst = []
+        with ZstdFile(BytesIO(COMPRESSED_THIS_FILE*5)) as f:
+            while True:
+                method = random.randint(0, 2)
+                size = random.randint(1, 300)
+
+                if method == 0:
+                    dat = f.read(size)
+                    if not dat:
+                        break
+                    lst.append(dat)
+                elif method == 1:
+                    ba = bytearray(size)
+                    read_size = f.readinto(ba)
+                    if read_size == 0:
+                        break
+                    lst.append(bytes(ba[:read_size]))
+                elif method == 2:
+                    ba = bytearray(size)
+                    read_size = f.readinto1(ba)
+                    if read_size == 0:
+                        break
+                    lst.append(bytes(ba[:read_size]))
+        self.assertEqual(b''.join(lst), THIS_FILE_BYTES*5)
+
+    def test_zstdfile_flush(self):
+        # closed
+        f = ZstdFile(BytesIO(), 'w')
+        f.close()
+        with self.assertRaises(ValueError):
+            f.flush()
+
+        # read
+        with ZstdFile(BytesIO(), 'r') as f:
+            # does nothing for read-only stream
+            f.flush()
+
+        # write
+        DAT = b'abcd'
+        bi = BytesIO()
+        with ZstdFile(bi, 'w') as f:
+            self.assertEqual(f.write(DAT), len(DAT))
+            self.assertEqual(f.tell(), len(DAT))
+            self.assertEqual(bi.tell(), 0) # not enough for a block
+
+            self.assertEqual(f.flush(), None)
+            self.assertEqual(f.tell(), len(DAT))
+            self.assertGreater(bi.tell(), 0) # flushed
+
+        # write, no .flush() method
+        class C:
+            def write(self, b):
+                pass
+        with ZstdFile(C(), 'w') as f:
+            self.assertEqual(f.write(DAT), len(DAT))
+            self.assertEqual(f.tell(), len(DAT))
+
+            self.assertEqual(f.flush(), None)
+            self.assertEqual(f.tell(), len(DAT))
+
+    def test_zstdfile_truncate(self):
+        with ZstdFile(BytesIO(), 'w') as f:
+            with self.assertRaises(io.UnsupportedOperation):
+                f.truncate(200)
+
+    def test_zstdfile_iter_issue45475(self):
+        lines = [l for l in ZstdFile(BytesIO(COMPRESSED_THIS_FILE))]
+        self.assertGreater(len(lines), 0)
+
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):
@@ -2633,23 +2857,26 @@ class OpenTestCase(unittest.TestCase):
     def test_text_modes(self):
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
 
-        with open(BytesIO(COMPRESSED_THIS_FILE), "rt") as f:
+        with open(BytesIO(COMPRESSED_THIS_FILE), "rt", encoding="utf-8") as f:
             self.assertEqual(f.read(), uncompressed)
 
         with BytesIO() as bio:
-            with open(bio, "wt") as f:
+            with open(bio, "wt", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
 
-            with open(bio, "at") as f:
+            with open(bio, "at", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed * 2)
 
     def test_bad_params(self):
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            TESTFN = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                TESTFN = pathlib.Path(tmp_f.name)
+            else:
+                TESTFN = tmp_f.name
 
         with self.assertRaises(ValueError):
             open(TESTFN, "")
@@ -2697,20 +2924,27 @@ class OpenTestCase(unittest.TestCase):
         # Test with explicit newline (universal newline mode disabled).
         text = THIS_FILE_STR.replace(os.linesep, "\n")
         with BytesIO() as bio:
-            with open(bio, "wt", newline="\n") as f:
+            with open(bio, "wt", encoding="utf-8", newline="\n") as f:
                 f.write(text)
             bio.seek(0)
-            with open(bio, "rt", newline="\r") as f:
+            with open(bio, "rt", encoding="utf-8", newline="\r") as f:
                 self.assertEqual(f.readlines(), [text])
 
     def test_x_mode(self):
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            TESTFN = pathlib.Path(tmp_f.name)
+            if sys.version_info >= (3, 6):
+                TESTFN = pathlib.Path(tmp_f.name)
+            else:
+                TESTFN = tmp_f.name
 
         for mode in ("x", "xb", "xt"):
             os.remove(TESTFN)
 
-            with open(TESTFN, mode):
+            if mode == "xt":
+                encoding = "utf-8"
+            else:
+                encoding = None
+            with open(TESTFN, mode, encoding=encoding):
                 pass
             with self.assertRaises(FileExistsError):
                 with open(TESTFN, mode):
@@ -2729,6 +2963,15 @@ class OpenTestCase(unittest.TestCase):
 
         self.assertEqual(dat, SAMPLES[0])
 
+    def test_buffer_protocol(self):
+        # don't use len() for buffer protocol objects
+        arr = array.array("i", range(1000))
+        LENGTH = len(arr) * arr.itemsize
+
+        with open(BytesIO(), "wb") as f:
+            self.assertEqual(f.write(arr), LENGTH)
+            self.assertEqual(f.tell(), LENGTH)
+
 class StreamFunctionsTestCase(unittest.TestCase):
 
     def test_compress_stream(self):
@@ -2737,7 +2980,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         ret = compress_stream(bi, bo,
                               level_or_option=1, zstd_dict=TRAINED_DICT,
                               pledged_input_size=2**64-1, # backward compatible
-                              read_size=200_000, write_size=200_000)
+                              read_size=200*KB, write_size=200*KB)
         output = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(output)))
         self.assertEqual(decompress(output, TRAINED_DICT), THIS_FILE_BYTES)
@@ -2817,8 +3060,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         self.assertEqual(in_dat, THIS_FILE_BYTES)
         self.assertEqual(decompress(out_dat), THIS_FILE_BYTES)
 
-    @skipIf(CParameter.nbWorkers.bounds() == (0, 0),
-            "zstd build doesn't support multi-threaded compression")
+    @unittest.skipIf(not zstd_support_multithread,
+                     "zstd build doesn't support multi-threaded compression")
     def test_compress_stream_multi_thread(self):
         size = 40*1024*1024
         b = THIS_FILE_BYTES * (size // len(THIS_FILE_BYTES))
@@ -2841,7 +3084,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bo = BytesIO()
         ret = decompress_stream(bi, bo,
                                 option={DParameter.windowLogMax:26},
-                                read_size=200_000, write_size=200_000)
+                                read_size=200*KB, write_size=200*KB)
         self.assertEqual(ret, (len(COMPRESSED_THIS_FILE), len(THIS_FILE_BYTES)))
         self.assertEqual(bo.getvalue(), THIS_FILE_BYTES)
         bi.close()
@@ -2904,7 +3147,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         dat = (COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME) * 2
         bi = BytesIO(dat)
         bo = BytesIO()
-        ret = decompress_stream(bi, bo, read_size=200_000, write_size=50_000)
+        ret = decompress_stream(bi, bo, read_size=200*KB, write_size=50*KB)
         output = bo.getvalue()
         self.assertEqual(ret, (len(dat), len(output)))
         self.assertEqual(output, DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_100_PLUS_32KB)
@@ -2965,18 +3208,16 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
             decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
+    def test_empty_input_no_callback(self):
+        def cb(a,b,c,d):
+            self.fail('callback function should not be called')
+        # callback function will not be called for empty input,
+        # it's a promised behavior.
+        compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+        decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+
 def test_main():
-    run_unittest(
-        FunctionsTestCase,
-        ClassShapeTestCase,
-        CompressorDecompressorTestCase,
-        DecompressorFlagsTestCase,
-        ZstdDictTestCase,
-        OutputBufferTestCase,
-        FileTestCase,
-        OpenTestCase,
-        StreamFunctionsTestCase,
-    )
+    unittest.main()
 
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.

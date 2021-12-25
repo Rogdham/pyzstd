@@ -5,21 +5,18 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
-  CIBW_BUILD: "cp36-* cp37-* cp38-* cp39-* cp310-* pp37-*"
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+  CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
-  build_wheels:
-    name: Build wheels on ${{ matrix.platform }}
+  # Run test on Ubuntu/macOS/Windows for every commit
+  run_test:
+    name: Test on ${{ matrix.platform }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
-
-    env:
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
-      CIBW_ARCHS_MACOS: "x86_64 arm64"
 
     steps:
       - uses: actions/checkout@v2
@@ -27,32 +24,76 @@ jobs:
 
       - name: Run test
         run: |
-          python setup.py install
+          python setup.py install --warning-as-error
           python tests/test_zstd.py
 
+  # Run test on PyPy for every commit
+  test_on_pypy:
+    name: Test on ${{ matrix.py }}
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        py: ['pypy-3.6', 'pypy-3.7', 'pypy-3.8']
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: ${{ matrix.py }}
+
+      - name: Build & test
+        run: |
+          sudo apt-get install -q -y zstd libzstd1 libzstd-dev
+          python setup.py --dynamic-link-zstd install
+          python tests/test_zstd.py
+
+  # Build Linux/macOS/Windows wheels
+  build_wheels:
+    name: Build wheels on ${{ matrix.platform }}
+    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
+    runs-on: ${{ matrix.platform }}
+
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+
+    env:
+      # generate manylinux2014_x86_64 wheels
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
+      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2014
+      # generate manylinux1_i686 wheels
+      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
+      CIBW_MANYLINUX_PYPY_I686_IMAGE: manylinux2014
+      # macOS archs
+      CIBW_ARCHS_MACOS: "x86_64 arm64"
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+
       - name: Install cibuildwheel & build wheels
-        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
         run: |
           python -m pip install -U cibuildwheel
           python -m cibuildwheel --output-dir wheelhouse
 
       - name: Upload wheels
-        if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
         uses: actions/upload-artifact@v2
         with:
           name: pyzstd-files
           path: wheelhouse/*.whl
 
-  # Build source distribution & manylinux1_x86_64
+  # Build source distribution & manylinux1_x86_64 wheels
   build_in_manylinux2010:
     name: Build in manylinux2010 environment
     if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
     runs-on: ubuntu-latest
 
     env:
+      # generate manylinux1_x86_64 wheels
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
+      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
-      CIBW_SKIP: pp*
 
     steps:
       - uses: actions/checkout@v2
@@ -85,9 +126,11 @@ jobs:
     strategy:
       matrix:
         arch: [aarch64, ppc64le, s390x]
+        skip_image: ["*musllinux*", "*manylinux*"]
 
     env:
       CIBW_ARCHS: ${{ matrix.arch }}
+      CIBW_SKIP:  ${{ matrix.skip_image }}
 
     steps:
       - uses: actions/checkout@v2
@@ -107,43 +150,22 @@ jobs:
           name: pyzstd-files
           path: wheelhouse/*.whl
 
-  # Run test on PyPy
-  test_on_pypy:
-    name: Test on ${{ matrix.py }}
+  # If the head commit message contains '<more-tests>', run test on
+  # armv6/armv7/aarch64/ppc64le/s390x architectures.
+  test_on_arches:
+    name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
     runs-on: ubuntu-latest
 
     strategy:
       matrix:
-        py: ['pypy-3.6', 'pypy-3.7']
-
-    steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
-        with:
-          python-version: ${{ matrix.py }}
-
-      - name: Build & test
-        run: |
-          sudo apt-get install -q -y zstd libzstd1 libzstd-dev
-          python setup.py --dynamic-link-zstd install
-          python tests/test_zstd.py
-
-  # Run test on armv7/aarch64/ppc64le/s390x
-  test_on_arches:
-    name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-    # The host should always be Linux
-    runs-on: ubuntu-20.04
-
-    strategy:
-      matrix:
-        arch: [armv7, aarch64, ppc64le, s390x]
-        distro: [ubuntu20.04]
+        arch: [armv6, armv7, aarch64, ppc64le, s390x]
+        distro: [bullseye]  # Debian 11
 
     steps:
       - uses: actions/checkout@v2
 
-      - uses: uraimo/run-on-arch-action@v2.0.9
+      - uses: uraimo/run-on-arch-action@v2.1.1
         name: Build & run test
         with:
           arch: ${{ matrix.arch }}
@@ -151,19 +173,35 @@ jobs:
 
           install: |
             apt-get update -q -y
-            apt-get install -q -y python3 python3-pip build-essential gcc
+            apt-get install -q -y python3 python3-dev python3-pip build-essential gcc
 
           run: |
             python3 -c "import platform;print('Machine type:', platform.machine())"
-            python3 -m pip install -U setuptools
-            python3 setup.py install
+            python3 setup.py install --warning-as-error
             python3 tests/test_zstd.py
+
+  # If the head commit message contains '<more-tests>', test on
+  # minimum version of CPython.
+  test_on_minimum_cpython:
+    name: Test on minimum version of CPython
+    if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions/setup-python@v2
+        with:
+          python-version: '3.5'
+
+      - name: Run test
+        run: |
+          python setup.py install --warning-as-error
+          python tests/test_zstd.py
 
   # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
-    needs: [build_wheels, build_in_manylinux2010, build_arch_wheels,
-            test_on_pypy, test_on_arches]
+    needs: [build_wheels, build_in_manylinux2010, build_arch_wheels]
     runs-on: ubuntu-latest
 
     steps:

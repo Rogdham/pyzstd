@@ -1,11 +1,11 @@
-.. title:: pyzstd moudle
+.. title:: pyzstd module
 
 Introduction
 ------------
 
-pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+Pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib module.
+The API is similar to Python's bz2/lzma/zlib modules.
 
 Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
 
@@ -43,8 +43,8 @@ Simple compression/decompression
     .. hint::
         If there are a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
-        * compression: :py:class:`ZstdCompressor`, :py:class:`RichMemZstdCompressor`.
-        * decompression: :py:class:`EndlessZstdDecompressor`.
+        * :py:class:`ZstdCompressor`
+        * :py:class:`RichMemZstdCompressor`
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -80,7 +80,7 @@ Simple compression/decompression
 
     Decompress *data*, return the decompressed data.
 
-    Support multiple concatenated frames.
+    Support multiple concatenated :ref:`frames<frame_block>`.
 
     :param data: Data to be decompressed.
     :type data: bytes-like object
@@ -160,25 +160,25 @@ Streaming compression
 
     If input stream is ``b''``, nothing will be written to output stream.
 
-    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
+    This function tries to zero-copy as much as possible. If the OS has read prefetching and write buffer, it may perform the tasks (read/compress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
     .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this parameter can be ``None``.
     :param level_or_option: When it's an ``int`` object, it represents :ref:`compression level<compression_level>`. When it's a ``dict`` object, it contains :ref:`advanced compression parameters<CParameter>`. The default value ``None`` means to use zstd's default compression level/parameters.
     :type level_or_option: int or dict
     :param zstd_dict: Pre-trained dictionary for compression.
     :type zstd_dict: ZstdDict
-    :param pledged_input_size: If set this argument to the size of input data, the :ref:`size<content_size>` will be written into frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
+    :param pledged_input_size: If set this parameter to the size of input data, the :ref:`size<content_size>` will be written into the frame header. If the actual input data doesn't match it, a :py:class:`ZstdError` exception will be raised. It may increase compression ratio slightly, and help decompression code to allocate output buffer faster.
     :type pledged_input_size: int
     :param read_size: Input buffer size, in bytes.
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
@@ -205,14 +205,19 @@ Streaming compression
                 compress_stream(ifh, bo)
                 compressed_dat = bo.getvalue()
 
-        # with callback function
-        def func(total_input, total_output, read_data, write_data):
-            percent = 100 * total_input / input_file_size
-            print(f'Progress: {percent:.1f}%')
+        # Print progress using callback function
+        def compress_print_progress(input_file_path, output_file_path):
+            input_file_size = os.path.getsize(input_file_path)
 
-        with io.open(input_file_path, 'rb') as ifh:
-            with io.open(output_file_path, 'wb') as ofh:
-                compress_stream(ifh, ofh, callback=func)
+            def func(total_input, total_output, read_data, write_data):
+                # If input stream is empty, the callback function
+                # will not be called. So no ZeroDivisionError here.
+                percent = 100 * total_input / input_file_size
+                print(f'Progress: {percent:.1f}%', end='\r')
+
+            with io.open(input_file_path, 'rb') as ifh:
+                with io.open(output_file_path, 'wb') as ofh:
+                    compress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdCompressor
@@ -254,29 +259,29 @@ Streaming compression
 
         The last mode used to this compressor, its value can be :py:attr:`~ZstdCompressor.CONTINUE`, :py:attr:`~ZstdCompressor.FLUSH_BLOCK`, :py:attr:`~ZstdCompressor.FLUSH_FRAME`. Initialized to :py:attr:`~ZstdCompressor.FLUSH_FRAME`.
 
-        It can be used to get the current state of a compressor, such as, a block ends, a frame ends.
+        It can be used to get the current state of a compressor, such as, data flushed, a frame ended.
 
     .. py:attribute:: CONTINUE
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress` method.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress` method.
 
         Collect more data, encoder decides when to output compressed result, for optimal compression ratio. Usually used for traditional streaming compression.
 
     .. py:attribute:: FLUSH_BLOCK
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
-        Flush any remaining data, but don't close current :ref:`frame<frame_block>`. Usually used for communication scenarios.
+        Flush any remaining data, but don't close the current :ref:`frame<frame_block>`. Usually used for communication scenarios.
 
-        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception.
+        If there is data, it creates at least one new :ref:`block<frame_block>`, that can be decoded immediately on reception. If no remaining data, no block is created, return ``b''``.
 
         **Note**: Abuse of this mode will reduce compression ratio. Use it only when necessary.
 
     .. py:attribute:: FLUSH_FRAME
 
-        Used for *mode* argument in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
+        Used for *mode* parameter in :py:meth:`~ZstdCompressor.compress`, :py:meth:`~ZstdCompressor.flush` methods.
 
-        Flush any remaining data, and close current :ref:`frame<frame_block>`. Usually used for traditional flush.
+        Flush any remaining data, and close the current :ref:`frame<frame_block>`. Usually used for traditional flush.
 
         Since zstd data consists of one or more independent frames, data can still be provided after a frame is closed.
 
@@ -314,16 +319,16 @@ Streaming decompression
 
     A fast and convenient function, decompresses *input_stream* and writes the decompressed data to *output_stream*, it doesn't close the streams.
 
-    Supports multiple concatenated frames.
+    Supports multiple concatenated :ref:`frames<frame_block>`.
 
-    This function tries to zero-copy as much as possible. If the OS has read prefetch and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
+    This function tries to zero-copy as much as possible. If the OS has read prefetching and write buffer, it may perform the tasks (read/decompress/write) in parallel to some degree.
 
     The default values of *read_size* and *write_size* parameters are the buffer sizes recommended by zstd, increasing them may be faster, and reduces the number of callback function calls.
 
     .. versionadded:: 0.14.2
 
     :param input_stream: Input stream that has a `.readinto(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.readinto>`_ method.
-    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this argument can be ``None``.
+    :param output_stream: Output stream that has a `.write(b) <https://docs.python.org/3/library/io.html#io.RawIOBase.write>`_ method. If use *callback* function, this parameter can be ``None``.
     :param zstd_dict: Pre-trained dictionary for decompression.
     :type zstd_dict: ZstdDict
     :param option: A ``dict`` object, contains :ref:`advanced decompression parameters<DParameter>`.
@@ -332,7 +337,7 @@ Streaming decompression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.
@@ -360,14 +365,19 @@ Streaming decompression
                 decompress_stream(ifh, bo)
                 decompressed_dat = bo.getvalue()
 
-        # with callback function
-        def func(total_input, total_output, read_data, write_data):
-            percent = 100 * total_input / input_file_size
-            print(f'Progress: {percent:.1f}%')
+        # Print progress using callback function
+        def decompress_print_progress(input_file_path, output_file_path):
+            input_file_size = os.path.getsize(input_file_path)
 
-        with io.open(input_file_path, 'rb') as ifh:
-            with io.open(output_file_path, 'wb') as ofh:
-                decompress_stream(ifh, ofh, callback=func)
+            def func(total_input, total_output, read_data, write_data):
+                # If input stream is empty, the callback function
+                # will not be called. So no ZeroDivisionError here.
+                percent = 100 * total_input / input_file_size
+                print(f'Progress: {percent:.1f}%', end='\r')
+
+            with io.open(input_file_path, 'rb') as ifh:
+                with io.open(output_file_path, 'wb') as ofh:
+                    decompress_stream(ifh, ofh, callback=func)
 
 
 .. py:class:: ZstdDecompressor
@@ -444,10 +454,9 @@ Streaming decompression
 
 .. py:class:: EndlessZstdDecompressor
 
-    It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used in these scenarios:
+    A streaming decompressor.
 
-        * Streaming decompression for multiple concatenated frames.
-        * Reuse for big number of same type individual data. (Compared to :py:func:`decompress` function, significantly faster on Windows, no significant improvement on Linux.)
+    It doesn't stop after a :ref:`frame<frame_block>` is decompressed, can be used to decompress multiple concatenated frames.
 
     Thread-safe at method level.
 
@@ -467,13 +476,13 @@ Streaming decompression
 
     .. py:attribute:: at_frame_edge
 
-        ``True`` when both input and output streams are at a :ref:`frame<frame_block>` edge, or the decompressor just be initialized.
+        ``True`` when both the input and output streams are at a :ref:`frame<frame_block>` edge, or the decompressor just be initialized.
 
         This flag could be used to check data integrity in some cases.
 
     .. sourcecode:: python
 
-        # --- streaming decomression, unlimited output ---
+        # --- streaming decompression, unlimited output ---
         d1 = EndlessZstdDecompressor()
 
         decompressed_dat1 = d1.decompress(dat1)
@@ -482,7 +491,7 @@ Streaming decompression
 
         assert d1.at_frame_edge, 'data ends in an incomplete frame.'
 
-        # --- streaming decomression, limited output ---
+        # --- streaming decompression, limited output ---
         d2 = EndlessZstdDecompressor()
 
         while True:
@@ -497,19 +506,6 @@ Streaming decompression
 
             chunk = d2.decompress(dat, 10*1024*1024) # limit output buffer to 10 MiB
             write_output(chunk)
-
-        # --- reuse for same type individual data ---
-
-        # reuse an object may eliminate the small overhead of creating
-        # context / setting parameters / loading dictionary.
-        d3 = EndlessZstdDecompressor()
-        for compressed_data in data_source():
-            decompressed_data = d3.decompress(compressed_data)
-
-            # check data integrity
-            if not d3.at_frame_edge:
-                decompressed_data = None  # decompressed data is incomplete
-                d3 = EndlessZstdDecompressor() # reset decompressor
 
     .. hint:: Why :py:class:`EndlessZstdDecompressor` doesn't stop at frame edges?
 
@@ -530,7 +526,7 @@ Dictionary
         * function :py:func:`finalize_dict`
 
 .. note::
-    If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically, has best effect on data that smaller than 1 KiB.
+    If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically.
 
     **Attention**
 
@@ -544,6 +540,13 @@ Dictionary
 
     Zstd training mode can be used to tune the algorithm for a selected type of data. Training is achieved by providing it with a few samples (one file per sample). The result of this training is stored in a file called "dictionary", which must be loaded before compression and decompression.
 
+    See the FAQ in `this file <https://github.com/facebook/zstd/blob/dev/lib/zdict.h>`_ for details.
+
+    **Advanced dictionary training**
+
+    Pyzstd module only uses zstd library's stable API. The stable API only exposes two dictionary training functions that corresponding to :py:func:`train_dict` and :py:func:`finalize_dict`.
+
+    If want to adjust advanced training parameters, you may use zstd's CLI program, it has entries to zstd library's experimental API.
 
 .. py:class:: ZstdDict
 
@@ -632,14 +635,14 @@ Module-level functions
 
     This section contains:
 
-        * function :py:func:`get_frame_info`, get frame infomation from frame header.
+        * function :py:func:`get_frame_info`, get frame information from a frame header.
         * function :py:func:`get_frame_size`, get a frame's size.
 
 .. py:function:: get_frame_info(frame_buffer)
 
-    Get zstd frame infomation from a frame header.
+    Get zstd frame information from a frame header.
 
-    Return a two-items namedtuple: (decompressed_size, dictionary_id)
+    Return a 2-item namedtuple: (decompressed_size, dictionary_id)
 
     If ``decompressed_size`` is ``None``, decompressed size is unknown.
 
@@ -684,7 +687,8 @@ Module-level variables
 
         * :py:data:`zstd_version`, a ``str``.
         * :py:data:`zstd_version_info`, a ``tuple``.
-        * :py:data:`compressionLevel_values`, some values defined by underlying zstd library.
+        * :py:data:`compressionLevel_values`, some values defined by the underlying zstd library.
+        * :py:data:`zstd_support_multithread`, whether the underlying zstd library supports multi-threaded compression.
 
 .. py:data:: zstd_version
 
@@ -708,16 +712,32 @@ Module-level variables
 
 .. py:data:: compressionLevel_values
 
-    A three-items namedtuple, values defined by underlying zstd library, see :ref:`compression level<compression_level>` for details.
+    A 3-item namedtuple, values defined by the underlying zstd library, see :ref:`compression level<compression_level>` for details.
 
-    ``default`` is default compression level, it is used when compression level is set to ``0``.
+    ``default`` is default compression level, it is used when compression level is set to ``0`` or not set.
 
-    ``min``/``max`` are minimum/maximum avaliable values of compression level, both inclusive.
+    ``min``/``max`` are minimum/maximum available values of compression level, both inclusive.
 
 .. sourcecode:: python
 
     >>> pyzstd.compressionLevel_values  # 131072 = 128*1024
     values(default=3, min=-131072, max=22)
+
+
+.. py:data:: zstd_support_multithread
+
+    Whether the underlying zstd library was compiled with :ref:`multi-threaded compression<mt_compression>` support.
+
+    It's almost always ``True``.
+
+    It's ``False`` when dynamically linked to zstd library that compiled without multi-threaded support. Ordinary users will not meet this situation.
+
+.. versionadded:: 0.15.1
+
+.. sourcecode:: python
+
+    >>> pyzstd.zstd_support_multithread
+    True
 
 
 ZstdFile class and open() function
@@ -727,27 +747,69 @@ ZstdFile class and open() function
 
     Open a zstd-compressed file in binary mode.
 
-    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. You may read their documentation.
+    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library.
 
-    This class can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
+    Like BZ2File/GzipFile/LZMAFile classes, ZstdFile is not thread-safe, so if you need to use a single ZstdFile object from multiple threads, it is necessary to protect it with a lock.
+
+    It can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
 
     .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
-        When using read mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+        The *filename* parameter can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
+
+        The *mode* parameter can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
+
+        If in reading mode (decompression):
+
+            * The *level_or_option* parameter can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+            * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
+
+    In writing mode (compression), these methods are available:
+
+        * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
+        * `.flush() <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. It uses :py:attr:`ZstdCompressor.FLUSH_BLOCK` mode, abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Implemented in version 0.15.1*)
+
+    In reading mode (decompression), these methods and statement are available:
+
+        * `.read(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read>`_
+        * `.read1(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.read1>`_
+        * `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_
+        * `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_
+        * `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_
+        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if ``.seek()`` to "previous position" or "position relative to EOF (the first time)", the decompression has to be restarted from zero.
+        * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
+        * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
+
+    In both reading and writing modes, these methods and property are available:
+
+        * `.close() <https://docs.python.org/3/library/io.html#io.IOBase.close>`_
+        * `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_
+        * `.fileno() <https://docs.python.org/3/library/io.html#io.IOBase.fileno>`_
+        * `.closed <https://docs.python.org/3/library/io.html#io.IOBase.closed>`_ (a property attribute)
+        * `.writable() <https://docs.python.org/3/library/io.html#io.IOBase.writable>`_
+        * `.readable() <https://docs.python.org/3/library/io.html#io.IOBase.readable>`_
+        * `.seekable() <https://docs.python.org/3/library/io.html#io.IOBase.seekable>`_
 
 .. py:function:: open(filename, mode="rb", *, level_or_option=None, zstd_dict=None, encoding=None, errors=None, newline=None)
 
-    Open a zstd-compressed file in binary or text mode, returning a file object (:py:class:`ZstdFile` or `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_).
+    Open a zstd-compressed file in binary or text mode, returning a file object.
 
-    This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library. You may read their documentation.
+    This function is very similar to `bz2.open() <https://docs.python.org/3/library/bz2.html#bz2.open>`_ / `gzip.open() <https://docs.python.org/3/library/gzip.html#gzip.open>`_ / `lzma.open() <https://docs.python.org/3/library/lzma.html#lzma.open>`_ functions in Python standard library.
 
-    When using read mode (decompression), the *level_or_option* argument can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+    The *filename* parameter can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the returned file object is closed.
 
+    The *mode* parameter can be any of "r", "rb", "w", "wb", "x", "xb", "a" or "ab" for binary mode, or "rt", "wt", "xt", or "at" for text mode. The default is "rb".
+
+    If in reading mode (decompression), the *level_or_option* parameter can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
+
+    In binary mode, a :py:class:`ZstdFile` object is returned.
+
+    In text mode, a :py:class:`ZstdFile` object is created, and wrapped in an `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_ object with the specified encoding, error handling behavior, and line ending(s).
 
 Advanced parameters
 -------------------
 
-    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclass of IntEnum, used for setting advanced parameters.
+    This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclasses of ``IntEnum``, used for setting advanced parameters.
 
     :py:class:`CParameter` class' attributes:
 
@@ -773,10 +835,6 @@ Advanced parameters
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`CParameter` name, the value is a 32-bit signed integer value.
 
-    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
-
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
-
     .. sourcecode:: python
 
         option = {CParameter.compressionLevel : 10,
@@ -789,6 +847,10 @@ Advanced parameters
         c = ZstdCompressor(level_or_option=option)
         compressed_dat1 = c.compress(raw_dat)
         compressed_dat2 = c.flush()
+
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be clamped silently.
+
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. py:method:: bounds(self)
 
@@ -815,11 +877,11 @@ Advanced parameters
 
         Larger values requiring more memory and typically compressing more.
 
-        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.4.8, means 128 MiB (1 << 27).
+        This will set a memory budget for streaming decompression. Using a value greater than ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` requires explicitly allowing such size at streaming decompression stage, see :py:attr:`DParameter.windowLogMax`. ``ZSTD_WINDOWLOG_LIMIT_DEFAULT`` is 27 in zstd v1.2+, means 128 MiB (1 << 27).
 
         Must be clamped between ``ZSTD_WINDOWLOG_MIN`` and ``ZSTD_WINDOWLOG_MAX``.
 
-        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default windowLog", then the value is dynamically set, see "W" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: hashLog
 
@@ -829,7 +891,7 @@ Advanced parameters
 
         Larger tables improve compression ratio of strategies <= :py:attr:`~Strategy.dfast`, and improve speed of strategies > :py:attr:`~Strategy.dfast`.
 
-        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default hashLog", then the value is dynamically set, see "H" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: chainLog
 
@@ -843,7 +905,7 @@ Advanced parameters
 
         It's still useful when using :py:attr:`~Strategy.dfast` strategy, in which case it defines a secondary probe table.
 
-        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default chainLog", then the value is dynamically set, see "C" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: searchLog
 
@@ -853,7 +915,7 @@ Advanced parameters
 
         This parameter is useless for :py:attr:`~Strategy.fast` and :py:attr:`~Strategy.dfast` strategies.
 
-        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default searchLog", then the value is dynamically set, see "S" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: minMatch
 
@@ -867,7 +929,7 @@ Advanced parameters
 
         Note that currently, for all strategies < :py:attr:`~Strategy.btopt`, effective minimum is ``4``, for all strategies > :py:attr:`~Strategy.fast`, effective maximum is ``6``.
 
-        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default minMatchLength", then the value is dynamically set, see "L" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: targetLength
 
@@ -885,7 +947,7 @@ Advanced parameters
 
             Larger values make compression faster, and weaker.
 
-        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default targetLength", then the value is dynamically set, see "TL" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: strategy
 
@@ -893,7 +955,7 @@ Advanced parameters
 
         The higher the value of selected strategy, the more complex it is, resulting in stronger and slower compression.
 
-        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_.
+        Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
 
     .. py:attribute:: enableLongDistanceMatching
 
@@ -965,11 +1027,13 @@ Advanced parameters
 
             * :py:func:`compress` function
             * :py:func:`richmem_compress` function
-            * :py:class:`RichMemZstdCompressor` class
-            * :py:func:`compress_stream` function setting *pledged_input_size* argument
             * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
+            * :py:class:`RichMemZstdCompressor` class
+            * :py:func:`compress_stream` function setting *pledged_input_size* parameter
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
+
+        \* :py:class:`ZstdCompressor` has an undocumented method to set the size, ``help(ZstdCompressor._set_pledged_input_size)`` to see the usage.
 
     .. py:attribute:: checksumFlag
 
@@ -989,17 +1053,20 @@ Advanced parameters
 
         Select how many threads will be spawned to compress in parallel.
 
-        When nbWorkers > ``1``, enables multi-threaded compression, see :ref:`zstd multi-threaded compression<mt_compression>` for details.
+        When nbWorkers >= ``1``, enables multi-threaded compression, ``1`` means "1-thread multi-threaded mode". See :ref:`zstd multi-threaded compression<mt_compression>` for details.
 
         More workers improve speed, but also increase memory usage.
 
-        ``0`` (default) or ``1`` means to use single-threaded compression, no worker is spawned, compression is performed inside caller's thread.
+        ``0`` (default) means "single-threaded mode", no worker is spawned, compression is performed inside caller's thread.
+
+    .. versionchanged:: 0.15.1
+        Setting to ``1`` means "1-thread multi-threaded mode", instead of "single-threaded mode".
 
     .. py:attribute:: jobSize
 
         Size of a compression job, in bytes.
 
-        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` >= 1.
 
         Each compression job is completed in parallel, so this value can indirectly impact the number of active threads.
 
@@ -1014,7 +1081,7 @@ Advanced parameters
 
         Control the overlap size, as a fraction of window size. (The "window size" here is not strict :py:attr:`~CParameter.windowLog`, see zstd source code.)
 
-        This value is enforced only when :py:attr:`~CParameter.nbWorkers` > 1.
+        This value is enforced only when :py:attr:`~CParameter.nbWorkers` >= 1.
 
         The overlap size is an amount of data reloaded from previous job at the beginning of a new job. It helps preserve compression ratio, while each job is compressed in parallel. Larger values increase compression ratio, but decrease speed.
 
@@ -1026,7 +1093,7 @@ Advanced parameters
 
         Each intermediate rank increases/decreases load size by a factor 2:
 
-        9: full window;  8: w/2;  7: w/4;  6: w/8;  5:w/16;  4: w/32;  3:w/64;  2:w/128;  1:no overlap;  0:default
+        9: full window;  8: w/2;  7: w/4;  6: w/8;  5: w/16;  4: w/32;  3: w/64;  2: w/128;  1: no overlap;  0: default.
 
 
 .. _DParameter:
@@ -1036,10 +1103,6 @@ Advanced parameters
     Advanced decompression parameters.
 
     When using, put the parameters in a ``dict`` object, the key is a :py:class:`DParameter` name, the value is a 32-bit signed integer value.
-
-    Each parameter should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be automatically clamped.
-
-    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. sourcecode:: python
 
@@ -1052,6 +1115,10 @@ Advanced parameters
         # used with ZstdDecompressor object
         d = ZstdDecompressor(option=option)
         decompressed_dat = d.decompress(dat)
+
+    Parameter value should belong to an interval with lower and upper bounds, otherwise they will either trigger an error or be clamped silently.
+
+    The constant values mentioned below are defined in `zstd.h <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_, note that these values may be different in different zstd versions.
 
     .. py:method:: bounds(self)
 
@@ -1070,7 +1137,7 @@ Advanced parameters
 
         This parameter is only useful in streaming mode, since no internal buffer is allocated in single-pass mode. :py:func:`decompress` function may use streaming mode or single-pass mode.
 
-        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.4.8, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
+        By default, a decompression context accepts window sizes <= ``(1 << ZSTD_WINDOWLOG_LIMIT_DEFAULT)``, the constant is ``27`` in zstd v1.2+, means 128 MiB (1 << 27). If frame requested window size is greater than this value, need to explicitly set this parameter.
 
         Special: value ``0`` means "use default maximum windowLog".
 
@@ -1113,14 +1180,14 @@ Compression level
     Compression level is an integer:
 
     * ``1`` to ``22`` (currently), regular levels. Levels >= 20, labeled *ultra*, should be used with caution, as they require more memory.
-    * ``0`` means use default level, which is currently ``3`` defined by underlying zstd library.
+    * ``0`` means use the default level, which is currently ``3`` defined by the underlying zstd library.
     * ``-131072`` to ``-1``, negative levels extend the range of speed vs ratio preferences. The lower the level, the faster the speed, but at the cost of compression ratio. 131072 = 128*1024.
 
-    :py:data:`compressionLevel_values` is some values defined by underlying zstd library.
+    :py:data:`compressionLevel_values` are some values defined by the underlying zstd library.
 
     **For advanced user**
 
-    Compression levels are just numbers that map to a set of compression parameters, see this `v1.4.8 table <https://github.com/facebook/zstd/blob/v1.4.8/lib/compress/zstd_compress.c#L4971-L5076>`_ for overview. The parameters may be adjusted by underlying zstd library after gathering some infomation, such as data size, using dictionary or not.
+    Compression levels are just numbers that map to a set of compression parameters, see `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_ for overview. The parameters may be adjusted by the underlying zstd library after gathering some information, such as data size, using dictionary or not.
 
     Setting a compression level does not set all other :ref:`compression parameters<CParameter>` to default. Setting this will dynamically impact the compression parameters which have not been manually set, the manually set ones will "stick".
 
@@ -1144,7 +1211,7 @@ Frame and block
 
     A frame encapsulates one or multiple "blocks". Block has a guaranteed maximum size (3 bytes block header + 128 KiB), the actual maximum size depends on frame parameters.
 
-    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need later blocks. So flushing block may be used in communication scenarios, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
+    Unlike independent frames, each block depends on previous blocks for proper decoding, but doesn't need the following blocks, a complete block can be fully decompressed. So flushing block may be used in communication scenarios, see :py:attr:`ZstdCompressor.FLUSH_BLOCK`.
 
     .. attention::
 
@@ -1158,9 +1225,9 @@ Multi-threaded compression
 
 .. note:: Multi-threaded compression
 
-    Zstd library supports multi-threaded compression, set :py:attr:`CParameter.nbWorkers` parameter > ``1`` to enable multi-threaded compression.
+    Zstd library supports multi-threaded compression. Set :py:attr:`CParameter.nbWorkers` parameter >= ``1`` to enable multi-threaded compression, ``1`` means "1-thread multi-threaded mode".
 
-    The threads are spawned by underlying zstd library, not by pyzstd module.
+    The threads are spawned by the underlying zstd library, not by pyzstd module.
 
     .. sourcecode:: python
 
@@ -1195,7 +1262,7 @@ Rich memory mode
 
     When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
-    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra copy memory for this output buffer size.
+    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
 
     .. sourcecode:: python
 
@@ -1225,7 +1292,7 @@ Use with tarfile module
 
         import tarfile
 
-        # when using read mode (decompression), the level_or_option argument
+        # when using read mode (decompression), the level_or_option parameter
         # can only be a dict object, that represents decompression option. It
         # doesn't support int type compression level in this case.
 
@@ -1241,8 +1308,10 @@ Use with tarfile module
                     raise
 
             def close(self):
-                super().close()
-                self.zstd_file.close()
+                try:
+                    super().close()
+                finally:
+                    self.zstd_file.close()
 
         # write .tar.zst file (compression)
         with ZstdTarFile('archive.tar.zst', mode='w', level_or_option=5) as tar:
@@ -1252,7 +1321,7 @@ Use with tarfile module
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
 
-    When the above code is in read mode (decompression), ``TarFile`` may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and operate on it. This code encapsulates the process:
+    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and read from it. This code encapsulates the process:
 
     .. sourcecode:: python
 
@@ -1260,27 +1329,17 @@ Use with tarfile module
         import io
         import tarfile
         import tempfile
+        from pyzstd import decompress_stream
 
         @contextlib.contextmanager
         def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
-            try:
-                ifh = tmp = tar = None
-                ifh = io.open(name, 'rb')
-
-                tmp = tempfile.TemporaryFile()
-                decompress_stream(ifh, tmp,
-                                  zstd_dict=zstd_dict, option=option)
-                tmp.seek(0)
-
-                tar = tarfile.TarFile(fileobj=tmp, **kwargs)
-                yield tar
-            finally:
-                if tar is not None:
-                    tar.close()
-                if tmp is not None:
-                    tmp.close()
-                if ifh is not None:
-                    ifh.close()
+            with io.open(name, 'rb') as ifh:
+                with tempfile.TemporaryFile() as tmp_file:
+                    decompress_stream(ifh, tmp_file,
+                                      zstd_dict=zstd_dict, option=option)
+                    tmp_file.seek(0)
+                    with tarfile.TarFile(fileobj=tmp_file, **kwargs) as tar:
+                        yield tar
 
         with ZstdTarReader('archive.tar.zst') as tar:
             # do something
@@ -1310,7 +1369,7 @@ Zstd dictionary ID
 
     In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
 
-    In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
+    In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in the frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
 
 
 Build pyzstd module with options
@@ -1318,11 +1377,18 @@ Build pyzstd module with options
 
 .. _build_pyzstd:
 
-.. versionadded:: 0.14.4
-
 .. note:: Build pyzstd module with options
 
-    Pyzstd module supports:
+    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
+
+    .. sourcecode:: shell
+
+        # build and install
+        pip install --install-option="--avx2" -v pyzstd-0.15.1.tar.gz
+        # build a redistributable wheel
+        pip wheel --build-option="--avx2" pyzstd-0.15.1.tar.gz
+
+    2️⃣ Pyzstd module supports:
 
         * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
@@ -1340,7 +1406,8 @@ Build pyzstd module with options
 
         * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
         * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. (Use v1.5.0 new API if possible.)
+        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``lib`` folder.
+        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
 
     On Linux, dynamically link to zstd library provided by system:
 
@@ -1348,7 +1415,7 @@ Build pyzstd module with options
 
         # build and install
         sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
-        # build a distributable wheel
+        # build a redistributable wheel
         pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:

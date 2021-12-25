@@ -1,13 +1,14 @@
-import _compression
 import io
 from enum import IntEnum
 from os import PathLike
-from typing import Dict, ByteString, Optional, Union, Callable, \
-                   ClassVar, Tuple, NamedTuple, BinaryIO, TextIO
+from typing import overload, Dict, ByteString, Optional, Union, Callable, \
+                   Iterable, Literal, ClassVar, Tuple, NamedTuple, BinaryIO, \
+                   TextIO
 
 __version__: str
 zstd_version: str
 zstd_version_info: Tuple[int, int, int]
+zstd_support_multithread: bool
 
 class values(NamedTuple):
     default: int
@@ -63,7 +64,7 @@ class ZstdDict:
     dict_id: int
 
     def __init__(self,
-                 dict_content: ByteString,
+                 dict_content,
                  is_raw: bool = False) -> None: ...
 
 class ZstdCompressor:
@@ -78,18 +79,20 @@ class ZstdCompressor:
                  zstd_dict: Optional[ZstdDict] = None) -> None: ...
 
     def compress(self,
-                 data: ByteString,
+                 data,
                  mode: Union[ZstdCompressor.CONTINUE, ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.CONTINUE) -> bytes: ...
 
     def flush(self,
               mode: Union[ZstdCompressor.FLUSH_BLOCK, ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.FLUSH_FRAME) -> bytes: ...
+
+    def _set_pledged_input_size(self, size: Union[int, None]) -> None: ...
 
 class RichMemZstdCompressor:
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                  zstd_dict: Optional[ZstdDict] = None) -> None: ...
 
-    def compress(self, data: ByteString) -> bytes: ...
+    def compress(self, data) -> bytes: ...
 
 class ZstdDecompressor:
     needs_input: bool
@@ -119,11 +122,11 @@ class EndlessZstdDecompressor:
 class ZstdError(Exception):
     ...
 
-def compress(data: ByteString,
+def compress(data,
              level_or_option: Union[None, int, Dict[CParameter, int]] = None,
              zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
 
-def richmem_compress(data: ByteString,
+def richmem_compress(data,
                      level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                      zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
 
@@ -144,11 +147,11 @@ def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, Non
                       read_size: int = 131_075, write_size: int = 131_072,
                       callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
-def train_dict(samples: Iterable[ByteString],
+def train_dict(samples: Iterable,
                dict_size: int) -> ZstdDict: ...
 
 def finalize_dict(zstd_dict: ZstdDict,
-                  samples: Iterable[ByteString],
+                  samples: Iterable,
                   dict_size: int,
                   level: int) -> ZstdDict: ...
 
@@ -160,43 +163,62 @@ def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 
 def get_frame_size(frame_buffer: ByteString) -> int: ...
 
-class ZstdFile(_compression.BaseStream):
+class ZstdFile(io.BufferedIOBase):
     def __init__(self,
                  filename: Union[str, bytes, PathLike, BinaryIO],
                  mode: str = "r",
                  *,
                  level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
                  zstd_dict: Optional[ZstdDict] = None) -> None: ...
-
     def close(self) -> None: ...
 
-    @property
-    def closed(self) -> bool: ...
-
-    def fileno(self) -> int: ...
-
-    def seekable(self) -> bool: ...
-
-    def readable(self) -> bool: ...
-
-    def writable(self) -> bool: ...
-
-    def peek(self, size: int = -1) -> bytes: ...
+    def write(self, data) -> int: ...
+    def flush(self) -> None: ...
 
     def read(self, size: int = -1) -> bytes: ...
-
     def read1(self, size: int = -1) -> bytes: ...
-
+    def readinto(self, b) -> int: ...
+    def readinto1(self, b) -> int: ...
     def readline(self, size: int = -1) -> bytes: ...
-
-    def write(self, data: ByteString) -> int: ...
-
     def seek(self,
              offset: int,
              whence: Union[io.SEEK_SET, io.SEEK_CUR, io.SEEK_END] = io.SEEK_SET) -> int: ...
+    def peek(self, size: int = -1) -> bytes: ...
 
     def tell(self) -> int: ...
+    def fileno(self) -> int: ...
+    @property
+    def closed(self) -> bool: ...
+    def writable(self) -> bool: ...
+    def readable(self) -> bool: ...
+    def seekable(self) -> bool: ...
 
+_BinaryMode = Literal["r", "rb", # read
+                      "w", "wb", "a", "ab", "x", "xb"] # write
+_TextMode = Literal["rt", # read
+                    "wt", "at", "xt"] # write
+
+@overload
+def open(filename: Union[str, bytes, PathLike, BinaryIO],
+         mode: _BinaryMode = "rb",
+         *,
+         level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
+         zstd_dict: Optional[ZstdDict] = None,
+         encoding: None = None,
+         errors: None = None,
+         newline: None = None) -> ZstdFile: ...
+
+@overload
+def open(filename: Union[str, bytes, PathLike, BinaryIO],
+         mode: _TextMode = ...,
+         *,
+         level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
+         zstd_dict: Optional[ZstdDict] = None,
+         encoding: Optional[str] = None,
+         errors: Optional[str] = None,
+         newline: Optional[str] = None) -> TextIO: ...
+
+@overload
 def open(filename: Union[str, bytes, PathLike, BinaryIO],
          mode: str = "rb",
          *,
