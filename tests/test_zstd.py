@@ -83,7 +83,7 @@ def setUpModule():
              b'lilac', b'purple', b'navy', b'glod', b'silver', b'olive',
              b'dog', b'cat', b'tiger', b'lion', b'fish', b'bird']
     lst = []
-    for i in range(1500):
+    for i in range(300):
         sample = [b'%s = %d' % (random.choice(words), random.randrange(100))
                   for j in range(20)]
         sample = b'\n'.join(sample)
