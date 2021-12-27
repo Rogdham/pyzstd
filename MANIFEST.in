@@ -1,7 +1,7 @@
 include README.rst
 include LICENSE
 
-recursive-include lib *
+recursive-include zstd/lib *
 recursive-include src *
 recursive-include tests *
 
