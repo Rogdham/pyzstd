@@ -1390,7 +1390,7 @@ Build pyzstd module with options
 
     2️⃣ Pyzstd module supports:
 
-        * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``lib`` folder will be ignored.
+        * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``zstd`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
 
     On CPython, add these options to setup.py:
@@ -1406,7 +1406,7 @@ Build pyzstd module with options
 
         * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
         * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``lib`` folder.
+        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
         * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
 
     On Linux, dynamically link to zstd library provided by system:

@@ -33,7 +33,7 @@ def get_zstd_files_list():
 
     lst = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
-        directory = 'lib/' + sub_dir + '/'
+        directory = 'zstd/lib/' + sub_dir + '/'
         l = [directory + fn
                for fn in os.listdir(directory)
                if fnmatch.fnmatch(fn, ZSTD_FILE_EXTENSION)]
@@ -64,7 +64,7 @@ if DYNAMIC_LINK:
     }
 else:  # statically link to zstd lib
     kwargs = {
-        'include_dirs': ['lib', 'lib/dictBuilder'],
+        'include_dirs': ['zstd/lib', 'zstd/lib/dictBuilder'],
         'library_dirs': [],
         'libraries': [],
         'sources': get_zstd_files_list(),
