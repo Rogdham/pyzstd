@@ -456,29 +456,23 @@ def _check_int32_value(value, name):
     except:
         raise ValueError("%s should be 32-bit signed int value." % name)
 
-def _clamp_compression_level(level):
-    # In zstd v1.4.6-, lower bound is not clamped.
-    if m.ZSTD_versionNumber() < 10407:
-        if level < m.ZSTD_minCLevel():
-            return m.ZSTD_minCLevel()
-    return level
-
+# return: (compressionLevel, use_multithread)
 def _set_c_parameters(cctx, level_or_option):
-    level = 0  # 0 means use zstd's default compression level
-    use_multithread = False
-
     if isinstance(level_or_option, int):
         _check_int32_value(level_or_option, "Compression level")
-        level = _clamp_compression_level(level_or_option)
 
         # Set compression level
-        zstd_ret = m.ZSTD_CCtx_setParameter(cctx, m.ZSTD_c_compressionLevel, level)
+        zstd_ret = m.ZSTD_CCtx_setParameter(cctx, m.ZSTD_c_compressionLevel,
+                                            level_or_option)
         if m.ZSTD_isError(zstd_ret):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
-        return level, use_multithread
+        return level_or_option, False
 
     if isinstance(level_or_option, dict):
+        level = 0  # 0 means use zstd's default compression level
+        use_multithread = False
+
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             # Check key type
             if type(key) == DParameter:
@@ -490,7 +484,7 @@ def _set_c_parameters(cctx, level_or_option):
             _check_int32_value(value, "Value of option dict")
 
             if key == m.ZSTD_c_compressionLevel:
-                level = value = _clamp_compression_level(value)
+                level = value
             elif key == m.ZSTD_c_nbWorkers:
                 if value > 0:
                     use_multithread = True

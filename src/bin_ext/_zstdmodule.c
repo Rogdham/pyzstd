@@ -722,17 +722,6 @@ _get_DDict(ZstdDict *self)
     return self->d_dict;
 }
 
-static inline void
-clamp_compression_level(int *compressionLevel)
-{
-    /* In zstd v1.4.6-, lower bound is not clamped. */
-    if (ZSTD_versionNumber() < 10407) {
-        if (*compressionLevel < ZSTD_minCLevel()) {
-            *compressionLevel = ZSTD_minCLevel();
-        }
-    }
-}
-
 /* Set compressLevel or compression parameters to compression context. */
 static int
 set_c_parameters(ZstdCompressor *self,
@@ -749,9 +738,6 @@ set_c_parameters(ZstdCompressor *self,
                             "Compression level should be 32-bit signed int value.");
             return -1;
         }
-
-        /* Clamp compression level */
-        clamp_compression_level(&level);
 
         /* Save to *compress_level for generating ZSTD_CDICT */
         *compress_level = level;
@@ -799,9 +785,6 @@ set_c_parameters(ZstdCompressor *self,
             }
 
             if (key_v == ZSTD_c_compressionLevel) {
-                /* Clamp compression level */
-                clamp_compression_level(&value_v);
-
                 /* Save to *compress_level for generating ZSTD_CDICT */
                 *compress_level = value_v;
             } else if (key_v == ZSTD_c_nbWorkers) {
