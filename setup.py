@@ -24,21 +24,27 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     module_version = m.group(2)
 
 # -------- binary extension --------
-def get_zstd_files_list():
-    # Currently Linux/macOS can use assembly implementation
-    if sys.platform != 'win32':
-        ZSTD_FILE_EXTENSION = '*.[cCsS]'
-    else:
-        ZSTD_FILE_EXTENSION = '*.[cC]'
+ASM_SOURCE_LIST = []  # .S assembly source files
 
-    lst = []
+def get_zstd_files_list():
+    ret = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
         directory = 'zstd/lib/' + sub_dir + '/'
+        dir_list = os.listdir(directory)
+
+        # Source files
         l = [directory + fn
-               for fn in os.listdir(directory)
-               if fnmatch.fnmatch(fn, ZSTD_FILE_EXTENSION)]
-        lst.extend(l)
-    return lst
+               for fn in dir_list
+               if fnmatch.fnmatch(fn, '*.[cCsS]')]
+        ret.extend(l)
+
+        # .S assembly source files
+        s = [directory + fn
+               for fn in dir_list
+               if fnmatch.fnmatch(fn, '*.[sS]')]
+        ASM_SOURCE_LIST.extend(s)
+
+    return ret
 
 def has_option(option):
     if option in sys.argv:
@@ -97,13 +103,17 @@ class build_ext_compiler_check(build_ext):
         self.compiler.src_extensions.extend(['.s', '.S'])
 
         for extension in self.extensions:
-            if self.compiler.compiler_type.lower() in ('unix', 'mingw32'):
+            if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
                 if AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
                     extension.extra_compile_args.extend(instrs)
                 if WARNING_AS_ERROR:
                     extension.extra_compile_args.append('-Werror')
-            elif self.compiler.compiler_type.lower() == 'msvc':
+            elif self.compiler.compiler_type == 'msvc':
+                # Remove .S source files
+                for asm_source in ASM_SOURCE_LIST:
+                    extension.sources.remove(asm_source)
+
                 # /Ob3 is more aggressive inlining than /Ob2
                 # /GF eliminates duplicate strings
                 # /Gy does function level linking
