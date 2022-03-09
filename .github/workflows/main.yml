@@ -5,7 +5,7 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
-  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        py: ['pypy-3.6', 'pypy-3.7', 'pypy-3.8']
+        py: ['pypy-3.7', 'pypy-3.8', 'pypy-3.9']
 
     steps:
       - uses: actions/checkout@v2
