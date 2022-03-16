@@ -1,5 +1,6 @@
 from collections import namedtuple
 from enum import IntEnum
+from functools import lru_cache
 from sys import maxsize
 from threading import Lock
 from warnings import warn
@@ -76,6 +77,7 @@ class CParameter(IntEnum):
     jobSize                    = m.ZSTD_c_jobSize
     overlapLog                 = m.ZSTD_c_overlapLog
 
+    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
@@ -88,6 +90,7 @@ class DParameter(IntEnum):
 
     windowLogMax = m.ZSTD_d_windowLogMax
 
+    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter

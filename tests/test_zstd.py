@@ -1099,6 +1099,19 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         bi.close()
         bo.close()
 
+    def test_parameter_bounds_cache(self):
+        a = CParameter.compressionLevel.bounds()
+        b = CParameter.compressionLevel.bounds()
+        self.assertIs(a, b)
+
+        a = CParameter.windowLog.bounds()
+        b = CParameter.windowLog.bounds()
+        self.assertIs(a, b)
+
+        a = DParameter.windowLogMax.bounds()
+        b = DParameter.windowLogMax.bounds()
+        self.assertIs(a, b)
+
 class DecompressorFlagsTestCase(unittest.TestCase):
 
     def setUp(self):
