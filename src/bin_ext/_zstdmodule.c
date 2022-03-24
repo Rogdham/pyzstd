@@ -275,6 +275,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     PyObject *b;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
     Py_ssize_t block_size;
+    int append_ret;
 
     /* Ensure no gaps in the data */
     assert(ob->pos == ob->size);
@@ -310,11 +311,13 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
     }
-    if (PyList_Append(buffer->list, b) < 0) {
-        Py_DECREF(b);
+
+    /* Append to list */
+    append_ret = PyList_Append(buffer->list, b);
+    Py_DECREF(b);
+    if (append_ret < 0) {
         return -1;
     }
-    Py_DECREF(b);
 
     /* Set variables */
     buffer->allocated += block_size;
@@ -2889,8 +2892,7 @@ _get_frame_info(PyObject *module, PyObject *args)
 {
     Py_buffer frame_buffer;
 
-    uint64_t content_size;
-    char unknown_content_size;
+    uint64_t decompressed_size;
     uint32_t dict_id;
     PyObject *temp;
     PyObject *ret = NULL;
@@ -2900,19 +2902,18 @@ _get_frame_info(PyObject *module, PyObject *args)
     }
 
     /* ZSTD_getFrameContentSize */
-    content_size = ZSTD_getFrameContentSize(frame_buffer.buf,
-                                            frame_buffer.len);
-    if (content_size == ZSTD_CONTENTSIZE_UNKNOWN) {
-        unknown_content_size = 1;
-    } else if (content_size == ZSTD_CONTENTSIZE_ERROR) {
+    decompressed_size = ZSTD_getFrameContentSize(frame_buffer.buf,
+                                                 frame_buffer.len);
+
+    /* #define ZSTD_CONTENTSIZE_UNKNOWN (0ULL - 1)
+       #define ZSTD_CONTENTSIZE_ERROR   (0ULL - 2) */
+    if (decompressed_size == ZSTD_CONTENTSIZE_ERROR) {
         PyErr_SetString(static_state.ZstdError,
-                        "Error when getting a zstd frame's decompressed size, "
-                        "make sure the frame_buffer argument starts from the "
-                        "beginning of a frame and its size larger than the "
-                        "frame header (6~18 bytes).");
+                        "Error when getting information from the header of "
+                        "a zstd frame. Make sure the frame_buffer argument "
+                        "starts from the beginning of a frame, and its size "
+                        "larger than the frame header (6~18 bytes).");
         goto error;
-    } else {
-        unknown_content_size = 0;
     }
 
     /* ZSTD_getDictID_fromFrame */
@@ -2924,12 +2925,12 @@ _get_frame_info(PyObject *module, PyObject *args)
         goto error;
     }
 
-    /* 0, content_size */
-    if (unknown_content_size) {
+    /* 0, decompressed_size */
+    if (decompressed_size == ZSTD_CONTENTSIZE_UNKNOWN) {
         temp = Py_None;
         Py_INCREF(temp);
     } else {
-        temp = PyLong_FromUnsignedLongLong(content_size);
+        temp = PyLong_FromUnsignedLongLong(decompressed_size);
         if (temp == NULL) {
             goto error;
         }
@@ -2942,8 +2943,8 @@ _get_frame_info(PyObject *module, PyObject *args)
         goto error;
     }
     PyTuple_SET_ITEM(ret, 1, temp);
-    goto success;
 
+    goto success;
 error:
     Py_CLEAR(ret);
 success:

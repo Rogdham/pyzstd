@@ -1731,21 +1731,21 @@ def get_frame_info(frame_buffer):
     It's possible to append more items to the namedtuple in the future.
     """
 
-    content_size = m.ZSTD_getFrameContentSize(
-                      ffi.from_buffer(frame_buffer), len(frame_buffer))
-    if content_size == m.ZSTD_CONTENTSIZE_UNKNOWN:
-        content_size = None
-    elif content_size == m.ZSTD_CONTENTSIZE_ERROR:
-        msg = ("Error when getting a zstd frame's decompressed size, "
-               "make sure the frame_buffer argument starts from the "
-               "beginning of a frame and its size larger than the "
-               "frame header (6~18 bytes).")
+    decompressed_size = m.ZSTD_getFrameContentSize(
+                            ffi.from_buffer(frame_buffer), len(frame_buffer))
+    if decompressed_size == m.ZSTD_CONTENTSIZE_UNKNOWN:
+        decompressed_size = None
+    elif decompressed_size == m.ZSTD_CONTENTSIZE_ERROR:
+        msg = ("Error when getting information from the header of "
+               "a zstd frame. Make sure the frame_buffer argument "
+               "starts from the beginning of a frame, and its size "
+               "larger than the frame header (6~18 bytes).")
         raise ZstdError(msg)
 
     dict_id = m.ZSTD_getDictID_fromFrame(
                   ffi.from_buffer(frame_buffer), len(frame_buffer))
 
-    ret = _nt_frame_info(content_size, dict_id)
+    ret = _nt_frame_info(decompressed_size, dict_id)
     return ret
 
 def get_frame_size(frame_buffer):
