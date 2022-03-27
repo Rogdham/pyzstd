@@ -129,14 +129,16 @@ class FunctionsTestCase(unittest.TestCase):
         self.assertEqual(info.decompressed_size, 345)
         self.assertNotEqual(info.dictionary_id, 0)
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaisesRegex(ZstdError,
+                                    'not less than the frame header'):
             get_frame_info(b'aaaaaaaaaaaaaa')
 
     def test_get_frame_size(self):
         size = get_frame_size(COMPRESSED_100_PLUS_32KB)
         self.assertEqual(size, len(COMPRESSED_100_PLUS_32KB))
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaisesRegex(ZstdError,
+                                    'not less than this complete frame'):
             get_frame_size(b'aaaaaaaaaaaaaa')
 
 class ClassShapeTestCase(unittest.TestCase):

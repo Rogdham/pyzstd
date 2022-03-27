@@ -585,7 +585,6 @@ typedef enum {
     ERR_LOAD_D_DICT,
     ERR_LOAD_C_DICT,
 
-    ERR_GET_FRAME_SIZE,
     ERR_GET_C_BOUNDS,
     ERR_GET_D_BOUNDS,
     ERR_SET_C_LEVEL,
@@ -621,9 +620,6 @@ set_zstd_error(const error_type type, const size_t code)
         type_msg = "load zstd dictionary for compression";
         break;
 
-    case ERR_GET_FRAME_SIZE:
-        type_msg = "get the size of a zstd frame";
-        break;
     case ERR_GET_C_BOUNDS:
         type_msg = "get zstd compression parameter bounds";
         break;
@@ -2867,7 +2863,12 @@ get_frame_size(PyObject *module, PyObject *args)
 
     frame_size = ZSTD_findFrameCompressedSize(frame_buffer.buf, frame_buffer.len);
     if (ZSTD_isError(frame_size)) {
-        set_zstd_error(ERR_GET_FRAME_SIZE, frame_size);
+        PyErr_Format(static_state.ZstdError,
+                     "Error when finding the compressed size of a zstd frame. "
+                     "Make sure the frame_buffer argument starts from the "
+                     "beginning of a frame, and its length not less than this "
+                     "complete frame. Zstd error message: %s.",
+                     ZSTD_getErrorName(frame_size));
         goto error;
     }
 
@@ -2911,8 +2912,8 @@ _get_frame_info(PyObject *module, PyObject *args)
         PyErr_SetString(static_state.ZstdError,
                         "Error when getting information from the header of "
                         "a zstd frame. Make sure the frame_buffer argument "
-                        "starts from the beginning of a frame, and its size "
-                        "larger than the frame header (6~18 bytes).");
+                        "starts from the beginning of a frame, and its length "
+                        "not less than the frame header (6~18 bytes).");
         goto error;
     }
 

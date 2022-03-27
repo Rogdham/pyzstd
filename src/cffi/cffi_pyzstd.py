@@ -357,13 +357,12 @@ class _ErrorType:
     ERR_LOAD_D_DICT=3
     ERR_LOAD_C_DICT=4
 
-    ERR_GET_FRAME_SIZE=5
-    ERR_GET_C_BOUNDS=6
-    ERR_GET_D_BOUNDS=7
-    ERR_SET_C_LEVEL=8
+    ERR_GET_C_BOUNDS=5
+    ERR_GET_D_BOUNDS=6
+    ERR_SET_C_LEVEL=7
 
-    ERR_TRAIN_DICT=9
-    ERR_FINALIZE_DICT=10
+    ERR_TRAIN_DICT=8
+    ERR_FINALIZE_DICT=9
 
     _TYPE_MSG = (
         "decompress zstd data",
@@ -373,7 +372,6 @@ class _ErrorType:
         "load zstd dictionary for decompression",
         "load zstd dictionary for compression",
 
-        "get the size of a zstd frame",
         "get zstd compression parameter bounds",
         "get zstd decompression parameter bounds",
         "set zstd compression level",
@@ -1738,8 +1736,8 @@ def get_frame_info(frame_buffer):
     elif decompressed_size == m.ZSTD_CONTENTSIZE_ERROR:
         msg = ("Error when getting information from the header of "
                "a zstd frame. Make sure the frame_buffer argument "
-               "starts from the beginning of a frame, and its size "
-               "larger than the frame header (6~18 bytes).")
+               "starts from the beginning of a frame, and its length "
+               "not less than the frame header (6~18 bytes).")
         raise ZstdError(msg)
 
     dict_id = m.ZSTD_getDictID_fromFrame(
@@ -1762,6 +1760,11 @@ def get_frame_size(frame_buffer):
     frame_size = m.ZSTD_findFrameCompressedSize(
                      ffi.from_buffer(frame_buffer), len(frame_buffer))
     if m.ZSTD_isError(frame_size):
-        _set_zstd_error(_ErrorType.ERR_GET_FRAME_SIZE, frame_size)
+        msg = ("Error when finding the compressed size of a zstd frame. "
+               "Make sure the frame_buffer argument starts from the "
+               "beginning of a frame, and its length not less than this "
+               "complete frame. Zstd error message: %s.") % \
+               ffi.string(m.ZSTD_getErrorName(frame_size)).decode('utf-8')
+        raise ZstdError(msg)
 
     return frame_size
