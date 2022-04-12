@@ -3231,9 +3231,6 @@ class StreamFunctionsTestCase(unittest.TestCase):
         compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
         decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
 
-def test_main():
-    unittest.main()
-
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
 TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae\x06b\x02'
@@ -4419,4 +4416,4 @@ TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae
  b'\xb7\x99\x1b\xce\xc9\t*\x98\x97\xb43z\x01h\x9fu\xf1')
 
 if __name__ == "__main__":
-    test_main()
+    unittest.main()
