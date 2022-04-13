@@ -3686,10 +3686,15 @@ _set_parameter_types(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    Py_INCREF(c_parameter_type);
-    static_state.CParameter_type = (PyTypeObject*)c_parameter_type;
-    Py_INCREF(d_parameter_type);
-    static_state.DParameter_type = (PyTypeObject*)d_parameter_type;
+    /* Not for strict check, using the first values is fine. */
+    if (static_state.CParameter_type == NULL &&
+        static_state.DParameter_type == NULL)
+    {
+        Py_INCREF(c_parameter_type);
+        static_state.CParameter_type = (PyTypeObject*)c_parameter_type;
+        Py_INCREF(d_parameter_type);
+        static_state.DParameter_type = (PyTypeObject*)d_parameter_type;
+    }
 
     Py_RETURN_NONE;
 }
