@@ -104,11 +104,14 @@ class build_ext_compiler_check(build_ext):
 
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
+                # -g0: Level 0 produces no debug information at all
+                more_options = ['-g0']
                 if AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
-                    extension.extra_compile_args.extend(instrs)
+                    more_options.extend(instrs)
                 if WARNING_AS_ERROR:
-                    extension.extra_compile_args.append('-Werror')
+                    more_options.append('-Werror')
+                extension.extra_compile_args.extend(more_options)
             elif self.compiler.compiler_type == 'msvc':
                 # Remove .S source files
                 for asm_source in ASM_SOURCE_LIST:
