@@ -37,7 +37,7 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdDict;
 
 typedef struct {
@@ -56,10 +56,10 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* (nbWorker >= 1) ? 1 : 0 */
-    char use_multithread;
+    int use_multithread;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdCompressor;
 
 typedef struct {
@@ -96,7 +96,7 @@ typedef struct {
     char eof;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdDecompressor;
 
 typedef struct {
@@ -2153,7 +2153,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     Py_ssize_t initial_buffer_size = -1;
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
-    char use_input_buffer;
+    int use_input_buffer;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "y*|n:ZstdDecompressor.decompress", kwlist,
@@ -3043,7 +3043,7 @@ invoke_callback(PyObject *callback,
     PyObject *cb_args;
     PyObject *cb_ret;
     PyObject * const empty_memoryview = static_state.empty_readonly_memoryview;
-    char cb_referenced;
+    int cb_referenced;
 
     /* Input memoryview */
     const size_t in_size = in->size - *callback_read_pos;
@@ -3403,7 +3403,7 @@ success:
     ZSTD_freeCCtx(self.cctx);
 
     Py_XDECREF(in_memoryview);
-    PyMem_Free((char*) in.src);
+    PyMem_Free((void*) in.src);
     PyMem_Free(out.dst);
 
     return ret;
@@ -3660,7 +3660,7 @@ success:
     ZSTD_freeDCtx(self.dctx);
 
     Py_XDECREF(in_memoryview);
-    PyMem_Free((char*) in.src);
+    PyMem_Free((void*) in.src);
     PyMem_Free(out.dst);
 
     return ret;
