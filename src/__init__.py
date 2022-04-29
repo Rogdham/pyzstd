@@ -205,48 +205,35 @@ class ZstdDecompressReader(_compression.DecompressReader):
             chunks.append(data)
         return b''.join(chunks)
 
-    # Copied from base class, except use ZSTD_DStreamInSize() instead of
-    # BUFFER_SIZE (default is 8 KiB) as read size.
+    # Compare to super().read():
+    # 1, Use ZSTD_DStreamInSize() instead of BUFFER_SIZE (default is 8 KiB)
+    # 2, Use EndlessZstdDecompressor to simplify the code
     def read(self, size=-1):
         if size < 0:
             return self.readall()
-
         if not size or self._eof:
             return b""
-        data = None  # Default if EOF is encountered
+
         # Depending on the input data, our call to the decompressor may not
         # return any data. In this case, try again after reading another block.
         while True:
-            if self._decompressor.eof:
-                rawblock = (self._decompressor.unused_data or
-                            self._fp.read(_ZSTD_DStreamInSize))
+            if self._decompressor.needs_input:
+                rawblock = self._fp.read(_ZSTD_DStreamInSize)
                 if not rawblock:
-                    break
-                # Continue to next stream.
-                self._decompressor = self._decomp_factory(
-                    **self._decomp_args)
-                try:
-                    data = self._decompressor.decompress(rawblock, size)
-                except self._trailing_error:
-                    # Trailing data isn't a valid compressed stream; ignore it.
-                    break
-            else:
-                if self._decompressor.needs_input:
-                    rawblock = self._fp.read(_ZSTD_DStreamInSize)
-                    if not rawblock:
+                    if self._decompressor.at_frame_edge:
+                        self._eof = True
+                        self._size = self._pos
+                        return b""
+                    else:
                         raise EOFError("Compressed file ended before the "
                                        "end-of-stream marker was reached")
-                else:
-                    rawblock = b""
-                data = self._decompressor.decompress(rawblock, size)
+            else:
+                rawblock = b""
+
+            data = self._decompressor.decompress(rawblock, size)
             if data:
-                break
-        if not data:
-            self._eof = True
-            self._size = self._pos
-            return b""
-        self._pos += len(data)
-        return data
+                self._pos += len(data)
+                return data
 
     # Copied from base class, except use 32 KiB instead of
     # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
@@ -377,7 +364,7 @@ class ZstdFile(io.BufferedIOBase):
 
         # ZstdDecompressReader
         if mode_code == _MODE_READ:
-            raw = ZstdDecompressReader(self._fp, ZstdDecompressor,
+            raw = ZstdDecompressReader(self._fp, EndlessZstdDecompressor,
                                        trailing_error=ZstdError,
                                        zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw, _32_KiB)

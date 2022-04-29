@@ -2099,6 +2099,9 @@ class OutputBufferTestCase(unittest.TestCase):
         self.assertTrue(d.at_frame_edge)
 
 class FileTestCase(unittest.TestCase):
+    def setUp(self):
+        self.DECOMPRESSED_42 = b'a'*42
+        self.FRAME_42 = compress(self.DECOMPRESSED_42)
 
     def test_init(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2248,7 +2251,6 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict=b'dict123456')
 
-
     def test_close(self):
         with BytesIO(COMPRESSED_100_PLUS_32KB) as src:
             f = ZstdFile(src)
@@ -2387,6 +2389,14 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.writable)
 
+    def test_ZstdDecompressReader(self):
+        r = pyzstd.ZstdDecompressReader(BytesIO(self.FRAME_42),
+                                        EndlessZstdDecompressor,
+                                        trailing_error=ZstdError)
+        self.assertEqual(r.read(0), b'')
+        self.assertEqual(r.read(42), self.DECOMPRESSED_42)
+        self.assertEqual(r.read(10), b'')
+
     def test_read(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
@@ -2399,6 +2409,7 @@ class FileTestCase(unittest.TestCase):
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
             self.assertEqual(f.read(), b"")
+            self.assertEqual(f.read(10), b"")
 
     def test_read_0(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2406,6 +2417,14 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(0), b"")
+
+        # empty file
+        with ZstdFile(BytesIO(b'')) as f:
+            self.assertEqual(f.read(0), b"")
+            self.assertEqual(f.read(10), b"")
+
+        with ZstdFile(BytesIO(b'')) as f:
+            self.assertEqual(f.read(10), b"")
 
     def test_read_10(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2443,6 +2462,13 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(TEST_DAT_130KB[:-200])) as f:
             self.assertRaises(EOFError, f.read)
 
+        # Trailing data isn't a valid compressed stream
+        with ZstdFile(BytesIO(self.FRAME_42 + b'12345')) as f:
+            self.assertRaises(ZstdError, f.read)
+
+        with ZstdFile(BytesIO(SKIPPABLE_FRAME + b'12345')) as f:
+            self.assertRaises(ZstdError, f.read)
+
     def test_read_truncated(self):
         # Drop stream epilogue: 4 bytes checksum
         truncated = TEST_DAT_130KB[:-4]
@@ -2454,7 +2480,7 @@ class FileTestCase(unittest.TestCase):
             self.assertRaises(EOFError, f.read, 1)
 
         # Incomplete header
-        for i in range(20):
+        for i in range(1, 20):
             with ZstdFile(BytesIO(truncated[:i])) as f:
                 self.assertRaises(EOFError, f.read, 1)
 
