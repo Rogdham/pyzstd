@@ -24,8 +24,6 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
     module_version = m.group(2)
 
 # -------- binary extension --------
-ASM_SOURCE_LIST = []  # .S assembly source files
-
 def get_zstd_files_list():
     ret = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
@@ -37,13 +35,6 @@ def get_zstd_files_list():
                for fn in dir_list
                if fnmatch.fnmatch(fn, '*.[cCsS]')]
         ret.extend(l)
-
-        # .S assembly source files
-        s = [directory + fn
-               for fn in dir_list
-               if fnmatch.fnmatch(fn, '*.[sS]')]
-        ASM_SOURCE_LIST.extend(s)
-
     return ret
 
 def has_option(option):
@@ -114,8 +105,8 @@ class build_ext_compiler_check(build_ext):
                 extension.extra_compile_args.extend(more_options)
             elif self.compiler.compiler_type == 'msvc':
                 # Remove .S source files
-                for asm_source in ASM_SOURCE_LIST:
-                    extension.sources.remove(asm_source)
+                extension.sources = [i for i in extension.sources
+                                        if not fnmatch.fnmatch(i, '*.[sS]')]
 
                 # /Ob3 is more aggressive inlining than /Ob2
                 # /GF eliminates duplicate strings
