@@ -550,6 +550,14 @@ class _Compressor:
         self._lock = Lock()
         level = 0  # 0 means use zstd's default compression level
 
+        self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
+        if self._singleton_in_buf == ffi.NULL:
+            raise MemoryError
+
+        self._singleton_out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._singleton_out_buf == ffi.NULL:
+            raise MemoryError
+
         # Compression context
         self._cctx = m.ZSTD_createCCtx()
         if self._cctx == ffi.NULL:
@@ -574,17 +582,13 @@ class _Compressor:
 
     def _compress_impl(self, data, end_directive, rich_mem):
         # Input buffer
-        in_buf = _new_nonzero("ZSTD_inBuffer *")
-        if in_buf == ffi.NULL:
-            raise MemoryError
+        in_buf = self._singleton_in_buf
         in_buf.src = ffi.from_buffer(data)
         in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
 
         # Initialize output buffer
@@ -610,17 +614,13 @@ class _Compressor:
 
     def _compress_mt_continue_impl(self, data):
         # Input buffer
-        in_buf = _new_nonzero("ZSTD_inBuffer *")
-        if in_buf == ffi.NULL:
-            raise MemoryError
+        in_buf = self._singleton_in_buf
         in_buf.src = ffi.from_buffer(data)
         in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
         out.initAndGrow(out_buf, -1)
 
@@ -853,6 +853,14 @@ class _Decompressor:
         self._in_begin = 0
         self._in_end = 0
 
+        self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
+        if self._singleton_in_buf == ffi.NULL:
+            raise MemoryError
+
+        self._singleton_out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._singleton_out_buf == ffi.NULL:
+            raise MemoryError
+
         # Decompression context
         self._dctx = m.ZSTD_createDCtx()
         if self._dctx == ffi.NULL:
@@ -890,9 +898,7 @@ class _Decompressor:
                 return b""
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
         if initial_size >= 0:
             out.initWithSize(out_buf, max_length, initial_size)
@@ -941,10 +947,7 @@ class _Decompressor:
         self._lock.acquire()
         try:
             initial_buffer_size = -1
-
-            in_buf = _new_nonzero("ZSTD_inBuffer *")
-            if in_buf == ffi.NULL:
-                raise MemoryError
+            in_buf = self._singleton_in_buf
 
             if self._type == _TYPE_DEC:
                 # Check .eof flag
@@ -1204,16 +1207,11 @@ def decompress(data, zstd_dict=None, option=None):
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
     option:    A dict object, contains advanced decompression parameters.
     """
-    # Initialize & set ZstdDecompressor
-    decomp = _Decompressor(zstd_dict, option)
-    decomp._at_frame_edge = True
-    decomp._type = _TYPE_ENDLESS_DEC
+    # EndlessZstdDecompressor
+    decomp = EndlessZstdDecompressor(zstd_dict, option)
 
     # Prepare input data
-    in_buf = _new_nonzero("ZSTD_inBuffer *")
-    if in_buf == ffi.NULL:
-        raise MemoryError
-
+    in_buf = decomp._singleton_in_buf
     in_buf.src = ffi.from_buffer(data)
     in_buf.size = len(data)
     in_buf.pos = 0
