@@ -178,7 +178,7 @@ Streaming compression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
@@ -337,7 +337,7 @@ Streaming decompression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``, the first two are ``int`` objects, the last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects. If input stream is ``b''``, it will not be called.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.

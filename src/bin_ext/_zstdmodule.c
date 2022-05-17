@@ -3042,8 +3042,6 @@ invoke_callback(PyObject *callback,
     PyObject *out_memoryview;
     PyObject *cb_args;
     PyObject *cb_ret;
-    PyObject * const empty_memoryview = static_state.empty_readonly_memoryview;
-    int cb_referenced;
 
     /* Input memoryview */
     const size_t in_size = in->size - *callback_read_pos;
@@ -3056,7 +3054,7 @@ invoke_callback(PyObject *callback,
             goto error;
         }
     } else {
-        in_memoryview = empty_memoryview;
+        in_memoryview = static_state.empty_readonly_memoryview;
         Py_INCREF(in_memoryview);
     }
 
@@ -3068,7 +3066,7 @@ invoke_callback(PyObject *callback,
             goto error;
         }
     } else {
-        out_memoryview = empty_memoryview;
+        out_memoryview = static_state.empty_readonly_memoryview;
         Py_INCREF(out_memoryview);
     }
 
@@ -3084,9 +3082,6 @@ invoke_callback(PyObject *callback,
 
     /* Callback */
     cb_ret = PyObject_CallObject(callback, cb_args);
-
-    cb_referenced = (in_memoryview != empty_memoryview && Py_REFCNT(in_memoryview) > 2) ||
-                    (out_memoryview != empty_memoryview && Py_REFCNT(out_memoryview) > 2);
     Py_DECREF(cb_args);
     Py_DECREF(in_memoryview);
     Py_DECREF(out_memoryview);
@@ -3095,16 +3090,6 @@ invoke_callback(PyObject *callback,
         goto error;
     }
     Py_DECREF(cb_ret);
-
-    /* memoryview object was referenced in callback function */
-    if (cb_referenced) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "The third and fourth arguments of callback function "
-                        "are memoryview objects. If want to reference them "
-                        "outside the callback function, convert them to bytes "
-                        "object using bytes() function.");
-        goto error;
-    }
 
     return 0;
 error:
