@@ -2895,7 +2895,6 @@ _get_frame_info(PyObject *module, PyObject *args)
 
     uint64_t decompressed_size;
     uint32_t dict_id;
-    PyObject *temp;
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTuple(args, "y*:_get_frame_info", &frame_buffer)) {
@@ -2921,30 +2920,15 @@ _get_frame_info(PyObject *module, PyObject *args)
     dict_id = ZSTD_getDictID_fromFrame(frame_buffer.buf, frame_buffer.len);
 
     /* Build tuple */
-    ret = PyTuple_New(2);
+    if (decompressed_size == ZSTD_CONTENTSIZE_UNKNOWN) {
+        ret = Py_BuildValue("OI", Py_None, dict_id);
+    } else {
+        ret = Py_BuildValue("KI", decompressed_size, dict_id);
+    }
+
     if (ret == NULL) {
         goto error;
     }
-
-    /* 0, decompressed_size */
-    if (decompressed_size == ZSTD_CONTENTSIZE_UNKNOWN) {
-        temp = Py_None;
-        Py_INCREF(temp);
-    } else {
-        temp = PyLong_FromUnsignedLongLong(decompressed_size);
-        if (temp == NULL) {
-            goto error;
-        }
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    /* 1, dict_id */
-    temp = PyLong_FromUnsignedLong(dict_id);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
-
     goto success;
 error:
     Py_CLEAR(ret);
@@ -3071,7 +3055,7 @@ invoke_callback(PyObject *callback,
     }
 
     /* callback function arguments */
-    cb_args = Py_BuildValue("(KKOO)",
+    cb_args = Py_BuildValue("KKOO",
                             total_input_size, total_output_size,
                             in_memoryview, out_memoryview);
     if (cb_args == NULL) {
@@ -3094,34 +3078,6 @@ invoke_callback(PyObject *callback,
     return 0;
 error:
     return -1;
-}
-
-/* Return NULL on failure */
-FORCE_INLINE PyObject *
-build_return_tuple(uint64_t total_input_size, uint64_t total_output_size)
-{
-    PyObject *ret, *temp;
-
-    ret = PyTuple_New(2);
-    if (ret == NULL) {
-        return NULL;
-    }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
-
-    return ret;
 }
 
 PyDoc_STRVAR(compress_stream_doc,
@@ -3374,7 +3330,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     } /* Read loop */
 
     /* Return value */
-    ret = build_return_tuple(total_input_size, total_output_size);
+    ret = Py_BuildValue("KK", total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
@@ -3631,7 +3587,7 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     } /* Read loop */
 
     /* Return value */
-    ret = build_return_tuple(total_input_size, total_output_size);
+    ret = Py_BuildValue("KK", total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }

@@ -127,7 +127,7 @@ class FunctionsTestCase(unittest.TestCase):
         dat = compress(b'a'*345, zstd_dict=TRAINED_DICT)
         info = get_frame_info(dat)
         self.assertEqual(info.decompressed_size, 345)
-        self.assertNotEqual(info.dictionary_id, 0)
+        self.assertEqual(info.dictionary_id, TRAINED_DICT.dict_id)
 
         with self.assertRaisesRegex(ZstdError,
                                     'not less than the frame header'):
@@ -1078,7 +1078,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         # output b''
         bi = BytesIO(b'')
         bo = BytesIO()
-        compress_stream(bi, bo)
+        ret = compress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
@@ -1096,7 +1097,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         bi = BytesIO(b'')
         bo = BytesIO()
-        decompress_stream(bi, bo)
+        ret = decompress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
