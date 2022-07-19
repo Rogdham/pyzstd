@@ -95,7 +95,10 @@ class build_ext_compiler_check(build_ext):
 
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
-                # -g0: Level 0 produces no debug information at all
+                # -g0: Level 0 produces no debug information at all. This
+                #      reduces the size of GCC wheels.
+                #      By default CPython won't print any C stack trace, so -g0
+                #      and -g2 are same for most users.
                 more_options = ['-g0']
                 if AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
@@ -108,9 +111,12 @@ class build_ext_compiler_check(build_ext):
                 extension.sources = [i for i in extension.sources
                                         if not fnmatch.fnmatch(i, '*.[sS]')]
 
-                # /Ob3 is more aggressive inlining than /Ob2
-                # /GF eliminates duplicate strings
-                # /Gy does function level linking
+                # /Ob3: More aggressive inlining than /Ob2.
+                # /GF:  Eliminates duplicate strings.
+                # /Gy:  Does function level linking.
+                #       /Ob3 is a bit faster on the whole. In setuptools
+                #       v56.1.0+, /GF and /Gy are enabled by default, they
+                #       reduce the size of MSVC wheels.
                 more_options = ['/Ob3', '/GF', '/Gy']
                 if AVX2:
                     more_options.append('/arch:AVX2')
