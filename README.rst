@@ -18,6 +18,10 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.3  (Aug 3, 2022)**
+
+Fix ``ZstdError`` object can't be pickled.
+
 **0.15.2  (Jan 22, 2022)**
 
 Update bundled zstd source code from v1.5.1 to `v1.5.2 <https://github.com/facebook/zstd/releases/tag/v1.5.2>`_.
