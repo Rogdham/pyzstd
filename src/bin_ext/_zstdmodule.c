@@ -37,7 +37,7 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdDict;
 
 typedef struct {
@@ -56,10 +56,10 @@ typedef struct {
     PyThread_type_lock lock;
 
     /* (nbWorker >= 1) ? 1 : 0 */
-    char use_multithread;
+    int use_multithread;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdCompressor;
 
 typedef struct {
@@ -96,7 +96,7 @@ typedef struct {
     char eof;
 
     /* __init__ has been called, 0 or 1. */
-    char inited;
+    int inited;
 } ZstdDecompressor;
 
 typedef struct {
@@ -275,6 +275,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
     PyObject *b;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
     Py_ssize_t block_size;
+    int append_ret;
 
     /* Ensure no gaps in the data */
     assert(ob->pos == ob->size);
@@ -310,11 +311,13 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
         PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
     }
-    if (PyList_Append(buffer->list, b) < 0) {
-        Py_DECREF(b);
+
+    /* Append to list */
+    append_ret = PyList_Append(buffer->list, b);
+    Py_DECREF(b);
+    if (append_ret < 0) {
         return -1;
     }
-    Py_DECREF(b);
 
     /* Set variables */
     buffer->allocated += block_size;
@@ -582,7 +585,6 @@ typedef enum {
     ERR_LOAD_D_DICT,
     ERR_LOAD_C_DICT,
 
-    ERR_GET_FRAME_SIZE,
     ERR_GET_C_BOUNDS,
     ERR_GET_D_BOUNDS,
     ERR_SET_C_LEVEL,
@@ -618,9 +620,6 @@ set_zstd_error(const error_type type, const size_t code)
         type_msg = "load zstd dictionary for compression";
         break;
 
-    case ERR_GET_FRAME_SIZE:
-        type_msg = "get the size of a zstd frame";
-        break;
     case ERR_GET_C_BOUNDS:
         type_msg = "get zstd compression parameter bounds";
         break;
@@ -722,17 +721,6 @@ _get_DDict(ZstdDict *self)
     return self->d_dict;
 }
 
-static inline void
-clamp_compression_level(int *compressionLevel)
-{
-    /* In zstd v1.4.6-, lower bound is not clamped. */
-    if (ZSTD_versionNumber() < 10407) {
-        if (*compressionLevel < ZSTD_minCLevel()) {
-            *compressionLevel = ZSTD_minCLevel();
-        }
-    }
-}
-
 /* Set compressLevel or compression parameters to compression context. */
 static int
 set_c_parameters(ZstdCompressor *self,
@@ -749,9 +737,6 @@ set_c_parameters(ZstdCompressor *self,
                             "Compression level should be 32-bit signed int value.");
             return -1;
         }
-
-        /* Clamp compression level */
-        clamp_compression_level(&level);
 
         /* Save to *compress_level for generating ZSTD_CDICT */
         *compress_level = level;
@@ -799,9 +784,6 @@ set_c_parameters(ZstdCompressor *self,
             }
 
             if (key_v == ZSTD_c_compressionLevel) {
-                /* Clamp compression level */
-                clamp_compression_level(&value_v);
-
                 /* Save to *compress_level for generating ZSTD_CDICT */
                 *compress_level = value_v;
             } else if (key_v == ZSTD_c_nbWorkers) {
@@ -1162,7 +1144,7 @@ static PyType_Slot zstddict_slots[] = {
 };
 
 static PyType_Spec zstddict_type_spec = {
-    .name = "_zstd.ZstdDict",
+    .name = "pyzstd.ZstdDict",
     .basicsize = sizeof(ZstdDict),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstddict_slots,
@@ -1867,7 +1849,7 @@ static PyType_Slot zstdcompressor_slots[] = {
 };
 
 static PyType_Spec zstdcompressor_type_spec = {
-    .name = "_zstd.ZstdCompressor",
+    .name = "pyzstd.ZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstdcompressor_slots,
@@ -1999,7 +1981,7 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
 };
 
 static PyType_Spec richmem_zstdcompressor_type_spec = {
-    .name = "_zstd.RichMemZstdCompressor",
+    .name = "pyzstd.RichMemZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = richmem_zstdcompressor_slots,
@@ -2171,7 +2153,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
     Py_ssize_t initial_buffer_size = -1;
     ZSTD_inBuffer in;
     PyObject *ret = NULL;
-    char use_input_buffer;
+    int use_input_buffer;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "y*|n:ZstdDecompressor.decompress", kwlist,
@@ -2619,7 +2601,7 @@ static PyType_Slot ZstdDecompressor_slots[] = {
 };
 
 static PyType_Spec ZstdDecompressor_type_spec = {
-    .name = "_zstd.ZstdDecompressor",
+    .name = "pyzstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = ZstdDecompressor_slots,
@@ -2691,7 +2673,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
 };
 
 static PyType_Spec EndlessZstdDecompressor_type_spec = {
-    .name = "_zstd.EndlessZstdDecompressor",
+    .name = "pyzstd.EndlessZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = EndlessZstdDecompressor_slots,
@@ -2881,7 +2863,12 @@ get_frame_size(PyObject *module, PyObject *args)
 
     frame_size = ZSTD_findFrameCompressedSize(frame_buffer.buf, frame_buffer.len);
     if (ZSTD_isError(frame_size)) {
-        set_zstd_error(ERR_GET_FRAME_SIZE, frame_size);
+        PyErr_Format(static_state.ZstdError,
+                     "Error when finding the compressed size of a zstd frame. "
+                     "Make sure the frame_buffer argument starts from the "
+                     "beginning of a frame, and its length not less than this "
+                     "complete frame. Zstd error message: %s.",
+                     ZSTD_getErrorName(frame_size));
         goto error;
     }
 
@@ -2906,10 +2893,8 @@ _get_frame_info(PyObject *module, PyObject *args)
 {
     Py_buffer frame_buffer;
 
-    uint64_t content_size;
-    char unknown_content_size;
+    uint64_t decompressed_size;
     uint32_t dict_id;
-    PyObject *temp;
     PyObject *ret = NULL;
 
     if (!PyArg_ParseTuple(args, "y*:_get_frame_info", &frame_buffer)) {
@@ -2917,50 +2902,34 @@ _get_frame_info(PyObject *module, PyObject *args)
     }
 
     /* ZSTD_getFrameContentSize */
-    content_size = ZSTD_getFrameContentSize(frame_buffer.buf,
-                                            frame_buffer.len);
-    if (content_size == ZSTD_CONTENTSIZE_UNKNOWN) {
-        unknown_content_size = 1;
-    } else if (content_size == ZSTD_CONTENTSIZE_ERROR) {
+    decompressed_size = ZSTD_getFrameContentSize(frame_buffer.buf,
+                                                 frame_buffer.len);
+
+    /* #define ZSTD_CONTENTSIZE_UNKNOWN (0ULL - 1)
+       #define ZSTD_CONTENTSIZE_ERROR   (0ULL - 2) */
+    if (decompressed_size == ZSTD_CONTENTSIZE_ERROR) {
         PyErr_SetString(static_state.ZstdError,
-                        "Error when getting a zstd frame's decompressed size, "
-                        "make sure the frame_buffer argument starts from the "
-                        "beginning of a frame and its size larger than the "
-                        "frame header (6~18 bytes).");
+                        "Error when getting information from the header of "
+                        "a zstd frame. Make sure the frame_buffer argument "
+                        "starts from the beginning of a frame, and its length "
+                        "not less than the frame header (6~18 bytes).");
         goto error;
-    } else {
-        unknown_content_size = 0;
     }
 
     /* ZSTD_getDictID_fromFrame */
     dict_id = ZSTD_getDictID_fromFrame(frame_buffer.buf, frame_buffer.len);
 
     /* Build tuple */
-    ret = PyTuple_New(2);
+    if (decompressed_size == ZSTD_CONTENTSIZE_UNKNOWN) {
+        ret = Py_BuildValue("OI", Py_None, dict_id);
+    } else {
+        ret = Py_BuildValue("KI", decompressed_size, dict_id);
+    }
+
     if (ret == NULL) {
         goto error;
     }
-
-    /* 0, content_size */
-    if (unknown_content_size) {
-        temp = Py_None;
-        Py_INCREF(temp);
-    } else {
-        temp = PyLong_FromUnsignedLongLong(content_size);
-        if (temp == NULL) {
-            goto error;
-        }
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    /* 1, dict_id */
-    temp = PyLong_FromUnsignedLong(dict_id);
-    if (temp == NULL) {
-        goto error;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
     goto success;
-
 error:
     Py_CLEAR(ret);
 success:
@@ -3057,8 +3026,6 @@ invoke_callback(PyObject *callback,
     PyObject *out_memoryview;
     PyObject *cb_args;
     PyObject *cb_ret;
-    PyObject * const empty_memoryview = static_state.empty_readonly_memoryview;
-    char cb_referenced;
 
     /* Input memoryview */
     const size_t in_size = in->size - *callback_read_pos;
@@ -3071,7 +3038,7 @@ invoke_callback(PyObject *callback,
             goto error;
         }
     } else {
-        in_memoryview = empty_memoryview;
+        in_memoryview = static_state.empty_readonly_memoryview;
         Py_INCREF(in_memoryview);
     }
 
@@ -3083,12 +3050,12 @@ invoke_callback(PyObject *callback,
             goto error;
         }
     } else {
-        out_memoryview = empty_memoryview;
+        out_memoryview = static_state.empty_readonly_memoryview;
         Py_INCREF(out_memoryview);
     }
 
     /* callback function arguments */
-    cb_args = Py_BuildValue("(KKOO)",
+    cb_args = Py_BuildValue("KKOO",
                             total_input_size, total_output_size,
                             in_memoryview, out_memoryview);
     if (cb_args == NULL) {
@@ -3099,9 +3066,6 @@ invoke_callback(PyObject *callback,
 
     /* Callback */
     cb_ret = PyObject_CallObject(callback, cb_args);
-
-    cb_referenced = (in_memoryview != empty_memoryview && Py_REFCNT(in_memoryview) > 2) ||
-                    (out_memoryview != empty_memoryview && Py_REFCNT(out_memoryview) > 2);
     Py_DECREF(cb_args);
     Py_DECREF(in_memoryview);
     Py_DECREF(out_memoryview);
@@ -3111,47 +3075,9 @@ invoke_callback(PyObject *callback,
     }
     Py_DECREF(cb_ret);
 
-    /* memoryview object was referenced in callback function */
-    if (cb_referenced) {
-        PyErr_SetString(PyExc_RuntimeError,
-                        "The third and fourth arguments of callback function "
-                        "are memoryview objects. If want to reference them "
-                        "outside the callback function, convert them to bytes "
-                        "object using bytes() function.");
-        goto error;
-    }
-
     return 0;
 error:
     return -1;
-}
-
-/* Return NULL on failure */
-FORCE_INLINE PyObject *
-build_return_tuple(uint64_t total_input_size, uint64_t total_output_size)
-{
-    PyObject *ret, *temp;
-
-    ret = PyTuple_New(2);
-    if (ret == NULL) {
-        return NULL;
-    }
-
-    temp = PyLong_FromUnsignedLongLong(total_input_size);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromUnsignedLongLong(total_output_size);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
-
-    return ret;
 }
 
 PyDoc_STRVAR(compress_stream_doc,
@@ -3404,7 +3330,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     } /* Read loop */
 
     /* Return value */
-    ret = build_return_tuple(total_input_size, total_output_size);
+    ret = Py_BuildValue("KK", total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
@@ -3418,7 +3344,7 @@ success:
     ZSTD_freeCCtx(self.cctx);
 
     Py_XDECREF(in_memoryview);
-    PyMem_Free((char*) in.src);
+    PyMem_Free((void*) in.src);
     PyMem_Free(out.dst);
 
     return ret;
@@ -3661,7 +3587,7 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     } /* Read loop */
 
     /* Return value */
-    ret = build_return_tuple(total_input_size, total_output_size);
+    ret = Py_BuildValue("KK", total_input_size, total_output_size);
     if (ret == NULL) {
         goto error;
     }
@@ -3675,7 +3601,7 @@ success:
     ZSTD_freeDCtx(self.dctx);
 
     Py_XDECREF(in_memoryview);
-    PyMem_Free((char*) in.src);
+    PyMem_Free((void*) in.src);
     PyMem_Free(out.dst);
 
     return ret;
@@ -3701,10 +3627,15 @@ _set_parameter_types(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    Py_INCREF(c_parameter_type);
-    static_state.CParameter_type = (PyTypeObject*)c_parameter_type;
-    Py_INCREF(d_parameter_type);
-    static_state.DParameter_type = (PyTypeObject*)d_parameter_type;
+    /* Not for strict check, using the first values is fine. */
+    if (static_state.CParameter_type == NULL &&
+        static_state.DParameter_type == NULL)
+    {
+        Py_INCREF(c_parameter_type);
+        static_state.CParameter_type = (PyTypeObject*)c_parameter_type;
+        Py_INCREF(d_parameter_type);
+        static_state.DParameter_type = (PyTypeObject*)d_parameter_type;
+    }
 
     Py_RETURN_NONE;
 }
@@ -3949,7 +3880,7 @@ PyInit__zstd(void)
 
     /* ZstdError */
     static_state.ZstdError = PyErr_NewExceptionWithDoc(
-                                  "_zstd.ZstdError",
+                                  "pyzstd.ZstdError",
                                   "Call to the underlying zstd library failed.",
                                   NULL, NULL);
     if (static_state.ZstdError == NULL) {

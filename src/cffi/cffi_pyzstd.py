@@ -1,5 +1,6 @@
 from collections import namedtuple
 from enum import IntEnum
+from functools import lru_cache
 from sys import maxsize
 from threading import Lock
 from warnings import warn
@@ -76,6 +77,7 @@ class CParameter(IntEnum):
     jobSize                    = m.ZSTD_c_jobSize
     overlapLog                 = m.ZSTD_c_overlapLog
 
+    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
@@ -88,6 +90,7 @@ class DParameter(IntEnum):
 
     windowLogMax = m.ZSTD_d_windowLogMax
 
+    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter
@@ -354,13 +357,12 @@ class _ErrorType:
     ERR_LOAD_D_DICT=3
     ERR_LOAD_C_DICT=4
 
-    ERR_GET_FRAME_SIZE=5
-    ERR_GET_C_BOUNDS=6
-    ERR_GET_D_BOUNDS=7
-    ERR_SET_C_LEVEL=8
+    ERR_GET_C_BOUNDS=5
+    ERR_GET_D_BOUNDS=6
+    ERR_SET_C_LEVEL=7
 
-    ERR_TRAIN_DICT=9
-    ERR_FINALIZE_DICT=10
+    ERR_TRAIN_DICT=8
+    ERR_FINALIZE_DICT=9
 
     _TYPE_MSG = (
         "decompress zstd data",
@@ -370,7 +372,6 @@ class _ErrorType:
         "load zstd dictionary for decompression",
         "load zstd dictionary for compression",
 
-        "get the size of a zstd frame",
         "get zstd compression parameter bounds",
         "get zstd decompression parameter bounds",
         "set zstd compression level",
@@ -456,29 +457,23 @@ def _check_int32_value(value, name):
     except:
         raise ValueError("%s should be 32-bit signed int value." % name)
 
-def _clamp_compression_level(level):
-    # In zstd v1.4.6-, lower bound is not clamped.
-    if m.ZSTD_versionNumber() < 10407:
-        if level < m.ZSTD_minCLevel():
-            return m.ZSTD_minCLevel()
-    return level
-
+# return: (compressionLevel, use_multithread)
 def _set_c_parameters(cctx, level_or_option):
-    level = 0  # 0 means use zstd's default compression level
-    use_multithread = False
-
     if isinstance(level_or_option, int):
         _check_int32_value(level_or_option, "Compression level")
-        level = _clamp_compression_level(level_or_option)
 
         # Set compression level
-        zstd_ret = m.ZSTD_CCtx_setParameter(cctx, m.ZSTD_c_compressionLevel, level)
+        zstd_ret = m.ZSTD_CCtx_setParameter(cctx, m.ZSTD_c_compressionLevel,
+                                            level_or_option)
         if m.ZSTD_isError(zstd_ret):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
-        return level, use_multithread
+        return level_or_option, False
 
     if isinstance(level_or_option, dict):
+        level = 0  # 0 means use zstd's default compression level
+        use_multithread = False
+
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             # Check key type
             if type(key) == DParameter:
@@ -490,7 +485,7 @@ def _set_c_parameters(cctx, level_or_option):
             _check_int32_value(value, "Value of option dict")
 
             if key == m.ZSTD_c_compressionLevel:
-                level = value = _clamp_compression_level(value)
+                level = value
             elif key == m.ZSTD_c_nbWorkers:
                 if value > 0:
                     use_multithread = True
@@ -555,6 +550,14 @@ class _Compressor:
         self._lock = Lock()
         level = 0  # 0 means use zstd's default compression level
 
+        self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
+        if self._singleton_in_buf == ffi.NULL:
+            raise MemoryError
+
+        self._singleton_out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._singleton_out_buf == ffi.NULL:
+            raise MemoryError
+
         # Compression context
         self._cctx = m.ZSTD_createCCtx()
         if self._cctx == ffi.NULL:
@@ -579,17 +582,13 @@ class _Compressor:
 
     def _compress_impl(self, data, end_directive, rich_mem):
         # Input buffer
-        in_buf = _new_nonzero("ZSTD_inBuffer *")
-        if in_buf == ffi.NULL:
-            raise MemoryError
+        in_buf = self._singleton_in_buf
         in_buf.src = ffi.from_buffer(data)
         in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
 
         # Initialize output buffer
@@ -615,17 +614,13 @@ class _Compressor:
 
     def _compress_mt_continue_impl(self, data):
         # Input buffer
-        in_buf = _new_nonzero("ZSTD_inBuffer *")
-        if in_buf == ffi.NULL:
-            raise MemoryError
+        in_buf = self._singleton_in_buf
         in_buf.src = ffi.from_buffer(data)
         in_buf.size = _nbytes(data)
         in_buf.pos = 0
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
         out.initAndGrow(out_buf, -1)
 
@@ -858,6 +853,14 @@ class _Decompressor:
         self._in_begin = 0
         self._in_end = 0
 
+        self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
+        if self._singleton_in_buf == ffi.NULL:
+            raise MemoryError
+
+        self._singleton_out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._singleton_out_buf == ffi.NULL:
+            raise MemoryError
+
         # Decompression context
         self._dctx = m.ZSTD_createDCtx()
         if self._dctx == ffi.NULL:
@@ -895,9 +898,7 @@ class _Decompressor:
                 return b""
 
         # Output buffer
-        out_buf = _new_nonzero("ZSTD_outBuffer *")
-        if out_buf == ffi.NULL:
-            raise MemoryError
+        out_buf = self._singleton_out_buf
         out = _BlocksOutputBuffer()
         if initial_size >= 0:
             out.initWithSize(out_buf, max_length, initial_size)
@@ -946,10 +947,7 @@ class _Decompressor:
         self._lock.acquire()
         try:
             initial_buffer_size = -1
-
-            in_buf = _new_nonzero("ZSTD_inBuffer *")
-            if in_buf == ffi.NULL:
-                raise MemoryError
+            in_buf = self._singleton_in_buf
 
             if self._type == _TYPE_DEC:
                 # Check .eof flag
@@ -1209,16 +1207,11 @@ def decompress(data, zstd_dict=None, option=None):
     zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
     option:    A dict object, contains advanced decompression parameters.
     """
-    # Initialize & set ZstdDecompressor
-    decomp = _Decompressor(zstd_dict, option)
-    decomp._at_frame_edge = True
-    decomp._type = _TYPE_ENDLESS_DEC
+    # EndlessZstdDecompressor
+    decomp = EndlessZstdDecompressor(zstd_dict, option)
 
     # Prepare input data
-    in_buf = _new_nonzero("ZSTD_inBuffer *")
-    if in_buf == ffi.NULL:
-        raise MemoryError
-
+    in_buf = decomp._singleton_in_buf
     in_buf.src = ffi.from_buffer(data)
     in_buf.size = len(data)
     in_buf.pos = 0
@@ -1734,21 +1727,21 @@ def get_frame_info(frame_buffer):
     It's possible to append more items to the namedtuple in the future.
     """
 
-    content_size = m.ZSTD_getFrameContentSize(
-                      ffi.from_buffer(frame_buffer), len(frame_buffer))
-    if content_size == m.ZSTD_CONTENTSIZE_UNKNOWN:
-        content_size = None
-    elif content_size == m.ZSTD_CONTENTSIZE_ERROR:
-        msg = ("Error when getting a zstd frame's decompressed size, "
-               "make sure the frame_buffer argument starts from the "
-               "beginning of a frame and its size larger than the "
-               "frame header (6~18 bytes).")
+    decompressed_size = m.ZSTD_getFrameContentSize(
+                            ffi.from_buffer(frame_buffer), len(frame_buffer))
+    if decompressed_size == m.ZSTD_CONTENTSIZE_UNKNOWN:
+        decompressed_size = None
+    elif decompressed_size == m.ZSTD_CONTENTSIZE_ERROR:
+        msg = ("Error when getting information from the header of "
+               "a zstd frame. Make sure the frame_buffer argument "
+               "starts from the beginning of a frame, and its length "
+               "not less than the frame header (6~18 bytes).")
         raise ZstdError(msg)
 
     dict_id = m.ZSTD_getDictID_fromFrame(
                   ffi.from_buffer(frame_buffer), len(frame_buffer))
 
-    ret = _nt_frame_info(content_size, dict_id)
+    ret = _nt_frame_info(decompressed_size, dict_id)
     return ret
 
 def get_frame_size(frame_buffer):
@@ -1765,6 +1758,11 @@ def get_frame_size(frame_buffer):
     frame_size = m.ZSTD_findFrameCompressedSize(
                      ffi.from_buffer(frame_buffer), len(frame_buffer))
     if m.ZSTD_isError(frame_size):
-        _set_zstd_error(_ErrorType.ERR_GET_FRAME_SIZE, frame_size)
+        msg = ("Error when finding the compressed size of a zstd frame. "
+               "Make sure the frame_buffer argument starts from the "
+               "beginning of a frame, and its length not less than this "
+               "complete frame. Zstd error message: %s.") % \
+               ffi.string(m.ZSTD_getErrorName(frame_size)).decode('utf-8')
+        raise ZstdError(msg)
 
     return frame_size

@@ -127,16 +127,18 @@ class FunctionsTestCase(unittest.TestCase):
         dat = compress(b'a'*345, zstd_dict=TRAINED_DICT)
         info = get_frame_info(dat)
         self.assertEqual(info.decompressed_size, 345)
-        self.assertNotEqual(info.dictionary_id, 0)
+        self.assertEqual(info.dictionary_id, TRAINED_DICT.dict_id)
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaisesRegex(ZstdError,
+                                    'not less than the frame header'):
             get_frame_info(b'aaaaaaaaaaaaaa')
 
     def test_get_frame_size(self):
         size = get_frame_size(COMPRESSED_100_PLUS_32KB)
         self.assertEqual(size, len(COMPRESSED_100_PLUS_32KB))
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaisesRegex(ZstdError,
+                                    'not less than this complete frame'):
             get_frame_size(b'aaaaaaaaaaaaaa')
 
 class ClassShapeTestCase(unittest.TestCase):
@@ -399,6 +401,18 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertEqual(len(t), 2)
         self.assertEqual(type(t[0]), int)
         self.assertEqual(type(t[1]), int)
+
+    def test_zstderror_pickle(self):
+        try:
+            decompress(b'invalid data')
+        except Exception as e:
+            self.assertEqual(type(e), ZstdError)
+
+            s = pickle.dumps(e)
+            obj = pickle.loads(s)
+            self.assertEqual(type(obj), ZstdError)
+        else:
+            self.assertFalse(True, 'unreachable code path')
 
 class CompressorDecompressorTestCase(unittest.TestCase):
 
@@ -1076,7 +1090,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         # output b''
         bi = BytesIO(b'')
         bo = BytesIO()
-        compress_stream(bi, bo)
+        ret = compress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
@@ -1094,10 +1109,24 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         bi = BytesIO(b'')
         bo = BytesIO()
-        decompress_stream(bi, bo)
+        ret = decompress_stream(bi, bo)
+        self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
         bo.close()
+
+    def test_parameter_bounds_cache(self):
+        a = CParameter.compressionLevel.bounds()
+        b = CParameter.compressionLevel.bounds()
+        self.assertIs(a, b)
+
+        a = CParameter.windowLog.bounds()
+        b = CParameter.windowLog.bounds()
+        self.assertIs(a, b)
+
+        a = DParameter.windowLogMax.bounds()
+        b = DParameter.windowLogMax.bounds()
+        self.assertIs(a, b)
 
 class DecompressorFlagsTestCase(unittest.TestCase):
 
@@ -2084,6 +2113,9 @@ class OutputBufferTestCase(unittest.TestCase):
         self.assertTrue(d.at_frame_edge)
 
 class FileTestCase(unittest.TestCase):
+    def setUp(self):
+        self.DECOMPRESSED_42 = b'a'*42
+        self.FRAME_42 = compress(self.DECOMPRESSED_42)
 
     def test_init(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2233,7 +2265,6 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict=b'dict123456')
 
-
     def test_close(self):
         with BytesIO(COMPRESSED_100_PLUS_32KB) as src:
             f = ZstdFile(src)
@@ -2372,6 +2403,14 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.writable)
 
+    def test_ZstdDecompressReader(self):
+        r = pyzstd.ZstdDecompressReader(BytesIO(self.FRAME_42),
+                                        EndlessZstdDecompressor,
+                                        trailing_error=ZstdError)
+        self.assertEqual(r.read(0), b'')
+        self.assertEqual(r.read(42), self.DECOMPRESSED_42)
+        self.assertEqual(r.read(10), b'')
+
     def test_read(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
@@ -2384,6 +2423,7 @@ class FileTestCase(unittest.TestCase):
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
             self.assertEqual(f.read(), b"")
+            self.assertEqual(f.read(10), b"")
 
     def test_read_0(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2391,6 +2431,14 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(0), b"")
+
+        # empty file
+        with ZstdFile(BytesIO(b'')) as f:
+            self.assertEqual(f.read(0), b"")
+            self.assertEqual(f.read(10), b"")
+
+        with ZstdFile(BytesIO(b'')) as f:
+            self.assertEqual(f.read(10), b"")
 
     def test_read_10(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -2428,6 +2476,13 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(TEST_DAT_130KB[:-200])) as f:
             self.assertRaises(EOFError, f.read)
 
+        # Trailing data isn't a valid compressed stream
+        with ZstdFile(BytesIO(self.FRAME_42 + b'12345')) as f:
+            self.assertRaises(ZstdError, f.read)
+
+        with ZstdFile(BytesIO(SKIPPABLE_FRAME + b'12345')) as f:
+            self.assertRaises(ZstdError, f.read)
+
     def test_read_truncated(self):
         # Drop stream epilogue: 4 bytes checksum
         truncated = TEST_DAT_130KB[:-4]
@@ -2439,7 +2494,7 @@ class FileTestCase(unittest.TestCase):
             self.assertRaises(EOFError, f.read, 1)
 
         # Incomplete header
-        for i in range(20):
+        for i in range(1, 20):
             with ZstdFile(BytesIO(truncated[:i])) as f:
                 self.assertRaises(EOFError, f.read, 1)
 
@@ -3215,9 +3270,6 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # it's a promised behavior.
         compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
         decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
-
-def test_main():
-    unittest.main()
 
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
@@ -4404,4 +4456,4 @@ TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae
  b'\xb7\x99\x1b\xce\xc9\t*\x98\x97\xb43z\x01h\x9fu\xf1')
 
 if __name__ == "__main__":
-    test_main()
+    unittest.main()

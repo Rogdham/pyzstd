@@ -25,20 +25,17 @@ with io.open(INIT_PATH, 'r', encoding='utf-8') as file:
 
 # -------- binary extension --------
 def get_zstd_files_list():
-    # Currently Linux/macOS can use assembly implementation
-    if sys.platform != 'win32':
-        ZSTD_FILE_EXTENSION = '*.[cCsS]'
-    else:
-        ZSTD_FILE_EXTENSION = '*.[cC]'
-
-    lst = []
+    ret = []
     for sub_dir in ('common', 'compress', 'decompress', 'dictBuilder'):
         directory = 'zstd/lib/' + sub_dir + '/'
+        dir_list = os.listdir(directory)
+
+        # Source files
         l = [directory + fn
-               for fn in os.listdir(directory)
-               if fnmatch.fnmatch(fn, ZSTD_FILE_EXTENSION)]
-        lst.extend(l)
-    return lst
+               for fn in dir_list
+               if fnmatch.fnmatch(fn, '*.[cCsS]')]
+        ret.extend(l)
+    return ret
 
 def has_option(option):
     if option in sys.argv:
@@ -97,16 +94,29 @@ class build_ext_compiler_check(build_ext):
         self.compiler.src_extensions.extend(['.s', '.S'])
 
         for extension in self.extensions:
-            if self.compiler.compiler_type.lower() in ('unix', 'mingw32'):
+            if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
+                # -g0: Level 0 produces no debug information at all. This
+                #      reduces the size of GCC wheels.
+                #      By default CPython won't print any C stack trace, so -g0
+                #      and -g2 are same for most users.
+                more_options = ['-g0']
                 if AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
-                    extension.extra_compile_args.extend(instrs)
+                    more_options.extend(instrs)
                 if WARNING_AS_ERROR:
-                    extension.extra_compile_args.append('-Werror')
-            elif self.compiler.compiler_type.lower() == 'msvc':
-                # /Ob3 is more aggressive inlining than /Ob2
-                # /GF eliminates duplicate strings
-                # /Gy does function level linking
+                    more_options.append('-Werror')
+                extension.extra_compile_args.extend(more_options)
+            elif self.compiler.compiler_type == 'msvc':
+                # Remove .S source files
+                extension.sources = [i for i in extension.sources
+                                        if not fnmatch.fnmatch(i, '*.[sS]')]
+
+                # /Ob3: More aggressive inlining than /Ob2.
+                # /GF:  Eliminates duplicate strings.
+                # /Gy:  Does function level linking.
+                #       /Ob3 is a bit faster on the whole. In setuptools
+                #       v56.1.0+, /GF and /Gy are enabled by default, they
+                #       reduce the size of MSVC wheels.
                 more_options = ['/Ob3', '/GF', '/Gy']
                 if AVX2:
                     more_options.append('/arch:AVX2')
@@ -140,6 +150,7 @@ setup(
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
         "Programming Language :: Python :: 3.10",
+        "Programming Language :: Python :: 3.11",
     ],
     keywords='zstandard zstd compression decompression compress decompress',
 

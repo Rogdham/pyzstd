@@ -5,7 +5,7 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
-  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
@@ -36,7 +36,7 @@ jobs:
 
     strategy:
       matrix:
-        py: ['pypy-3.6', 'pypy-3.7', 'pypy-3.8']
+        py: ['pypy-3.7', 'pypy-3.8', 'pypy-3.9']
 
     steps:
       - uses: actions/checkout@v2
@@ -145,7 +145,7 @@ jobs:
       - uses: actions/setup-python@v2
 
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v1
+        uses: docker/setup-qemu-action@v2
 
       - name: Install cibuildwheel & build wheels
         run: |
@@ -175,7 +175,7 @@ jobs:
         with:
           submodules: true
 
-      - uses: uraimo/run-on-arch-action@v2.1.1
+      - uses: uraimo/run-on-arch-action@v2.2.0
         name: Build & run test
         with:
           arch: ${{ matrix.arch }}
