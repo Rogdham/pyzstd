@@ -1144,7 +1144,7 @@ static PyType_Slot zstddict_slots[] = {
 };
 
 static PyType_Spec zstddict_type_spec = {
-    .name = "_zstd.ZstdDict",
+    .name = "pyzstd.ZstdDict",
     .basicsize = sizeof(ZstdDict),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstddict_slots,
@@ -1849,7 +1849,7 @@ static PyType_Slot zstdcompressor_slots[] = {
 };
 
 static PyType_Spec zstdcompressor_type_spec = {
-    .name = "_zstd.ZstdCompressor",
+    .name = "pyzstd.ZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = zstdcompressor_slots,
@@ -1981,7 +1981,7 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
 };
 
 static PyType_Spec richmem_zstdcompressor_type_spec = {
-    .name = "_zstd.RichMemZstdCompressor",
+    .name = "pyzstd.RichMemZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = richmem_zstdcompressor_slots,
@@ -2601,7 +2601,7 @@ static PyType_Slot ZstdDecompressor_slots[] = {
 };
 
 static PyType_Spec ZstdDecompressor_type_spec = {
-    .name = "_zstd.ZstdDecompressor",
+    .name = "pyzstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = ZstdDecompressor_slots,
@@ -2673,7 +2673,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
 };
 
 static PyType_Spec EndlessZstdDecompressor_type_spec = {
-    .name = "_zstd.EndlessZstdDecompressor",
+    .name = "pyzstd.EndlessZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = EndlessZstdDecompressor_slots,
@@ -3880,7 +3880,7 @@ PyInit__zstd(void)
 
     /* ZstdError */
     static_state.ZstdError = PyErr_NewExceptionWithDoc(
-                                  "_zstd.ZstdError",
+                                  "pyzstd.ZstdError",
                                   "Call to the underlying zstd library failed.",
                                   NULL, NULL);
     if (static_state.ZstdError == NULL) {

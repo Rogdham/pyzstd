@@ -402,6 +402,18 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertEqual(type(t[0]), int)
         self.assertEqual(type(t[1]), int)
 
+    def test_zstderror_pickle(self):
+        try:
+            decompress(b'invalid data')
+        except Exception as e:
+            self.assertEqual(type(e), ZstdError)
+
+            s = pickle.dumps(e)
+            obj = pickle.loads(s)
+            self.assertEqual(type(obj), ZstdError)
+        else:
+            self.assertFalse(True, 'unreachable code path')
+
 class CompressorDecompressorTestCase(unittest.TestCase):
 
     def test_simple_bad_args(self):
