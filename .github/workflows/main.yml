@@ -5,6 +5,7 @@ name: cibuildwheel
 on: [push, pull_request]
 
 env:
+  PYTHON_VER: '3.10'
   CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
@@ -19,10 +20,12 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VER }}
 
       - name: Run test
         run: |
@@ -39,8 +42,10 @@ jobs:
         py: ['pypy-3.7', 'pypy-3.8', 'pypy-3.9']
 
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-python@v2
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-python@v4
         with:
           python-version: ${{ matrix.py }}
 
@@ -61,20 +66,16 @@ jobs:
         platform: [ubuntu-latest, macos-latest, windows-latest]
 
     env:
-      # generate manylinux2014_x86_64 wheels
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2014
-      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2014
-      # generate manylinux1_i686 wheels
-      CIBW_MANYLINUX_I686_IMAGE: manylinux2014
-      CIBW_MANYLINUX_PYPY_I686_IMAGE: manylinux2014
       # macOS archs
       CIBW_ARCHS_MACOS: "x86_64 arm64"
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VER }}
 
       - name: Install cibuildwheel & build wheels
         run: |
@@ -95,15 +96,18 @@ jobs:
 
     env:
       # generate manylinux1_x86_64 wheels
+      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
       CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VER }}
 
       - name: Build source distribution & wheels
         run: |
@@ -139,10 +143,12 @@ jobs:
       CIBW_SKIP:  ${{ matrix.skip_image }}
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VER }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
@@ -171,10 +177,9 @@ jobs:
         distro: [bullseye]  # Debian 11
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-
       - uses: uraimo/run-on-arch-action@v2.2.0
         name: Build & run test
         with:
@@ -198,10 +203,10 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: actions/setup-python@v2
+      - uses: actions/setup-python@v4
         with:
           python-version: '3.5'
 
