@@ -406,8 +406,6 @@ class ClassShapeTestCase(unittest.TestCase):
         try:
             decompress(b'invalid data')
         except Exception as e:
-            self.assertEqual(type(e), ZstdError)
-
             s = pickle.dumps(e)
             obj = pickle.loads(s)
             self.assertEqual(type(obj), ZstdError)

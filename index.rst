@@ -552,7 +552,9 @@ Dictionary
 
     Represents a zstd dictionary, can be used for compression/decompression.
 
-    It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects. It has an internal cache for costly digesting.
+    It has an internal cache for costly digesting, so it's recommended to reuse ``ZstdDict`` object for the same dictionary.
+
+    It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -742,6 +744,11 @@ Module-level variables
 
 ZstdFile class and open() function
 ---------------------------------------
+
+    This section contains:
+
+        * class :py:class:`ZstdFile`, open a zstd-compressed file in binary mode.
+        * function :py:func:`open`, open a zstd-compressed file in binary or text mode.
 
 .. py:class:: ZstdFile
 
@@ -1404,10 +1411,10 @@ Build pyzstd module with options
 
     Some notes:
 
-        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
-        * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
-        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
+        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static linking, the packages on `Anaconda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic linking.
+        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
+        * Static linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
+        * Dynamic linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
 
     On Linux, dynamically link to zstd library provided by system:
 
