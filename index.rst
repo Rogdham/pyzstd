@@ -1386,21 +1386,27 @@ Build pyzstd module with options
 
 .. note:: Build pyzstd module with options
 
-    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
+    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
 
     .. sourcecode:: shell
 
+        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
         # build and install
-        pip install --install-option="--avx2" -v pyzstd-0.15.1.tar.gz
+        pip install --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
         # build a redistributable wheel
-        pip wheel --build-option="--avx2" pyzstd-0.15.1.tar.gz
+        pip wheel --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
+        # 🟠 legacy commands:
+        # build and install
+        python setup.py install --avx2
+        # build a redistributable wheel
+        python setup.py bdist_wheel --avx2
 
     2️⃣ Pyzstd module supports:
 
         * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``zstd`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
 
-    On CPython, add these options to setup.py:
+    On CPython, provide these build options:
 
         #. no option: C implementation, statically link to zstd library.
         #. ``--dynamic-link-zstd``: C implementation, dynamically link to zstd library.
@@ -1409,21 +1415,27 @@ Build pyzstd module with options
 
     On PyPy, only CFFI implementation can be used, so ``--cffi`` is added implicitly. ``--dynamic-link-zstd`` is optional.
 
+    .. sourcecode:: shell
+
+        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
+        # build and install
+        pip3 install --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
+        # build a redistributable wheel
+        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
+        # specify more than one option
+        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd --cffi" -v pyzstd-0.15.4.tar.gz
+        # 🟠 legacy commands:
+        # build and install
+        python3 setup.py install --dynamic-link-zstd
+        # build a redistributable wheel
+        python3 setup.py bdist_wheel --dynamic-link-zstd
+
     Some notes:
 
         * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static linking, the packages on `Anaconda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic linking.
         * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
         * Static linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
         * Dynamic linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
-
-    On Linux, dynamically link to zstd library provided by system:
-
-    .. sourcecode:: shell
-
-        # build and install
-        sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
-        # build a redistributable wheel
-        pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
 

@@ -29,7 +29,7 @@ jobs:
 
       - name: Run test
         run: |
-          python setup.py install --warning-as-error
+          python -m pip install --config-settings="--build-option=--warning-as-error" -v .
           python tests/test_zstd.py
 
   # Run test on PyPy for every commit
@@ -52,7 +52,7 @@ jobs:
       - name: Build & test
         run: |
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
-          python setup.py --dynamic-link-zstd install
+          python -m pip install --config-settings="--build-option=--dynamic-link-zstd" -v .
           python tests/test_zstd.py
 
   # Build Linux/macOS/Windows wheels
@@ -124,21 +124,17 @@ jobs:
 
       - name: Build source distribution & wheels
         run: |
-          python setup.py sdist --formats=gztar
-          python -m pip install -U cibuildwheel
+          python -m pip install -U build cibuildwheel
+          python -m build --sdist
           python -m cibuildwheel --output-dir wheelhouse
 
-      - name: Upload source distribution
+      - name: Upload source distribution & manylinux1_x86_64 wheels
         uses: actions/upload-artifact@v3
         with:
           name: pyzstd-files
-          path: dist/*.tar.gz
-
-      - name: Upload manylinux1_x86_64
-        uses: actions/upload-artifact@v3
-        with:
-          name: pyzstd-files
-          path: wheelhouse/*.whl
+          path: |
+            dist/*.tar.gz
+            wheelhouse/*.whl
 
   # Build aarch64/ppc64le/s390x wheels
   build_arch_wheels:
@@ -206,7 +202,8 @@ jobs:
 
           run: |
             python3 -c "import platform;print('Machine type:', platform.machine())"
-            python3 setup.py install --warning-as-error
+            python3 -m pip install -U pip
+            python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
             python3 tests/test_zstd.py
 
   # If the head commit message contains '<more-tests>', test on
@@ -214,7 +211,7 @@ jobs:
   test_on_minimum_cpython:
     name: Test on minimum version of CPython
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-20.04
 
     steps:
       - uses: actions/checkout@v3
