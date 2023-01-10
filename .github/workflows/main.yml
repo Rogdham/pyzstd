@@ -175,7 +175,7 @@ jobs:
           path: wheelhouse/*.whl
 
   # If the head commit message contains '<more-tests>', run test on
-  # armv6/armv7/aarch64/ppc64le/s390x architectures.
+  # armv6/armv7/aarch64/ppc64le/s390x/riscv64 architectures.
   test_on_arches:
     name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
@@ -184,25 +184,27 @@ jobs:
     strategy:
       matrix:
         arch: [armv6, armv7, aarch64, ppc64le, s390x]
-        distro: [bullseye]  # Debian 11
+        distro: [alpine_latest]
+        include:
+          - arch: riscv64
+            distro: alpine_edge
 
     steps:
       - uses: actions/checkout@v3
         with:
           submodules: true
-      - uses: uraimo/run-on-arch-action@v2.2.0
+      - uses: uraimo/run-on-arch-action@v2
         name: Build & run test
         with:
           arch: ${{ matrix.arch }}
           distro: ${{ matrix.distro }}
 
           install: |
-            apt-get update -q -y
-            apt-get install -q -y python3 python3-dev python3-pip build-essential gcc
+            apk update
+            apk add python3 python3-dev py3-pip build-base gcc
 
           run: |
             python3 -c "import platform;print('Machine type:', platform.machine())"
-            python3 -m pip install -U pip
             python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
             python3 tests/test_zstd.py
 
@@ -241,7 +243,6 @@ jobs:
       - name: Upload to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          user: __token__
           password: ${{ secrets.PYPI_TOKEN }}
           skip_existing: true
           verbose: true
