@@ -12,12 +12,16 @@ env:
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
   run_test:
-    name: Test on ${{ matrix.platform }}
+    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
+        architecture: [x64]
+        include:
+          - platform: windows-latest
+            architecture: x86
 
     steps:
       - uses: actions/checkout@v3
@@ -26,6 +30,7 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VER }}
+          architecture: ${{ matrix.architecture }}
 
       - name: Run test
         run: |
