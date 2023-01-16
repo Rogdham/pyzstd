@@ -14,6 +14,7 @@
     #error "pyzstd module requires zstd v1.4.0+"
 #endif
 
+/* Added in Python 3.7 */
 #ifndef Py_UNREACHABLE
     #define Py_UNREACHABLE() assert(0)
 #endif
@@ -1504,9 +1505,9 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     return 0;
 }
 
-static inline PyObject *
+FORCE_INLINE PyObject *
 compress_impl(ZstdCompressor *self, Py_buffer *data,
-              ZSTD_EndDirective end_directive, int rich_mem)
+              const ZSTD_EndDirective end_directive, const int rich_mem)
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
