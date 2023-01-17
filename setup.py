@@ -55,11 +55,13 @@ class pyzstd_build_ext(build_ext):
 
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
-                # -g0: Level 0 produces no debug information at all. This
-                #      reduces the size of GCC wheels.
-                #      By default CPython won't print any C stack trace, so -g0
-                #      and -g2 are same for most users.
-                more_options = ['-g0']
+                # -fvisibility=hidden:
+                #   Set default symbol visibility to hidden.
+                # -g0:
+                #   Level 0 produces no debug information at all. This reduces
+                #   the size of GCC wheels. By default CPython won't print any
+                #   C stack trace, so -g0 and -g2 are same for most users.
+                more_options = ['-fvisibility=hidden', '-g0']
                 if self.PYZSTD_AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
                     more_options.extend(instrs)
@@ -74,9 +76,9 @@ class pyzstd_build_ext(build_ext):
                 # /Ob3: More aggressive inlining than /Ob2.
                 # /GF:  Eliminates duplicate strings.
                 # /Gy:  Does function level linking.
-                #       /Ob3 is a bit faster on the whole. In setuptools
-                #       v56.1.0+, /GF and /Gy are enabled by default, they
-                #       reduce the size of MSVC wheels.
+                #   /Ob3 is a bit faster on the whole. In setuptools v56.1+,
+                #   /GF and /Gy are enabled by default, they reduce the size
+                #   of MSVC wheels.
                 more_options = ['/Ob3', '/GF', '/Gy']
                 if self.PYZSTD_AVX2:
                     more_options.append('/arch:AVX2')
@@ -146,7 +148,7 @@ def do_setup():
         python_requires='>=3.5',
 
         classifiers=[
-            "Development Status :: 4 - Beta",
+            "Development Status :: 5 - Production/Stable",
             "Intended Audience :: Developers",
             "Topic :: System :: Archiving :: Compression",
             "License :: OSI Approved :: BSD License",
