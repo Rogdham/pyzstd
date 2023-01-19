@@ -213,26 +213,6 @@ jobs:
             python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
             python3 tests/test_zstd.py
 
-  # If the head commit message contains '<more-tests>', test on
-  # minimum version of CPython.
-  test_on_minimum_cpython:
-    name: Test on minimum version of CPython
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
-    runs-on: ubuntu-20.04
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-      - uses: actions/setup-python@v4
-        with:
-          python-version: '3.5'
-
-      - name: Run test
-        run: |
-          python setup.py install --warning-as-error
-          python tests/test_zstd.py
-
   # Upload to PyPI
   upload_pypi:
     name: Publish to PyPI
