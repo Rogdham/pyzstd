@@ -94,8 +94,8 @@ def do_setup():
     pyzstd_build_ext.PYZSTD_WARNING_AS_ERROR = has_option('--warning-as-error')
 
     DYNAMIC_LINK = has_option('--dynamic-link-zstd')
-    CFFI = has_option('--cffi') or \
-           platform.python_implementation() == 'PyPy'
+    CFFI = has_option('--cffi') or platform.python_implementation() == 'PyPy'
+    MULTI_PHASE_INIT = has_option('--multi-phase-init')
 
     if DYNAMIC_LINK:
         kwargs = {
@@ -131,6 +131,9 @@ def do_setup():
         # binary extension
         kwargs['name'] = 'pyzstd.c._zstd'
         kwargs['sources'].append('src/bin_ext/_zstdmodule.c')
+        if MULTI_PHASE_INIT:
+            # use PEP-489 for CPython 3.9+
+            kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
 
         binary_extension = Extension(**kwargs)
 

@@ -1457,3 +1457,19 @@ Build pyzstd module with options
         * %SystemRoot%\System32
 
     Note that the above list doesn't include the current working directory and %PATH% directories.
+
+    3️⃣ Use "Multi-phase initialization" on CPython
+
+    If provide ``--multi-phase-init`` build option, pyzstd module will be built with `PEP-489 (Multi-phase extension module initialization) <https://peps.python.org/pep-0489/>`_ for CPython 3.9+.
+
+    At present, this option is disabled by default. It can be enabled after CPython's sub-interpreter is mature.
+
+    If enabled, like CPython standard library, these classes can't be subclassed:
+
+        * :py:class:`ZstdCompressor`
+        * :py:class:`RichMemZstdCompressor`
+        * :py:class:`ZstdDecompressor`
+        * :py:class:`EndlessZstdDecompressor`
+        * :py:class:`ZstdDict`
+
+    After `this section in PEP-573 <https://peps.python.org/pep-0573/#passing-the-defining-class-to-extension-methods>`_ is fully implemented, they may support subclass.

@@ -24,7 +24,8 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    compressionLevel_values, get_frame_info, get_frame_size, \
                    ZstdFile, open
 
-if not hasattr(pyzstd, 'CFFI_PYZSTD'):
+PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG
+if PYZSTD_CONFIG[0] == 'c':
     from pyzstd.c import _zstd
 
 DECOMPRESSED_DAT = None
@@ -185,9 +186,14 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # supports subclass
-        class SubClass(ZstdCompressor):
-            pass
+        # subclass
+        if PYZSTD_CONFIG[1]: # multi-phase init
+            with self.assertRaisesRegex(TypeError, 'base type'):
+                class SubClass(ZstdCompressor):
+                    pass
+        else:
+            class SubClass(ZstdCompressor):
+                pass
 
     def test_RichMemZstdCompressor(self):
         # class attributes
@@ -233,9 +239,14 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # supports subclass
-        class SubClass(RichMemZstdCompressor):
-            pass
+        # subclass
+        if PYZSTD_CONFIG[1]: # multi-phase init
+            with self.assertRaisesRegex(TypeError, 'base type'):
+                class SubClass(RichMemZstdCompressor):
+                    pass
+        else:
+            class SubClass(RichMemZstdCompressor):
+                pass
 
     def test_Decompressor(self):
         # method & member
@@ -282,9 +293,14 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # supports subclass
-        class SubClass(ZstdDecompressor):
-            pass
+        # subclass
+        if PYZSTD_CONFIG[1]: # multi-phase init
+            with self.assertRaisesRegex(TypeError, 'base type'):
+                class SubClass(ZstdDecompressor):
+                    pass
+        else:
+            class SubClass(ZstdDecompressor):
+                pass
 
     def test_EndlessDecompressor(self):
         # method & member
@@ -331,9 +347,14 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # supports subclass
-        class SubClass(EndlessZstdDecompressor):
-            pass
+        # subclass
+        if PYZSTD_CONFIG[1]: # multi-phase init
+            with self.assertRaisesRegex(TypeError, 'base type'):
+                class SubClass(EndlessZstdDecompressor):
+                    pass
+        else:
+            class SubClass(EndlessZstdDecompressor):
+                pass
 
     def test_ZstdDict(self):
         ZstdDict(b'12345678', True)
@@ -349,9 +370,14 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(zd)
 
-        # supports subclass
-        class SubClass(ZstdDict):
-            pass
+        # subclass
+        if PYZSTD_CONFIG[1]: # multi-phase init
+            with self.assertRaisesRegex(TypeError, 'base type'):
+                class SubClass(ZstdDict):
+                    pass
+        else:
+            class SubClass(ZstdDict):
+                pass
 
     def test_Strategy(self):
         # class attributes
@@ -1793,7 +1819,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
-    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(PYZSTD_CONFIG[0] == 'cffi', 'cffi implementation')
     def test_train_dict_c(self):
         # argument wrong type
         with self.assertRaises(TypeError):
@@ -1811,7 +1837,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
-    @unittest.skipIf(hasattr(pyzstd, 'CFFI_PYZSTD'), 'cffi implementation')
+    @unittest.skipIf(PYZSTD_CONFIG[0] == 'cffi', 'cffi implementation')
     def test_finalize_dict_c(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
@@ -2592,7 +2618,7 @@ class FileTestCase(unittest.TestCase):
             self.assertListEqual(f.readlines(), lines)
 
     def test_decompress_limited(self):
-        if hasattr(pyzstd, 'CFFI_PYZSTD'):
+        if PYZSTD_CONFIG[0] == 'cffi':
             _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
         else:
             _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize

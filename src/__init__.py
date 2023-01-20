@@ -12,14 +12,15 @@ try:
     # Import C implementation
     from .c.c_pyzstd import *
     from .c.c_pyzstd import _train_dict, _finalize_dict, \
-                            _ZSTD_DStreamInSize
+                            _ZSTD_DStreamInSize, _MULTI_PHASE_INIT
+    PYZSTD_CONFIG = ('c', _MULTI_PHASE_INIT)
 except ImportError:
     try:
         # Import CFFI implementation
         from .cffi.cffi_pyzstd import *
         from .cffi.cffi_pyzstd import _train_dict, _finalize_dict, \
                                       _ZSTD_DStreamInSize
-        CFFI_PYZSTD = True
+        PYZSTD_CONFIG = ('cffi', False)
     except ImportError:
         raise ImportError(
             "pyzstd module: Neither C implementation nor CFFI implementation "

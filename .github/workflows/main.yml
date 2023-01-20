@@ -1,5 +1,4 @@
-# Automatically build binary wheels and source packages.
-name: cibuildwheel
+name: pyzstd
 
 # Build on every branch push, tag push, and pull request change.
 on: [push, pull_request]
@@ -12,16 +11,21 @@ env:
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
   run_test:
-    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }}
+    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} ${{ matrix.multi_phase_init }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         architecture: [x64]
+        multi_phase_init: ['', '--multi-phase-init']
         include:
           - platform: windows-latest
             architecture: x86
+            multi_phase_init: ''
+          - platform: windows-latest
+            architecture: x86
+            multi_phase_init: '--multi-phase-init'
 
     steps:
       - uses: actions/checkout@v3
@@ -34,7 +38,7 @@ jobs:
 
       - name: Run test
         run: |
-          python -m pip install --config-settings="--build-option=--warning-as-error" -v .
+          python -m pip install --config-settings="--build-option=--warning-as-error ${{ matrix.multi_phase_init }}" -vv .
           python tests/test_zstd.py
 
   # Run test on PyPy for every commit

@@ -20,6 +20,7 @@ __all__ = (# From this file
 _ZSTD_DStreamInSize = _zstd._ZSTD_DStreamInSize
 _train_dict = _zstd._train_dict
 _finalize_dict = _zstd._finalize_dict
+_MULTI_PHASE_INIT = _zstd._MULTI_PHASE_INIT
 
 
 # compressionLevel_values
