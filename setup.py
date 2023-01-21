@@ -132,7 +132,7 @@ def do_setup():
         kwargs['name'] = 'pyzstd.c._zstd'
         kwargs['sources'].append('src/bin_ext/_zstdmodule.c')
         if MULTI_PHASE_INIT:
-            # use PEP-489 for CPython 3.9+
+            # use multi-phase initialization (PEP-489) for CPython 3.11+
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
 
         binary_extension = Extension(**kwargs)

@@ -186,14 +186,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # subclass
-        if PYZSTD_CONFIG[1]: # multi-phase init
-            with self.assertRaisesRegex(TypeError, 'base type'):
-                class SubClass(ZstdCompressor):
-                    pass
-        else:
-            class SubClass(ZstdCompressor):
-                pass
+        # supports subclass
+        class SubClass(ZstdCompressor):
+            pass
 
     def test_RichMemZstdCompressor(self):
         # class attributes
@@ -239,14 +234,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(c)
 
-        # subclass
-        if PYZSTD_CONFIG[1]: # multi-phase init
-            with self.assertRaisesRegex(TypeError, 'base type'):
-                class SubClass(RichMemZstdCompressor):
-                    pass
-        else:
-            class SubClass(RichMemZstdCompressor):
-                pass
+        # supports subclass
+        class SubClass(RichMemZstdCompressor):
+            pass
 
     def test_Decompressor(self):
         # method & member
@@ -293,14 +283,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # subclass
-        if PYZSTD_CONFIG[1]: # multi-phase init
-            with self.assertRaisesRegex(TypeError, 'base type'):
-                class SubClass(ZstdDecompressor):
-                    pass
-        else:
-            class SubClass(ZstdDecompressor):
-                pass
+        # supports subclass
+        class SubClass(ZstdDecompressor):
+            pass
 
     def test_EndlessDecompressor(self):
         # method & member
@@ -347,14 +332,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(d)
 
-        # subclass
-        if PYZSTD_CONFIG[1]: # multi-phase init
-            with self.assertRaisesRegex(TypeError, 'base type'):
-                class SubClass(EndlessZstdDecompressor):
-                    pass
-        else:
-            class SubClass(EndlessZstdDecompressor):
-                pass
+        # supports subclass
+        class SubClass(EndlessZstdDecompressor):
+            pass
 
     def test_ZstdDict(self):
         ZstdDict(b'12345678', True)
@@ -370,14 +350,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             pickle.dumps(zd)
 
-        # subclass
-        if PYZSTD_CONFIG[1]: # multi-phase init
-            with self.assertRaisesRegex(TypeError, 'base type'):
-                class SubClass(ZstdDict):
-                    pass
-        else:
-            class SubClass(ZstdDict):
-                pass
+        # supports subclass
+        class SubClass(ZstdDict):
+            pass
 
     def test_Strategy(self):
         # class attributes
@@ -1676,6 +1651,18 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertEqual(dat, b'')
         self.assertFalse(d.at_frame_edge)
         self.assertTrue(d.needs_input)
+
+    def test_EndlessZstdDecompressor_PEP489(self):
+        class D(EndlessZstdDecompressor):
+            def decompress(self, data):
+                return super().decompress(data)
+
+        d = D()
+        self.assertEqual(d.decompress(self.FRAME_42_60), self.DECOMPRESSED_42_60)
+        self.assertEqual(d.decompress(b''), b'')
+        self.assertTrue(d.at_frame_edge)
+        with self.assertRaises(ZstdError):
+            d.decompress(b'123456789')
 
 class ZstdDictTestCase(unittest.TestCase):
 

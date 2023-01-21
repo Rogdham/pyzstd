@@ -19,14 +19,13 @@
     #define Py_UNREACHABLE() assert(0)
 #endif
 
-/* These functions were added in Python 3.9:
-     PyType_FromModuleAndSpec()
-     PyType_GetModuleState()   */
-#if defined(USE_MULTI_PHASE_INIT) && PY_VERSION_HEX < 0x03090000
-    #warning "USE_MULTI_PHASE_INIT only works for CPython 3.9+"
+/* PyType_GetModuleByDef() function was added in Python 3.11.
+   0x030B00B1 is CPython 3.11 Beta1. */
+#if defined(USE_MULTI_PHASE_INIT) && PY_VERSION_HEX < 0x030B00B1
     #undef USE_MULTI_PHASE_INIT
 #endif
 
+/* Forward declaration */
 typedef struct _zstd_state _zstd_state;
 
 typedef struct {
@@ -138,6 +137,23 @@ struct _zstd_state {
 };
 
 #ifdef USE_MULTI_PHASE_INIT
+    /* For forward declaration of _zstdmodule */
+    static inline PyModuleDef* _get_zstd_PyModuleDef();
+
+    /* Get module state from a class type, and set it to supported object.
+       Used in Py_tp_new or Py_tp_init. */
+    #define SET_STATE_TO_OBJ(type, obj) \
+        do {                                                              \
+            PyModuleDef* const module_def = _get_zstd_PyModuleDef();      \
+            PyObject *module = PyType_GetModuleByDef(type, module_def);   \
+            if (module == NULL) {                                         \
+                goto error;                                               \
+            }                                                             \
+            (obj)->module_state = (_zstd_state*)PyModule_GetState(module);\
+            if ((obj)->module_state == NULL) {                            \
+                goto error;                                               \
+            }                                                             \
+        } while (0)
     /* Get module state from module object */
     #define STATE_FROM_MODULE(module) \
         _zstd_state* const _module_state = (_zstd_state*)PyModule_GetState(module); \
@@ -147,18 +163,21 @@ struct _zstd_state {
         _zstd_state* const _module_state = (obj)->module_state; \
         assert(_module_state != NULL);
     /* Place as module state. Only as r-value. */
-    #define MODULE_STATE (1 ? _module_state : 0)
+    #define MODULE_STATE (1 ? _module_state : NULL)
     /* Access a member of module state. Can be l-value or r-value. */
     #define MS_MEMBER(member) (_module_state->member)
-#else
+#else  /* Don't use multi-phase init */
     static _zstd_state static_state;
 
+    /* Get module state from a class type, and set it to supported object.
+       Used in Py_tp_new or Py_tp_init. */
+    #define SET_STATE_TO_OBJ(type, obj) ;
     /* Get module state from module object */
     #define STATE_FROM_MODULE(module) ;
     /* Get module state from supported object */
     #define STATE_FROM_OBJ(obj) ;
     /* Place as module state. Only as r-value. */
-    #define MODULE_STATE (1 ? &static_state : 0)
+    #define MODULE_STATE (1 ? &static_state : NULL)
     /* Access a member of module state. Can be l-value or r-value. */
     #define MS_MEMBER(member) (static_state.member)
 #endif
@@ -1017,13 +1036,8 @@ ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(self->d_dict == NULL);
     assert(self->inited == 0);
 
-/* Keep this first */
-#ifdef USE_MULTI_PHASE_INIT
-    self->module_state = (_zstd_state*)PyType_GetModuleState(type);
-    if (self->module_state == NULL) {
-        goto error;
-    }
-#endif
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
 
     /* ZSTD_CDict dict */
     self->c_dicts = PyDict_New();
@@ -1209,13 +1223,7 @@ static PyType_Slot zstddict_slots[] = {
 static PyType_Spec zstddict_type_spec = {
     .name = "pyzstd.ZstdDict",
     .basicsize = sizeof(ZstdDict),
-#ifdef USE_MULTI_PHASE_INIT
-    /* Calling PyType_GetModuleState() on a subclass is not safe. So doesn't
-       have Py_TPFLAGS_BASETYPE flag which prevents to create a subclass.*/
-    .flags = Py_TPFLAGS_DEFAULT,
-#else
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-#endif
     .slots = zstddict_slots,
 };
 
@@ -1478,13 +1486,8 @@ ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(self->use_multithread == 0);
     assert(self->inited == 0);
 
-/* Keep this first */
-#ifdef USE_MULTI_PHASE_INIT
-    self->module_state = (_zstd_state*)PyType_GetModuleState(type);
-    if (self->module_state == NULL) {
-        goto error;
-    }
-#endif
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
 
     /* Compression context */
     self->cctx = ZSTD_createCCtx();
@@ -1934,13 +1937,7 @@ static PyType_Slot zstdcompressor_slots[] = {
 static PyType_Spec zstdcompressor_type_spec = {
     .name = "pyzstd.ZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-#ifdef USE_MULTI_PHASE_INIT
-    /* Calling PyType_GetModuleState() on a subclass is not safe. So doesn't
-       have Py_TPFLAGS_BASETYPE flag which prevents to create a subclass.*/
-    .flags = Py_TPFLAGS_DEFAULT,
-#else
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-#endif
     .slots = zstdcompressor_slots,
 };
 
@@ -2072,13 +2069,7 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
 static PyType_Spec richmem_zstdcompressor_type_spec = {
     .name = "pyzstd.RichMemZstdCompressor",
     .basicsize = sizeof(ZstdCompressor),
-#ifdef USE_MULTI_PHASE_INIT
-    /* Calling PyType_GetModuleState() on a subclass is not safe. So doesn't
-       have Py_TPFLAGS_BASETYPE flag which prevents to create a subclass.*/
-    .flags = Py_TPFLAGS_DEFAULT,
-#else
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-#endif
     .slots = richmem_zstdcompressor_slots,
 };
 
@@ -2502,13 +2493,8 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     /* needs_input flag */
     self->needs_input = 1;
 
-/* Keep this first */
-#ifdef USE_MULTI_PHASE_INIT
-    self->module_state = (_zstd_state*)PyType_GetModuleState(type);
-    if (self->module_state == NULL) {
-        goto error;
-    }
-#endif
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
 
     /* Decompression context */
     self->dctx = ZSTD_createDCtx();
@@ -2710,13 +2696,7 @@ static PyType_Slot ZstdDecompressor_slots[] = {
 static PyType_Spec ZstdDecompressor_type_spec = {
     .name = "pyzstd.ZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
-#ifdef USE_MULTI_PHASE_INIT
-    /* Calling PyType_GetModuleState() on a subclass is not safe. So doesn't
-       have Py_TPFLAGS_BASETYPE flag which prevents to create a subclass.*/
-    .flags = Py_TPFLAGS_DEFAULT,
-#else
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-#endif
     .slots = ZstdDecompressor_slots,
 };
 
@@ -2788,13 +2768,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
 static PyType_Spec EndlessZstdDecompressor_type_spec = {
     .name = "pyzstd.EndlessZstdDecompressor",
     .basicsize = sizeof(ZstdDecompressor),
-#ifdef USE_MULTI_PHASE_INIT
-    /* Calling PyType_GetModuleState() on a subclass is not safe. So doesn't
-       have Py_TPFLAGS_BASETYPE flag which prevents to create a subclass.*/
-    .flags = Py_TPFLAGS_DEFAULT,
-#else
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
-#endif
     .slots = EndlessZstdDecompressor_slots,
 };
 
@@ -4132,6 +4106,14 @@ static PyModuleDef _zstdmodule = {
     .m_clear = _zstd_clear,
     .m_free = _zstd_free
 };
+
+#ifdef USE_MULTI_PHASE_INIT
+    /* For forward declaration of _zstdmodule */
+    static inline PyModuleDef* _get_zstd_PyModuleDef()
+    {
+        return &_zstdmodule;
+    }
+#endif
 
 PyMODINIT_FUNC
 PyInit__zstd(void)

@@ -4,28 +4,24 @@ name: pyzstd
 on: [push, pull_request]
 
 env:
-  PYTHON_VER: '3.10'  # Python to run test/cibuildwheel
+  PYTHON_VER: '3.10'        # Python to run test/cibuildwheel
+  PYTHON_VER_PEP489: '3.11' # Python to run test with multi-phase init
   CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
   run_test:
-    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} ${{ matrix.multi_phase_init }}
+    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
         architecture: [x64]
-        multi_phase_init: ['', '--multi-phase-init']
         include:
           - platform: windows-latest
             architecture: x86
-            multi_phase_init: ''
-          - platform: windows-latest
-            architecture: x86
-            multi_phase_init: '--multi-phase-init'
 
     steps:
       - uses: actions/checkout@v3
@@ -38,7 +34,36 @@ jobs:
 
       - name: Run test
         run: |
-          python -m pip install --config-settings="--build-option=--warning-as-error ${{ matrix.multi_phase_init }}" -vv .
+          python -m pip install --config-settings="--build-option=--warning-as-error" -vv .
+          python -c "import pyzstd; print('PYZSTD_CONFIG:', pyzstd.PYZSTD_CONFIG)"
+          python tests/test_zstd.py
+
+  # Run test with multi-phase init on Ubuntu/macOS/Windows
+  run_test_with_multi_phase_init:
+    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} with multi-phase init
+    runs-on: ${{ matrix.platform }}
+
+    strategy:
+      matrix:
+        platform: [ubuntu-latest, macos-latest, windows-latest]
+        architecture: [x64]
+        include:
+          - platform: windows-latest
+            architecture: x86
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+      - uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VER_PEP489 }}
+          architecture: ${{ matrix.architecture }}
+
+      - name: Run test with multi-phase init
+        run: |
+          python -m pip install --config-settings="--build-option=--warning-as-error --multi-phase-init" -vv .
+          python -c "import pyzstd; print('PYZSTD_CONFIG:', pyzstd.PYZSTD_CONFIG)"
           python tests/test_zstd.py
 
   # Run test on PyPy for every commit
@@ -62,6 +87,7 @@ jobs:
         run: |
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
           python -m pip install --config-settings="--build-option=--dynamic-link-zstd" -v .
+          python -c "import pyzstd; print('PYZSTD_CONFIG:', pyzstd.PYZSTD_CONFIG)"
           python tests/test_zstd.py
 
   # Build Linux/macOS/Windows wheels
@@ -213,8 +239,9 @@ jobs:
             apk add python3 python3-dev py3-pip build-base gcc
 
           run: |
-            python3 -c "import platform;print('Machine type:', platform.machine())"
+            python3 -c "import platform; print('Machine type:', platform.machine())"
             python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
+            python3 -c "import pyzstd; print('PYZSTD_CONFIG:', pyzstd.PYZSTD_CONFIG)"
             python3 tests/test_zstd.py
 
   # Upload to PyPI
