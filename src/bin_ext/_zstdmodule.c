@@ -122,16 +122,18 @@ typedef struct {
 } ZstdDecompressor;
 
 struct _zstd_state {
+    PyObject *empty_bytes;
+    PyObject *empty_readonly_memoryview;
+    PyObject *str_readinto;
+    PyObject *str_write;
+
     PyTypeObject *ZstdDict_type;
     PyTypeObject *ZstdCompressor_type;
     PyTypeObject *RichMemZstdCompressor_type;
     PyTypeObject *ZstdDecompressor_type;
     PyTypeObject *EndlessZstdDecompressor_type;
     PyObject *ZstdError;
-    PyObject *empty_bytes;
-    PyObject *empty_readonly_memoryview;
-    PyObject *str_readinto;
-    PyObject *str_write;
+
     PyTypeObject *CParameter_type;
     PyTypeObject *DParameter_type;
 };
@@ -592,13 +594,11 @@ set_parameter_error(const _zstd_state* const state, int is_compress,
                  ZSTD_versionString(), 8*(int)sizeof(Py_ssize_t));
 }
 
-#define ADD_INT_PREFIX_MACRO(module, macro)                  \
-    do {                                                     \
-        PyObject *o = PyLong_FromLong(macro);                \
-        if (PyModule_AddObject(module, "_" #macro, o) < 0) { \
-            Py_XDECREF(o);                                   \
-            return -1;                                       \
-        }                                                    \
+#define ADD_INT_PREFIX_MACRO(module, macro)                           \
+    do {                                                              \
+        if (PyModule_AddIntConstant(module, "_" #macro, macro) < 0) { \
+            return -1;                                                \
+        }                                                             \
     } while(0)
 
 static int
@@ -3772,17 +3772,17 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
 {
     STATE_FROM_MODULE(module);
 
-    Py_VISIT(MS_MEMBER(ZstdError));
+    Py_VISIT(MS_MEMBER(empty_bytes));
+    Py_VISIT(MS_MEMBER(empty_readonly_memoryview));
+    Py_VISIT(MS_MEMBER(str_readinto));
+    Py_VISIT(MS_MEMBER(str_write));
+
     Py_VISIT(MS_MEMBER(ZstdDict_type));
     Py_VISIT(MS_MEMBER(ZstdCompressor_type));
     Py_VISIT(MS_MEMBER(RichMemZstdCompressor_type));
     Py_VISIT(MS_MEMBER(ZstdDecompressor_type));
     Py_VISIT(MS_MEMBER(EndlessZstdDecompressor_type));
-
-    Py_VISIT(MS_MEMBER(empty_bytes));
-    Py_VISIT(MS_MEMBER(empty_readonly_memoryview));
-    Py_VISIT(MS_MEMBER(str_readinto));
-    Py_VISIT(MS_MEMBER(str_write));
+    Py_VISIT(MS_MEMBER(ZstdError));
 
     Py_VISIT(MS_MEMBER(CParameter_type));
     Py_VISIT(MS_MEMBER(DParameter_type));
@@ -3794,17 +3794,17 @@ _zstd_clear(PyObject *module)
 {
     STATE_FROM_MODULE(module);
 
-    Py_CLEAR(MS_MEMBER(ZstdError));
+    Py_CLEAR(MS_MEMBER(empty_bytes));
+    Py_CLEAR(MS_MEMBER(empty_readonly_memoryview));
+    Py_CLEAR(MS_MEMBER(str_readinto));
+    Py_CLEAR(MS_MEMBER(str_write));
+
     Py_CLEAR(MS_MEMBER(ZstdDict_type));
     Py_CLEAR(MS_MEMBER(ZstdCompressor_type));
     Py_CLEAR(MS_MEMBER(RichMemZstdCompressor_type));
     Py_CLEAR(MS_MEMBER(ZstdDecompressor_type));
     Py_CLEAR(MS_MEMBER(EndlessZstdDecompressor_type));
-
-    Py_CLEAR(MS_MEMBER(empty_bytes));
-    Py_CLEAR(MS_MEMBER(empty_readonly_memoryview));
-    Py_CLEAR(MS_MEMBER(str_readinto));
-    Py_CLEAR(MS_MEMBER(str_write));
+    Py_CLEAR(MS_MEMBER(ZstdError));
 
     Py_CLEAR(MS_MEMBER(CParameter_type));
     Py_CLEAR(MS_MEMBER(DParameter_type));
