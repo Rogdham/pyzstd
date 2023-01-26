@@ -574,6 +574,19 @@ class ZstdFile(io.BufferedIOBase):
         except AttributeError:
             self._check_mode(_MODE_READ)
 
+    def __iter__(self):
+        try:
+            self._buffer
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+        return self
+
+    def __next__(self):
+        ret = self._buffer.readline()
+        if ret:
+            return ret
+        raise StopIteration
+
     def tell(self):
         """Return the current file position."""
         if self._mode == _MODE_READ:
