@@ -663,54 +663,52 @@ typedef enum {
 /* Format error message and set ZstdError. */
 FORCE_NO_INLINE void
 set_zstd_error(const _zstd_state* const state,
-               const error_type type, const size_t code)
+               const error_type type, const size_t zstd_ret)
 {
     char buf[128];
-    char *type_msg;
-    assert(ZSTD_isError(code));
+    char *msg;
+    assert(ZSTD_isError(zstd_ret));
 
     switch (type)
     {
     case ERR_DECOMPRESS:
-        type_msg = "decompress zstd data";
+        msg = "Unable to decompress zstd data: %s";
         break;
     case ERR_COMPRESS:
-        type_msg = "compress zstd data";
+        msg = "Unable to compress zstd data: %s";
         break;
     case ERR_SET_PLEDGED_INPUT_SIZE:
-        type_msg = "set pledged uncompressed content size";
+        msg = "Unable to set pledged uncompressed content size: %s";
         break;
 
     case ERR_LOAD_D_DICT:
-        type_msg = "load zstd dictionary for decompression";
+        msg = "Unable to load zstd dictionary for decompression: %s";
         break;
     case ERR_LOAD_C_DICT:
-        type_msg = "load zstd dictionary for compression";
+        msg = "Unable to load zstd dictionary for compression: %s";
         break;
 
     case ERR_GET_C_BOUNDS:
-        type_msg = "get zstd compression parameter bounds";
+        msg = "Unable to get zstd compression parameter bounds: %s";
         break;
     case ERR_GET_D_BOUNDS:
-        type_msg = "get zstd decompression parameter bounds";
+        msg = "Unable to get zstd decompression parameter bounds: %s";
         break;
     case ERR_SET_C_LEVEL:
-        type_msg = "set zstd compression level";
+        msg = "Unable to set zstd compression level: %s";
         break;
 
     case ERR_TRAIN_DICT:
-        type_msg = "train zstd dictionary";
+        msg = "Unable to train zstd dictionary: %s";
         break;
     case ERR_FINALIZE_DICT:
-        type_msg = "finalize zstd dictionary";
+        msg = "Unable to finalize zstd dictionary: %s";
         break;
 
     default:
         Py_UNREACHABLE();
     }
-    PyOS_snprintf(buf, sizeof(buf), "Unable to %s: %s.",
-                  type_msg, ZSTD_getErrorName(code));
-
+    PyOS_snprintf(buf, sizeof(buf), msg, ZSTD_getErrorName(zstd_ret));
     PyErr_SetString(state->ZstdError, buf);
 }
 
