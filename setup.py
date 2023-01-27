@@ -55,13 +55,11 @@ class pyzstd_build_ext(build_ext):
 
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
-                # -fvisibility=hidden:
-                #   Set default symbol visibility to hidden.
                 # -g0:
                 #   Level 0 produces no debug information at all. This reduces
                 #   the size of GCC wheels. By default CPython won't print any
                 #   C stack trace, so -g0 and -g2 are same for most users.
-                more_options = ['-fvisibility=hidden', '-g0']
+                more_options = ['-g0']
                 if self.PYZSTD_AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
                     more_options.extend(instrs)
