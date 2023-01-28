@@ -347,7 +347,8 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertIn('.ZstdDict', str(type(zd)))
 
         # doesn't support pickle
-        with self.assertRaises(TypeError):
+        with self.assertRaisesRegex(TypeError,
+                                    r'save \.dict_content attribute'):
             pickle.dumps(zd)
 
         # supports subclass
