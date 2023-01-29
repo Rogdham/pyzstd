@@ -1256,7 +1256,7 @@ _train_dict(PyObject *module, PyObject *args)
     chunks_number = Py_SIZE(samples_size_list);
     if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The number of samples is too large.");
+                        "The number of samples should <= UINT32_MAX.");
         return NULL;
     }
 
@@ -1382,7 +1382,7 @@ _finalize_dict(PyObject *module, PyObject *args)
     chunks_number = Py_SIZE(samples_size_list);
     if ((size_t) chunks_number > UINT32_MAX) {
         PyErr_SetString(PyExc_ValueError,
-                        "The number of samples is too large.");
+                        "The number of samples should <= UINT32_MAX.");
         return NULL;
     }
 
@@ -2869,8 +2869,6 @@ _get_param_bounds(PyObject *module, PyObject *args)
     int is_compress;
     int parameter;
 
-    PyObject *ret;
-    PyObject *temp;
     ZSTD_bounds bound;
 
     if (!PyArg_ParseTuple(args, "ii:_get_param_bounds", &is_compress, &parameter)) {
@@ -2893,26 +2891,7 @@ _get_param_bounds(PyObject *module, PyObject *args)
         }
     }
 
-    ret = PyTuple_New(2);
-    if (ret == NULL) {
-        return NULL;
-    }
-
-    temp = PyLong_FromLong(bound.lowerBound);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 0, temp);
-
-    temp = PyLong_FromLong(bound.upperBound);
-    if (temp == NULL) {
-        Py_DECREF(ret);
-        return NULL;
-    }
-    PyTuple_SET_ITEM(ret, 1, temp);
-
-    return ret;
+    return Py_BuildValue("ii", bound.lowerBound, bound.upperBound);
 }
 
 PyDoc_STRVAR(get_frame_size_doc,
@@ -3715,15 +3694,13 @@ _set_parameter_types(PyObject *module, PyObject *args)
         return NULL;
     }
 
-    /* Not for strict check, using the first values is fine. */
-    if (MS_MEMBER(CParameter_type) == NULL &&
-        MS_MEMBER(DParameter_type) == NULL)
-    {
-        Py_INCREF(c_parameter_type);
-        MS_MEMBER(CParameter_type) = (PyTypeObject*)c_parameter_type;
-        Py_INCREF(d_parameter_type);
-        MS_MEMBER(DParameter_type) = (PyTypeObject*)d_parameter_type;
-    }
+    Py_XDECREF(MS_MEMBER(CParameter_type));
+    Py_INCREF(c_parameter_type);
+    MS_MEMBER(CParameter_type) = (PyTypeObject*)c_parameter_type;
+
+    Py_XDECREF(MS_MEMBER(DParameter_type));
+    Py_INCREF(d_parameter_type);
+    MS_MEMBER(DParameter_type) = (PyTypeObject*)d_parameter_type;
 
     Py_RETURN_NONE;
 }
@@ -3921,21 +3898,12 @@ get_zstd_version_info(void)
 {
     const uint32_t ver = ZSTD_versionNumber();
     uint32_t major, minor, release;
-    PyObject *ret;
 
     major = ver / 10000;
     minor = (ver / 100) % 100;
     release = ver % 100;
 
-    ret = PyTuple_New(3);
-    if (ret == NULL) {
-        return NULL;
-    }
-
-    PyTuple_SET_ITEM(ret, 0, PyLong_FromUnsignedLong(major));
-    PyTuple_SET_ITEM(ret, 1, PyLong_FromUnsignedLong(minor));
-    PyTuple_SET_ITEM(ret, 2, PyLong_FromUnsignedLong(release));
-    return ret;
+    return Py_BuildValue("III", major, minor, release);
 }
 
 static int _zstd_exec(PyObject *module) {
@@ -4085,11 +4053,11 @@ static PyModuleDef _zstdmodule = {
 };
 
 #ifdef USE_MULTI_PHASE_INIT
-    /* For forward declaration of _zstdmodule */
-    static inline PyModuleDef* _get_zstd_PyModuleDef()
-    {
-        return &_zstdmodule;
-    }
+/* For forward declaration of _zstdmodule */
+static inline PyModuleDef* _get_zstd_PyModuleDef()
+{
+    return &_zstdmodule;
+}
 #endif
 
 PyMODINIT_FUNC

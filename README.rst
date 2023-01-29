@@ -18,6 +18,14 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.4  (xx xx, 2023)**
+
+#. Update bundled zstd source code from v1.5.2 to `v1.5.x <https://github.com/facebook/zstd/releases/tag/v1.5.x>`_.
+
+#. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `doc <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+
+#. Support "multi-phase initialization" (PEP-489) on CPython 3.11+, can work with CPython sub-interpreters in the future. Currently this build option is disabled by default.
+
 **0.15.3  (Aug 3, 2022)**
 
 Fix ``ZstdError`` object can't be pickled.
