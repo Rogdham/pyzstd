@@ -10,6 +10,7 @@ import array
 import pathlib
 import pickle
 import random
+import subprocess
 import tempfile
 import unittest
 
@@ -1130,27 +1131,28 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
 class DecompressorFlagsTestCase(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         option = {CParameter.checksumFlag:1}
         c = ZstdCompressor(option)
 
-        self.DECOMPRESSED_42 = b'a'*42
-        self.FRAME_42 = c.compress(self.DECOMPRESSED_42, c.FLUSH_FRAME)
+        cls.DECOMPRESSED_42 = b'a'*42
+        cls.FRAME_42 = c.compress(cls.DECOMPRESSED_42, c.FLUSH_FRAME)
 
-        self.DECOMPRESSED_60 = b'a'*60
-        self.FRAME_60 = c.compress(self.DECOMPRESSED_60, c.FLUSH_FRAME)
+        cls.DECOMPRESSED_60 = b'a'*60
+        cls.FRAME_60 = c.compress(cls.DECOMPRESSED_60, c.FLUSH_FRAME)
 
-        self.FRAME_42_60 = self.FRAME_42 + self.FRAME_60
-        self.DECOMPRESSED_42_60 = self.DECOMPRESSED_42 + self.DECOMPRESSED_60
+        cls.FRAME_42_60 = cls.FRAME_42 + cls.FRAME_60
+        cls.DECOMPRESSED_42_60 = cls.DECOMPRESSED_42 + cls.DECOMPRESSED_60
 
-        self._130KB = 130*1024
+        cls._130KB = 130*1024
 
         c = ZstdCompressor()
-        self.UNKNOWN_FRAME_42 = c.compress(self.DECOMPRESSED_42) + c.flush()
-        self.UNKNOWN_FRAME_60 = c.compress(self.DECOMPRESSED_60) + c.flush()
-        self.UNKNOWN_FRAME_42_60 = self.UNKNOWN_FRAME_42 + self.UNKNOWN_FRAME_60
+        cls.UNKNOWN_FRAME_42 = c.compress(cls.DECOMPRESSED_42) + c.flush()
+        cls.UNKNOWN_FRAME_60 = c.compress(cls.DECOMPRESSED_60) + c.flush()
+        cls.UNKNOWN_FRAME_42_60 = cls.UNKNOWN_FRAME_42 + cls.UNKNOWN_FRAME_60
 
-        self.TRAIL = b'12345678abcdefg!@#$%^&*()_+|'
+        cls.TRAIL = b'12345678abcdefg!@#$%^&*()_+|'
 
     def test_function_decompress(self):
         self.assertEqual(decompress(b''), b'')
@@ -1899,23 +1901,24 @@ class ZstdDictTestCase(unittest.TestCase):
 
 class OutputBufferTestCase(unittest.TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUpClass(cls):
         KB = 1024
         MB = 1024 * 1024
 
         # should be same as the definition in _zstdmodule.c
-        self.BLOCK_SIZE = \
+        cls.BLOCK_SIZE = \
              [ 32*KB, 64*KB, 256*KB, 1*MB, 4*MB, 8*MB, 16*MB, 16*MB,
                32*MB, 32*MB, 32*MB, 32*MB, 64*MB, 64*MB, 128*MB, 128*MB,
                256*MB ]
 
         # accumulated size
-        self.ACCUMULATED_SIZE = list(itertools.accumulate(self.BLOCK_SIZE))
+        cls.ACCUMULATED_SIZE = list(itertools.accumulate(cls.BLOCK_SIZE))
 
-        self.TEST_RANGE = 5
+        cls.TEST_RANGE = 5
 
-        self.NO_SIZE_OPTION = {CParameter.compressionLevel: compressionLevel_values.min,
-                               CParameter.contentSizeFlag: 0}
+        cls.NO_SIZE_OPTION = {CParameter.compressionLevel: compressionLevel_values.min,
+                              CParameter.contentSizeFlag: 0}
 
     def compress_unknown_size(self, size):
         return compress(b'a' * size, self.NO_SIZE_OPTION)
@@ -3282,6 +3285,81 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # it's a promised behavior.
         compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
         decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+
+class CLITestCase(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        cls.tempdir = tempfile.TemporaryDirectory()
+        cls.dir_name = cls.tempdir.name
+
+        cls.samples_path = os.path.join(cls.dir_name, 'samples').rstrip(os.sep)
+        os.mkdir(cls.samples_path)
+
+        for i, sample in enumerate(SAMPLES):
+            file_path = os.path.join(cls.samples_path, str(i) + '.dat')
+            with open(file_path, 'wb') as f:
+                f.write(sample)
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.tempdir.cleanup()
+        assert not os.path.isdir(cls.dir_name)
+
+    def test_help(self):
+        cmd = [sys.executable, '-m', 'pyzstd', '-h']
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertIn(b'CLI of pyzstd module', result.stdout)
+
+    def test_sequence(self):
+        # train dict
+        DICT_PATH = os.path.join(self.dir_name, 'dict')
+        cmd = [sys.executable, '-m', 'pyzstd', '--train',
+               self.samples_path + os.sep + '*.dat',
+               '-o', DICT_PATH, '--dictID', '1234567']
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertRegex(result.stdout,
+                         rb'(?s)Training succeeded.*?dict_id=1234567')
+
+        # compress
+        cmd = [sys.executable, '-m', 'pyzstd', '--compress',
+               os.path.join(self.samples_path, '1.dat'),
+               '--level', '1', '-D', DICT_PATH]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertRegex(result.stdout,
+                         rb'output file:.*?1\.dat\.zst[\s\S]*?Compression succeeded')
+
+        # decompress
+        cmd = [sys.executable, '-m', 'pyzstd', '--decompress',
+               os.path.join(self.samples_path, '1.dat.zst'), '-f',
+               '-D', DICT_PATH]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertRegex(result.stdout,
+                         rb'output file:.*?1\.dat[\s\S]*?Decompression succeeded')
+
+        # test
+        cmd = [sys.executable, '-m', 'pyzstd', '--test',
+               os.path.join(self.samples_path, '1.dat.zst'),
+               '-D', DICT_PATH]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertRegex(result.stdout,
+                         rb'output file: None[\s\S]*?Decompression succeeded')
+
+        # create tar archive
+        cmd = [sys.executable, '-m', 'pyzstd',
+               '--tar-input-dir', self.samples_path,
+               '--level', '1']
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertRegex(result.stdout,
+                         rb'output file:.*?samples\.tar\.zst[\s\S]*?Archiving succeeded')
+
+        # extract tar archive
+        OUTPUT_DIR = os.path.join(self.dir_name, 'tar_output')
+        os.mkdir(OUTPUT_DIR)
+        cmd = [sys.executable, '-m', 'pyzstd', '--decompress',
+               os.path.join(self.dir_name, 'samples.tar.zst'),
+               '--tar-output-dir', OUTPUT_DIR]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertIn(b'Extraction succeeded', result.stdout)
 
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
