@@ -640,6 +640,7 @@ add_parameters(PyObject *module)
      Global functions
       - set parameters
       - load dictionary
+      - reduce_cannot_pickle
    -------------------------------------- */
 static const char init_twice_msg[] = "__init__ method is called twice.";
 
@@ -1004,6 +1005,18 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
     return 0;
 }
 
+PyDoc_STRVAR(reduce_cannot_pickle_doc,
+"Intentionally not supporting pickle.");
+
+static PyObject *
+reduce_cannot_pickle(PyObject *self)
+{
+    PyErr_Format(PyExc_TypeError,
+                 "Cannot pickle %s object.",
+                 Py_TYPE(self)->tp_name);
+    return NULL;
+}
+
 /* ------------------
      ZstdDict code
    ------------------ */
@@ -1133,9 +1146,6 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
 
     return 0;
 }
-
-PyDoc_STRVAR(reduce_cannot_pickle_doc,
-"Intentionally not supporting pickle.");
 
 static PyObject *
 ZstdDict_reduce(ZstdDict *self)
@@ -1895,6 +1905,9 @@ static PyMethodDef ZstdCompressor_methods[] = {
     {"_set_pledged_input_size", (PyCFunction)ZstdCompressor_set_pledged_input_size,
      METH_O, ZstdCompressor_set_pledged_input_size_doc},
 
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+     METH_NOARGS, reduce_cannot_pickle_doc},
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -2024,6 +2037,9 @@ RichMemZstdCompressor_compress(ZstdCompressor *self, PyObject *args, PyObject *k
 static PyMethodDef RichMem_ZstdCompressor_methods[] = {
     {"compress", (PyCFunction)RichMemZstdCompressor_compress,
      METH_VARARGS|METH_KEYWORDS, RichMemZstdCompressor_compress_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+     METH_NOARGS, reduce_cannot_pickle_doc},
 
     {NULL, NULL, 0, NULL}
 };
@@ -2629,6 +2645,9 @@ static PyMethodDef ZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)ZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, ZstdDecompressor_decompress_doc},
 
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+     METH_NOARGS, reduce_cannot_pickle_doc},
+
     {NULL, NULL, 0, NULL}
 };
 
@@ -2713,6 +2732,9 @@ EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObj
 static PyMethodDef EndlessZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)EndlessZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, EndlessZstdDecompressor_decompress_doc},
+
+    {"__reduce__", (PyCFunction)reduce_cannot_pickle,
+     METH_NOARGS, reduce_cannot_pickle_doc},
 
     {NULL, NULL, 0, NULL}
 };
