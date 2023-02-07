@@ -31,8 +31,10 @@ except ImportError:
 __version__ = '0.15.3'
 
 __doc__ = '''\
-Python bindings to Zstandard (zstd) compression library, the API is similar to
-Python's bz2/lzma/zlib modules.
+Python bindings to Zstandard (zstd) compression library, the API style is
+similar to Python's bz2/lzma/zlib modules.
+
+Command line interface of this module: python -m pyzstd --help
 
 Documentation: https://pyzstd.readthedocs.io
 GitHub: https://github.com/animalize/pyzstd

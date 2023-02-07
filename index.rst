@@ -5,9 +5,12 @@ Introduction
 
 Pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib modules.
+The API style is similar to Python's bz2/lzma/zlib modules.
 
-Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
+* Includes the latest zstd library source code.
+* Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
+* Has a CFFI implementation that can work with PyPy.
+* Has a command line interface, ``python -m pyzstd --help``. (*Added in version 0.15.4*)
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -546,7 +549,7 @@ Dictionary
 
     Pyzstd module only uses zstd library's stable API. The stable API only exposes two dictionary training functions that corresponding to :py:func:`train_dict` and :py:func:`finalize_dict`.
 
-    If want to adjust advanced training parameters, you may use zstd's CLI program, it has entries to zstd library's experimental API.
+    If want to adjust advanced training parameters, you may use zstd's CLI program (not pyzstd module's CLI), it has entries to zstd library's experimental API.
 
 .. py:class:: ZstdDict
 
@@ -1460,6 +1463,6 @@ Build pyzstd module with options
 
     3️⃣ Use "multi-phase initialization" on CPython.
 
-    If provide ``--multi-phase-init`` build option, it will build with "multi-phase initialization" (`PEP-489 <https://peps.python.org/pep-0489/>`_) for CPython 3.11+.
+    If provide ``--multi-phase-init`` build option, it will build with "multi-phase initialization" (`PEP-489 <https://peps.python.org/pep-0489/>`_) on CPython 3.11+.
 
     Since it adds a tiny overhead, it's disabled by default. It can be enabled after CPython's `sub-interpreters <https://peps.python.org/pep-0554/>`_ is mature.

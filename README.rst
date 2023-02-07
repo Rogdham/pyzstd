@@ -3,9 +3,12 @@ Introduction
 
 Pyzstd module provides classes and functions for compressing and decompressing data, using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib modules.
+The API style is similar to Python's bz2/lzma/zlib modules.
 
-Includes zstd v1.5.2 source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_ for details.
+* Includes zstd v1.5.2 source code
+* Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+* Has a CFFI implementation that can work with PyPy
+* Has a command line interface: ``python -m pyzstd --help``
 
 
 Links
@@ -22,11 +25,11 @@ Release note
 
 #. Update bundled zstd source code from v1.5.2 to `v1.5.x <https://github.com/facebook/zstd/releases/tag/v1.5.x>`_.
 
-#. Add a command line interface (CLI), ``python -m pyzstd --help``.
-
 #. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `doc <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 
 #. Support "multi-phase initialization" (PEP-489) on CPython 3.11+, can work with CPython sub-interpreters in the future. Currently this build option is disabled by default.
+
+#. Add a command line interface (CLI).
 
 **0.15.3  (Aug 3, 2022)**
 

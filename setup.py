@@ -139,7 +139,7 @@ def do_setup():
         name='pyzstd',
         version=module_version,
         description=("Python bindings to Zstandard (zstd) compression library, "
-                     "the API is similar to Python's bz2/lzma/zlib modules."),
+                     "the API style is similar to Python's bz2/lzma/zlib modules."),
         long_description=long_description,
         long_description_content_type='text/x-rst',
         author='Ma Lin',
