@@ -25,9 +25,7 @@ _MULTI_PHASE_INIT = _zstd._MULTI_PHASE_INIT
 
 # compressionLevel_values
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_values(_zstd._ZSTD_defaultCLevel,
-                                     _zstd._ZSTD_minCLevel,
-                                     _zstd._ZSTD_maxCLevel)
+compressionLevel_values = _nt_values(*_zstd._compressionLevel_values)
 
 
 _nt_frame_info = namedtuple('frame_info',

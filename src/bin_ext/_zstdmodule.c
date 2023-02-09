@@ -3829,26 +3829,21 @@ add_constants(PyObject *module)
         return -1;
     }
 
-    /* _ZSTD_defaultCLevel, ZSTD_defaultCLevel() was added in zstd v1.5.0. */
+    /* _compressionLevel_values: (default, min, max)
+       ZSTD_defaultCLevel() was added in zstd v1.5.0 */
 #if ZSTD_VERSION_NUMBER < 10500
-    value = ZSTD_CLEVEL_DEFAULT;
+    obj = Py_BuildValue("iii", ZSTD_CLEVEL_DEFAULT,
+                               ZSTD_minCLevel(),
+                               ZSTD_maxCLevel();
 #else
-    value = ZSTD_defaultCLevel();
+    obj = Py_BuildValue("iii", ZSTD_defaultCLevel(),
+                               ZSTD_minCLevel(),
+                               ZSTD_maxCLevel());
 #endif
-    if (PyModule_AddIntConstant(module, "_ZSTD_defaultCLevel",
-                                value) < 0) {
-        return -1;
-    }
-
-    /* _ZSTD_minCLevel */
-    if (PyModule_AddIntConstant(module, "_ZSTD_minCLevel",
-                                ZSTD_minCLevel()) < 0) {
-        return -1;
-    }
-
-    /* _ZSTD_maxCLevel */
-    if (PyModule_AddIntConstant(module, "_ZSTD_maxCLevel",
-                                ZSTD_maxCLevel()) < 0) {
+    if (PyModule_AddObject(module,
+                           "_compressionLevel_values",
+                           obj) < 0) {
+        Py_XDECREF(obj);
         return -1;
     }
 
@@ -3915,7 +3910,7 @@ add_constant_to_type(PyTypeObject *type, const char *name, const long value)
     return 0;
 }
 
-static PyObject *
+static inline PyObject *
 get_zstd_version_info(void)
 {
     const uint32_t ver = ZSTD_versionNumber();
