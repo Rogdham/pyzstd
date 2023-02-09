@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 # CLI of pyzstd module: python -m pyzstd --help
 import argparse
-import io
 import os
 from time import time
 
@@ -26,10 +25,13 @@ def progress_bar(progress, total, width=50):
 # open output file and assign to args.output
 def open_output(args, path):
     if not args.f and os.path.isfile(path):
-        msg = ('output file exists: {}, '
-               'use -f option to overwriting.').format(path)
-        raise FileExistsError(msg)
-    args.output = io.open(path, 'wb')
+        answer = input(('output file already exists:\n'
+                        '{}\noverwrite? (y/n) ').format(path))
+        print()
+        if answer != 'y':
+            import sys
+            sys.exit()
+    args.output = open(path, 'wb')
 
 def close_files(args):
     if args.input is not None:
@@ -40,7 +42,7 @@ def close_files(args):
 
 def compress_option(args):
     # threads
-    if args.single_thread or args.threads < 0:
+    if args.threads < 0:
         threads = 0
     elif args.threads == 0:
         threads = os.cpu_count()
@@ -175,6 +177,11 @@ def decompress(args):
 def train(args):
     from glob import glob
 
+    # check dictID range
+    if args.dictID is not None and \
+        not (0 < args.dictID <= 0xFFFFFFFF):
+        raise ValueError('--dictID value should: 0 < ID <= 0xFFFF_FFFF')
+
     # check output file
     if args.output is None:
         msg = 'need to specify output file using -o/--output option'
@@ -184,7 +191,7 @@ def train(args):
     print('Gathering samples, please wait.', flush=True)
     lst = []
     for file in glob(args.train, recursive=True):
-        with io.open(file, 'rb') as f:
+        with open(file, 'rb') as f:
             dat = f.read()
             lst.append(dat)
             print('samples count: %d' % len(lst), end='\r', flush=True)
@@ -206,7 +213,7 @@ def train(args):
            'Training, please wait.').format(
                 args.train, len(lst), samples_size,
                 args.output.name, args.maxdict,
-                'random' if args.dictID <= 0 else args.dictID)
+                'random' if args.dictID is None else args.dictID)
     print(msg, flush=True)
 
     # train
@@ -216,7 +223,7 @@ def train(args):
 
     # Dictionary_ID: 4 bytes, stored in little-endian format.
     # it can be any value, except 0 (which means no Dictionary_ID).
-    if args.dictID > 0 and len(zd.dict_content) >= 8:
+    if args.dictID is not None and len(zd.dict_content) >= 8:
         content = zd.dict_content[:4] + \
                     args.dictID.to_bytes(4, 'little') + \
                     zd.dict_content[8:]
@@ -366,7 +373,7 @@ def parse_arg():
                             '    python -m pyzstd -d IN_FILE -o OUT_FILE\n'
                             '  create a tar archive:\n'
                             '    python -m pyzstd --tar-input-dir DIR -o OUT_FILE\n'
-                            '  extract a tar archive:\n'
+                            '  extract a tar archive, output will forcibly overwrite existing files:\n'
                             '    python -m pyzstd -d IN_FILE --tar-output-dir DIR\n'
                             '  train a zstd dictionary, ** traverses sub-directories:\n'
                             '    python -m pyzstd --train "E:\\cpython\\**\\*.c" -o OUT_FILE'),
@@ -385,20 +392,19 @@ def parse_arg():
     gm.add_argument('-c', '--compress', type=str, metavar='FILE',
                     help='compress FILE')
     gm.add_argument('--tar-input-dir', type=str, metavar='DIR',
-                    help="create a tar archive from DIR, override -c/--compress option.")
+                    help=('create a tar archive from DIR. '
+                          'this option overrides -c/--compress option.'))
     g.add_argument('-l', '--level', type=int, metavar='#',
                    default=compressionLevel_values.default,
                    help='compression level, range: [{},{}], default: {}.'.
                    format(compressionLevel_values.min,
                           compressionLevel_values.max,
                           compressionLevel_values.default))
-    g.add_argument('-t', '--threads', type=int, default=-1,
-                   metavar='#',
-                   help='spawns # compression threads (0 means cores number)')
-    g.add_argument('--single-thread', action='store_true',
-                   help='use single thread mode to compress (default)')
+    g.add_argument('-t', '--threads', type=int, default=-1, metavar='#',
+                   help=('spawns # compression threads (0 means CPU cores number). '
+                         'if this option is not specified, use single thread mode.'))
     g.add_argument('--long', nargs='?', type=int, const=27, default=-1, metavar='#',
-                   help='enable long distance matching with given windowLog (default: 27)')
+                   help='enable long distance matching with given windowLog (default #: 27)')
     g.add_argument('--no-checksum', action='store_false',
                    dest='checksum', default=True,
                    help="don't add 4-byte XXH64 checksum to the frame")
@@ -411,7 +417,9 @@ def parse_arg():
     gm.add_argument('-d', '--decompress', type=str, metavar='FILE',
                     help='decompress FILE')
     g.add_argument('--tar-output-dir', type=str, metavar='DIR',
-                   help="extract tar archive to DIR, override -o/--output option.")
+                   help=('extract tar archive to DIR, '
+                         'output will forcibly overwrite existing files. '
+                         'this option overrides -o/--output option.'))
     gm.add_argument('--test', type=argparse.FileType('rb'), metavar='FILE',
                     help='try to decompress FILE to check integrity')
     g.add_argument('--windowLogMax', type=int, default=0, metavar='#',
@@ -422,18 +430,18 @@ def parse_arg():
                    help='create a dictionary from a training set of files')
     g.add_argument('--maxdict', type=int, metavar='SIZE', default=112640,
                    help='limit dictionary to SIZE bytes (default: 112640)')
-    g.add_argument('--dictID', type=int, metavar='DICT_ID', default=-1,
+    g.add_argument('--dictID', type=int, metavar='DICT_ID', default=None,
                    help='specify dictionary ID value (default: random)')
 
     args = p.parse_args()
 
     # input file
     if args.compress is not None:
-        args.input = io.open(args.compress, 'rb',
-                             buffering=C_READ_BUFFER)
+        args.input = open(args.compress, 'rb',
+                          buffering=C_READ_BUFFER)
     elif args.decompress is not None:
-        args.input = io.open(args.decompress, 'rb',
-                             buffering=D_READ_BUFFER)
+        args.input = open(args.decompress, 'rb',
+                          buffering=D_READ_BUFFER)
     else:
         args.input = None
 
