@@ -2,6 +2,7 @@
 # CLI of pyzstd module: python -m pyzstd --help
 import argparse
 import os
+import sys
 from time import time
 
 from pyzstd import compress_stream, decompress_stream, \
@@ -29,7 +30,6 @@ def open_output(args, path):
                         '{}\noverwrite? (y/n) ').format(path))
         print()
         if answer != 'y':
-            import sys
             sys.exit()
     args.output = open(path, 'wb')
 
@@ -127,8 +127,6 @@ def compress(args):
 
 def decompress(args):
     # input file size
-    if args.test is not None:
-        args.input = args.test
     input_file_size = os.path.getsize(args.input.name)
 
     # output file
@@ -176,11 +174,6 @@ def decompress(args):
 
 def train(args):
     from glob import glob
-
-    # check dictID range
-    if args.dictID is not None and \
-        not (0 < args.dictID <= 0xFFFFFFFF):
-        raise ValueError('--dictID value should: 0 < ID <= 0xFFFF_FFFF')
 
     # check output file
     if args.output is None:
@@ -361,6 +354,35 @@ def tarfile_extract(args):
             t2-t1, input_file_size, uncompressed_size, ratio)
     print(msg)
 
+def range_action(min, max, bits_msg=False):
+    class RangeAction(argparse.Action):
+        def __call__(self, parser, args, values, option_string=None):
+            # convert to int
+            try:
+                v = int(values)
+            except:
+                raise TypeError('{} should be an integer'.format(option_string))
+
+            # check range
+            if not (min <= v <= max):
+                # 32/64 bits message
+                if bits_msg:
+                    if sys.maxsize > 2**32:
+                        bits = 'in 64-bit build, '
+                    else:
+                        bits = 'in 32-bit build, '
+                else:
+                    bits = ''
+
+                # message
+                msg = ('{}{} value should: {} <= v <= {}. '
+                       'provided value is {}.').format(
+                        bits, option_string, min, max, v)
+                raise ValueError(msg)
+
+            setattr(args, self.dest, v)
+    return RangeAction
+
 def parse_arg():
     p = argparse.ArgumentParser(
                     prog = 'CLI of pyzstd module',
@@ -380,30 +402,34 @@ def parse_arg():
                     formatter_class=argparse.RawDescriptionHelpFormatter)
 
     g = p.add_argument_group('Common arguments')
-    g.add_argument('-D', '--dict', type=argparse.FileType('rb'), metavar='FILE',
+    g.add_argument('-D', '--dict', metavar='FILE', type=argparse.FileType('rb'),
                    help='use FILE as zstd dictionary for compression or decompression')
-    g.add_argument('-o', '--output', type=str, metavar='FILE',
+    g.add_argument('-o', '--output', metavar='FILE', type=str,
                    help='result stored into FILE')
     g.add_argument('-f', action='store_true',
                    help='disable output check, allows overwriting existing file.')
 
     g = p.add_argument_group('Compression arguments')
     gm = g.add_mutually_exclusive_group()
-    gm.add_argument('-c', '--compress', type=str, metavar='FILE',
+    gm.add_argument('-c', '--compress', metavar='FILE', type=str,
                     help='compress FILE')
-    gm.add_argument('--tar-input-dir', type=str, metavar='DIR',
+    gm.add_argument('--tar-input-dir', metavar='DIR', type=str,
                     help=('create a tar archive from DIR. '
                           'this option overrides -c/--compress option.'))
-    g.add_argument('-l', '--level', type=int, metavar='#',
+    g.add_argument('-l', '--level', metavar='#',
                    default=compressionLevel_values.default,
+                   action=range_action(compressionLevel_values.min,
+                                       compressionLevel_values.max),
                    help='compression level, range: [{},{}], default: {}.'.
                    format(compressionLevel_values.min,
                           compressionLevel_values.max,
                           compressionLevel_values.default))
-    g.add_argument('-t', '--threads', type=int, default=-1, metavar='#',
+    g.add_argument('-t', '--threads', metavar='#', default=-1,
+                   action=range_action(*CParameter.nbWorkers.bounds(), True),
                    help=('spawns # compression threads (0 means CPU cores number). '
                          'if this option is not specified, use single thread mode.'))
-    g.add_argument('--long', nargs='?', type=int, const=27, default=-1, metavar='#',
+    g.add_argument('--long', metavar='#', nargs='?', const=27, default=-1,
+                   action=range_action(*CParameter.windowLog.bounds(), True),
                    help='enable long distance matching with given windowLog (default #: 27)')
     g.add_argument('--no-checksum', action='store_false',
                    dest='checksum', default=True,
@@ -414,23 +440,25 @@ def parse_arg():
 
     g = p.add_argument_group('Decompression arguments')
     gm = g.add_mutually_exclusive_group()
-    gm.add_argument('-d', '--decompress', type=str, metavar='FILE',
+    gm.add_argument('-d', '--decompress', metavar='FILE', type=str,
                     help='decompress FILE')
-    g.add_argument('--tar-output-dir', type=str, metavar='DIR',
+    g.add_argument('--tar-output-dir', metavar='DIR', type=str,
                    help=('extract tar archive to DIR, '
                          'output will forcibly overwrite existing files. '
                          'this option overrides -o/--output option.'))
-    gm.add_argument('--test', type=argparse.FileType('rb'), metavar='FILE',
+    gm.add_argument('--test', metavar='FILE', type=str,
                     help='try to decompress FILE to check integrity')
-    g.add_argument('--windowLogMax', type=int, default=0, metavar='#',
+    g.add_argument('--windowLogMax', metavar='#', default=0,
+                   action=range_action(*DParameter.windowLogMax.bounds(), True),
                    help='set a memory usage limit for decompression (windowLogMax)')
 
     g = p.add_argument_group('Dictionary builder')
-    g.add_argument('--train', type=str, metavar='GLOB_PATH',
+    g.add_argument('--train', metavar='GLOB_PATH', type=str,
                    help='create a dictionary from a training set of files')
-    g.add_argument('--maxdict', type=int, metavar='SIZE', default=112640,
+    g.add_argument('--maxdict', metavar='SIZE', type=int, default=112640,
                    help='limit dictionary to SIZE bytes (default: 112640)')
-    g.add_argument('--dictID', type=int, metavar='DICT_ID', default=None,
+    g.add_argument('--dictID', metavar='DICT_ID', default=None,
+                   action=range_action(1, 0xFFFFFFFF),
                    help='specify dictionary ID value (default: random)')
 
     args = p.parse_args()
@@ -441,6 +469,9 @@ def parse_arg():
                           buffering=C_READ_BUFFER)
     elif args.decompress is not None:
         args.input = open(args.decompress, 'rb',
+                          buffering=D_READ_BUFFER)
+    elif args.test is not None:
+        args.input = open(args.test, 'rb',
                           buffering=D_READ_BUFFER)
     else:
         args.input = None

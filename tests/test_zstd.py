@@ -3361,6 +3361,55 @@ class CLITestCase(unittest.TestCase):
         result = subprocess.run(cmd, stdout=subprocess.PIPE)
         self.assertIn(b'Extraction succeeded', result.stdout)
 
+    def test_level_range(self):
+        OUTPUT_FILE = os.path.join(self.dir_name, 'level_range')
+        # default
+        cmd = [sys.executable, '-m', 'pyzstd', '--compress',
+               os.path.join(self.samples_path, '1.dat'),
+               '--output', OUTPUT_FILE]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertIn(b' - compression level: 3', result.stdout)
+
+        # out of range
+        cmd = [sys.executable, '-m', 'pyzstd', '--compress',
+               os.path.join(self.samples_path, '1.dat'),
+               '--level', str(compressionLevel_values.min - 1),
+               '--output', OUTPUT_FILE, '-f']
+        result = subprocess.run(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        self.assertIn(b'--level value should:', result.stderr)
+
+    def test_long_range(self):
+        OUTPUT_FILE = os.path.join(self.dir_name, 'long_range')
+        # default
+        cmd = [sys.executable, '-m', 'pyzstd', '--compress',
+               os.path.join(self.samples_path, '1.dat'), '--long',
+               '--output', OUTPUT_FILE]
+        result = subprocess.run(cmd, stdout=subprocess.PIPE)
+        self.assertIn(b' - long mode: yes, windowLog is 27', result.stdout)
+
+        # out of range
+        cmd = [sys.executable, '-m', 'pyzstd', '--compress',
+               os.path.join(self.samples_path, '1.dat'),
+               '--long', str(CParameter.windowLog.bounds()[1] + 1),
+               '--output', OUTPUT_FILE, '-f']
+        result = subprocess.run(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        self.assertRegex(result.stderr,
+                         rb'(32|64)-bit build, --long value should:')
+
+    def test_dictID_range(self):
+        OUTPUT_FILE = os.path.join(self.dir_name, 'dictid_range')
+        cmd = [sys.executable, '-m', 'pyzstd', '--train',
+               self.samples_path + os.sep + '*.dat',
+               '-o', OUTPUT_FILE, '--dictID', str(0xFFFFFFFF+1)]
+        result = subprocess.run(cmd,
+                                stdout=subprocess.PIPE,
+                                stderr=subprocess.PIPE)
+        self.assertIn(b'--dictID value should:', result.stderr)
+
 # uncompressed size 130KB, more than a zstd block.
 # with a frame epilogue, 4 bytes checksum.
 TEST_DAT_130KB = (b'(\xb5/\xfd\xa4\x00\x08\x02\x00\xcc\x87\x03:\xaaYN4pf\xc8\xae\x06b\x02'
