@@ -166,6 +166,8 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
                                 const void* dictContent, size_t dictContentSize,
                                 const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples,
                                 ZDICT_params_t parameters);
+
+int pyzstd_static_link;
 """)
 
 source = """
@@ -197,6 +199,12 @@ int ZSTD_defaultCLevel(void)
 {
     return ZSTD_CLEVEL_DEFAULT;
 }
+#endif
+
+#ifdef PYZSTD_STATIC_LINK
+pyzstd_static_link = 1;
+#else
+pyzstd_static_link = 0;
 #endif
 """
 

@@ -2,14 +2,13 @@
 # CLI of pyzstd module: python -m pyzstd --help
 import argparse
 import os
-import sys
 from time import time
 
 from pyzstd import compress_stream, decompress_stream, \
                    CParameter, DParameter, \
                    train_dict, ZstdDict, ZstdFile, \
                    compressionLevel_values, zstd_version, \
-                   __version__ as pyzstd_version
+                   __version__ as pyzstd_version, PYZSTD_CONFIG
 
 # buffer sizes recommended by zstd
 C_READ_BUFFER = 131072
@@ -30,6 +29,7 @@ def open_output(args, path):
                         '{}\noverwrite? (y/n) ').format(path))
         print()
         if answer != 'y':
+            import sys
             sys.exit()
     args.output = open(path, 'wb')
 
@@ -367,10 +367,7 @@ def range_action(min, max, bits_msg=False):
             if not (min <= v <= max):
                 # 32/64 bits message
                 if bits_msg:
-                    if sys.maxsize > 2**32:
-                        bits = 'in 64-bit build, '
-                    else:
-                        bits = 'in 32-bit build, '
+                    bits = 'in {}-bit build, '.format(PYZSTD_CONFIG[0])
                 else:
                     bits = ''
 

@@ -14,7 +14,10 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info', 'zstd_support_multithread',
-           'compressionLevel_values')
+           'compressionLevel_values', 'PYZSTD_CONFIG')
+
+PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
+                 'cffi', bool(m.pyzstd_static_link), False)
 
 # Used in __init__.py
 _ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()

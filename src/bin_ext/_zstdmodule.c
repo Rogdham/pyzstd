@@ -3831,15 +3831,14 @@ add_constants(PyObject *module)
 
     /* _compressionLevel_values: (default, min, max)
        ZSTD_defaultCLevel() was added in zstd v1.5.0 */
+    obj = Py_BuildValue("iii",
 #if ZSTD_VERSION_NUMBER < 10500
-    obj = Py_BuildValue("iii", ZSTD_CLEVEL_DEFAULT,
-                               ZSTD_minCLevel(),
-                               ZSTD_maxCLevel();
+                        ZSTD_CLEVEL_DEFAULT,
 #else
-    obj = Py_BuildValue("iii", ZSTD_defaultCLevel(),
-                               ZSTD_minCLevel(),
-                               ZSTD_maxCLevel());
+                        ZSTD_defaultCLevel(),
 #endif
+                        ZSTD_minCLevel(),
+                        ZSTD_maxCLevel());
     if (PyModule_AddObject(module,
                            "_compressionLevel_values",
                            obj) < 0) {
@@ -3854,13 +3853,23 @@ add_constants(PyObject *module)
         return -1;
     }
 
-    /* _MULTI_PHASE_INIT */
-#ifdef USE_MULTI_PHASE_INIT
-    obj = PyBool_FromLong(1);
+    /* PYZSTD_CONFIG */
+    obj = Py_BuildValue("isOO", 8*(int)sizeof(Py_ssize_t), "c",
+/* Statically link to zstd lib */
+#ifdef PYZSTD_STATIC_LINK
+                        Py_True,
 #else
-    obj = PyBool_FromLong(0);
+                        Py_False,
 #endif
-    if (PyModule_AddObject(module, "_MULTI_PHASE_INIT", obj) < 0) {
+/* Use multi-phase initialization */
+#ifdef USE_MULTI_PHASE_INIT
+                        Py_True
+#else
+                        Py_False
+#endif
+                        );
+
+    if (PyModule_AddObject(module, "PYZSTD_CONFIG", obj) < 0) {
         Py_XDECREF(obj);
         return -1;
     }

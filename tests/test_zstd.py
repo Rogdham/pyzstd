@@ -26,7 +26,7 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdFile, open
 
 PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG
-if PYZSTD_CONFIG[0] == 'c':
+if PYZSTD_CONFIG[1] == 'c':
     from pyzstd.c import _zstd
 
 DECOMPRESSED_DAT = None
@@ -414,6 +414,16 @@ class ClassShapeTestCase(unittest.TestCase):
             self.assertEqual(type(obj), ZstdError)
         else:
             self.assertFalse(True, 'unreachable code path')
+
+    def test_pyzstd_config(self):
+        self.assertEqual(len(PYZSTD_CONFIG), 4)
+        if sys.maxsize > 2**32:
+            self.assertEqual(PYZSTD_CONFIG[0], 64)
+        else:
+            self.assertEqual(PYZSTD_CONFIG[0], 32)
+        self.assertIn(PYZSTD_CONFIG[1], ('c', 'cffi'))
+        self.assertEqual(type(PYZSTD_CONFIG[2]), bool)
+        self.assertEqual(type(PYZSTD_CONFIG[3]), bool)
 
 class CompressorDecompressorTestCase(unittest.TestCase):
 
@@ -1809,7 +1819,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
-    @unittest.skipIf(PYZSTD_CONFIG[0] == 'cffi', 'cffi implementation')
+    @unittest.skipIf(PYZSTD_CONFIG[1] == 'cffi', 'cffi implementation')
     def test_train_dict_c(self):
         # argument wrong type
         with self.assertRaises(TypeError):
@@ -1827,7 +1837,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._train_dict(b'', [], 0)
 
-    @unittest.skipIf(PYZSTD_CONFIG[0] == 'cffi', 'cffi implementation')
+    @unittest.skipIf(PYZSTD_CONFIG[1] == 'cffi', 'cffi implementation')
     def test_finalize_dict_c(self):
         if zstd_version_info < (1, 4, 5):
             with self.assertRaises(NotImplementedError):
@@ -2609,7 +2619,7 @@ class FileTestCase(unittest.TestCase):
             self.assertListEqual(f.readlines(), lines)
 
     def test_decompress_limited(self):
-        if PYZSTD_CONFIG[0] == 'cffi':
+        if PYZSTD_CONFIG[1] == 'cffi':
             _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
         else:
             _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize

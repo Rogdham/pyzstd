@@ -109,7 +109,8 @@ def do_setup():
             'library_dirs': [],
             'libraries': [],
             'sources': get_zstd_files_list(),
-            'define_macros': [('ZSTD_MULTITHREAD', None)]
+            'define_macros': [('ZSTD_MULTITHREAD', None),
+                              ('PYZSTD_STATIC_LINK', None)]
         }
 
     if CFFI:
@@ -130,7 +131,7 @@ def do_setup():
         kwargs['name'] = 'pyzstd.c._zstd'
         kwargs['sources'].append('src/bin_ext/_zstdmodule.c')
         if MULTI_PHASE_INIT:
-            # use multi-phase initialization (PEP-489) for CPython 3.11+
+            # use multi-phase initialization (PEP-489) on CPython 3.11+
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
 
         binary_extension = Extension(**kwargs)
