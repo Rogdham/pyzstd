@@ -41,18 +41,11 @@ def close_files(args):
         args.output.close()
 
 def compress_option(args):
-    # threads
-    if args.threads < 0:
-        threads = 0
-    elif args.threads == 0:
-        threads = os.cpu_count()
-    else:
-        threads = args.threads
-
-    if threads == 0:
+    # threads message
+    if args.threads == 0:
         threads_msg = 'single-thread mode'
     else:
-        threads_msg = 'multi-thread mode, %d threads.' % threads
+        threads_msg = 'multi-thread mode, %d threads.' % args.threads
 
     # long mode
     if args.long >= 0:
@@ -66,7 +59,7 @@ def compress_option(args):
 
     # option
     option = {CParameter.compressionLevel: args.level,
-              CParameter.nbWorkers: threads,
+              CParameter.nbWorkers: args.threads,
               CParameter.enableLongDistanceMatching: use_long,
               CParameter.windowLog: windowLog,
               CParameter.checksumFlag: args.checksum,
@@ -421,10 +414,10 @@ def parse_arg():
                    format(compressionLevel_values.min,
                           compressionLevel_values.max,
                           compressionLevel_values.default))
-    g.add_argument('-t', '--threads', metavar='#', default=-1,
+    g.add_argument('-t', '--threads', metavar='#', default=0,
                    action=range_action(*CParameter.nbWorkers.bounds(), True),
-                   help=('spawns # compression threads (0 means CPU cores number). '
-                         'if this option is not specified, use single thread mode.'))
+                   help=('spawns # threads to compress. if this option is not '
+                         'specified or is 0, use single thread mode.'))
     g.add_argument('--long', metavar='#', nargs='?', const=27, default=-1,
                    action=range_action(*CParameter.windowLog.bounds(), True),
                    help='enable long distance matching with given windowLog (default #: 27)')
