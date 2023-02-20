@@ -13,7 +13,7 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'CParameter', 'DParameter', 'Strategy',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info', 'zstd_support_multithread',
+           'zstd_version', 'zstd_version_info',
            'compressionLevel_values', 'PYZSTD_CONFIG')
 
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
@@ -85,8 +85,6 @@ class CParameter(IntEnum):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
         return _get_param_bounds(1, self.value)
-
-zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class DParameter(IntEnum):
     """Decompression parameters"""

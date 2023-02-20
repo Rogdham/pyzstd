@@ -49,6 +49,9 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'zstd_support_multithread', 'compressionLevel_values')
 
 
+zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))
+
+
 def compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
 

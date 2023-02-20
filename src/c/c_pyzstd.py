@@ -13,7 +13,7 @@ __all__ = (# From this file
            'ZstdDecompressor', 'EndlessZstdDecompressor',
            'ZstdDict', 'ZstdError', 'decompress', 'get_frame_size',
            'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info', 'zstd_support_multithread',
+           'zstd_version', 'zstd_version_info',
            'PYZSTD_CONFIG')
 
 

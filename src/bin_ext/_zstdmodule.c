@@ -633,6 +633,17 @@ add_parameters(PyObject *module)
     /* Decompression parameters */
     ADD_INT_PREFIX_MACRO(module, ZSTD_d_windowLogMax);
 
+    /* ZSTD_strategy enum */
+    ADD_INT_PREFIX_MACRO(module, ZSTD_fast);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_dfast);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_greedy);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy2);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btlazy2);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btopt);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
+    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
+
     return 0;
 }
 
@@ -3797,35 +3808,9 @@ static inline int
 add_constants(PyObject *module)
 {
     PyObject *obj;
-    ZSTD_bounds param_bounds;
-    long value;
 
     /* Add zstd parameters */
     if (add_parameters(module) < 0) {
-        return -1;
-    }
-
-    /* ZSTD_strategy enum */
-    ADD_INT_PREFIX_MACRO(module, ZSTD_fast);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_dfast);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_greedy);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_lazy2);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_btlazy2);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_btopt);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra);
-    ADD_INT_PREFIX_MACRO(module, ZSTD_btultra2);
-
-    /* zstd_support_multithread */
-    param_bounds = ZSTD_cParam_getBounds(ZSTD_c_nbWorkers);
-    if (ZSTD_isError(param_bounds.error)) {
-        return -1;
-    }
-    value = param_bounds.upperBound != 0 || param_bounds.lowerBound != 0;
-
-    obj = PyBool_FromLong(value);
-    if (PyModule_AddObject(module, "zstd_support_multithread", obj) < 0) {
-        Py_XDECREF(obj);
         return -1;
     }
 
