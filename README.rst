@@ -5,7 +5,7 @@ Pyzstd module provides classes and functions for compressing and decompressing d
 
 The API style is similar to Python's bz2/lzma/zlib modules.
 
-* Includes zstd v1.5.2 source code
+* Includes zstd v1.5.4 source code
 * Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 * Has a CFFI implementation that can work with PyPy
 * Has a command line interface: ``python -m pyzstd --help``
@@ -21,9 +21,9 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.15.4  (xx xx, 2023)**
+**0.15.4  (Feb 24, 2023)**
 
-#. Update bundled zstd source code from v1.5.2 to `v1.5.x <https://github.com/facebook/zstd/releases/tag/v1.5.x>`_.
+#. Update bundled zstd source code from v1.5.2 to `v1.5.4 <https://github.com/facebook/zstd/releases/tag/v1.5.4>`_. v1.5.3 is a non-public release.
 
 #. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `doc <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 

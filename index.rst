@@ -1251,6 +1251,9 @@ Multi-threaded compression
 
     The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MiB data, single-threaded output is 273.55 MiB, multi-threaded output is 274.33 MiB.
 
+    .. hint::
+        Using "CPU physical cores number" as threads number may be the fastest, to get the number need to install third-party module. `os.cpu_count() <https://docs.python.org/3/library/os.html#os.cpu_count>`_ can only get "CPU logical cores number" (hyper-threading capability).
+
 
 Rich memory mode
 >>>>>>>>>>>>>>>>

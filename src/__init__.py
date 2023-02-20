@@ -26,7 +26,7 @@ except ImportError:
             "library, make sure not to remove zstd library, and the run-time "
             "zstd library's version can't be lower than that at compile-time.")
 
-__version__ = '0.15.3'
+__version__ = '0.15.4'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API style is
