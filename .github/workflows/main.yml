@@ -6,7 +6,7 @@ on: [push, pull_request]
 env:
   PYTHON_VER: '3.10'        # Python to run test/cibuildwheel
   PYTHON_VER_PEP489: '3.11' # Python to run test with multi-phase init
-  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
+  CIBW_BUILD: cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
@@ -144,10 +144,11 @@ jobs:
       # manylinux2014  >=19.3   3.7.8+, 3.8.4+, 3.9.0+    2.17 (2012-12-25)
       # manylinux_x_y  >=20.3   3.8.10+, 3.9.5+, 3.10.0+  x.y
       # manylinux2010 images EOL on 2022-08-01, it doesn't support cp311/pp39.
-      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+      CIBW_BUILD: cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
       CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
+      CIBW_SKIP: "*musllinux*"
 
     steps:
       - uses: actions/checkout@v3
@@ -163,13 +164,17 @@ jobs:
           python -m build --sdist
           python -m cibuildwheel --output-dir wheelhouse
 
-      - name: Upload source distribution & manylinux1_x86_64 wheels
+      - name: Upload source distribution
         uses: actions/upload-artifact@v3
         with:
           name: pyzstd-files
-          path: |
-            dist/*.tar.gz
-            wheelhouse/*.whl
+          path: dist/*.tar.gz
+
+      - name: Upload manylinux1_x86_64
+        uses: actions/upload-artifact@v3
+        with:
+          name: pyzstd-files
+          path: wheelhouse/*.whl
 
   # Build aarch64/ppc64le/s390x wheels
   build_arch_wheels:
