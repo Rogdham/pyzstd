@@ -5,9 +5,12 @@ Introduction
 
 Pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
 
-The API is similar to Python's bz2/lzma/zlib modules.
+The API style is similar to Python's bz2/lzma/zlib modules.
 
-Includes the latest zstd source code, can also dynamically link to zstd library provided by system, and has a CFFI implementation that can work with PyPy, see :ref:`this note<build_pyzstd>` for details.
+* Includes the latest zstd library source code.
+* Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
+* Has a CFFI implementation that can work with PyPy.
+* Has a command line interface, ``python -m pyzstd --help``. (*Added in version 0.15.4*)
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -178,7 +181,7 @@ Streaming compression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data (or its slice) outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
 
@@ -337,7 +340,7 @@ Streaming decompression
     :type read_size: int
     :param write_size: Output buffer size, in bytes.
     :type write_size: int
-    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
+    :param callback: A callback function that accepts four parameters: ``(total_input, total_output, read_data, write_data)``. The first two are ``int`` objects. The last two are readonly `memoryview <https://docs.python.org/3/library/stdtypes.html#memory-views>`_ objects, if want to reference the data (or its slice) outside the callback function, `convert <https://docs.python.org/3/library/stdtypes.html#memoryview.tobytes>`_ them to ``bytes`` objects. If input stream is ``b''``, the callback function will not be called.
     :type callback: callable
     :return: A 2-item tuple, ``(total_input, total_output)``, the items are ``int`` objects.
     :raises ZstdError: If decompression fails.
@@ -546,13 +549,15 @@ Dictionary
 
     Pyzstd module only uses zstd library's stable API. The stable API only exposes two dictionary training functions that corresponding to :py:func:`train_dict` and :py:func:`finalize_dict`.
 
-    If want to adjust advanced training parameters, you may use zstd's CLI program, it has entries to zstd library's experimental API.
+    If want to adjust advanced training parameters, you may use zstd's CLI program (not pyzstd module's CLI), it has entries to zstd library's experimental API.
 
 .. py:class:: ZstdDict
 
     Represents a zstd dictionary, can be used for compression/decompression.
 
-    It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects. It has an internal cache for costly digesting.
+    It has an internal cache for costly digesting, so it's recommended to reuse ``ZstdDict`` object for the same dictionary.
+
+    It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -742,6 +747,11 @@ Module-level variables
 
 ZstdFile class and open() function
 ---------------------------------------
+
+    This section contains:
+
+        * class :py:class:`ZstdFile`, open a zstd-compressed file in binary mode.
+        * function :py:func:`open`, open a zstd-compressed file in binary or text mode.
 
 .. py:class:: ZstdFile
 
@@ -1241,6 +1251,9 @@ Multi-threaded compression
 
     The multi-threaded output is a single :ref:`frame<frame_block>`, it's larger a little. Compressing a 520.58 MiB data, single-threaded output is 273.55 MiB, multi-threaded output is 274.33 MiB.
 
+    .. hint::
+        Using "CPU physical cores number" as threads number may be the fastest, to get the number need to install third-party module. `os.cpu_count() <https://docs.python.org/3/library/os.html#os.cpu_count>`_ can only get "CPU logical cores number" (hyper-threading capability).
+
 
 Rich memory mode
 >>>>>>>>>>>>>>>>
@@ -1379,21 +1392,27 @@ Build pyzstd module with options
 
 .. note:: Build pyzstd module with options
 
-    1️⃣ If add ``--avx2`` option to setup.py, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
+    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
 
     .. sourcecode:: shell
 
+        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
         # build and install
-        pip install --install-option="--avx2" -v pyzstd-0.15.1.tar.gz
+        pip install --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
         # build a redistributable wheel
-        pip wheel --build-option="--avx2" pyzstd-0.15.1.tar.gz
+        pip wheel --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
+        # 🟠 legacy commands:
+        # build and install
+        python setup.py install --avx2
+        # build a redistributable wheel
+        python setup.py bdist_wheel --avx2
 
     2️⃣ Pyzstd module supports:
 
         * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``zstd`` folder will be ignored.
         * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
 
-    On CPython, add these options to setup.py:
+    On CPython, provide these build options:
 
         #. no option: C implementation, statically link to zstd library.
         #. ``--dynamic-link-zstd``: C implementation, dynamically link to zstd library.
@@ -1402,21 +1421,27 @@ Build pyzstd module with options
 
     On PyPy, only CFFI implementation can be used, so ``--cffi`` is added implicitly. ``--dynamic-link-zstd`` is optional.
 
-    Some notes:
-
-        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static link, the packages on `Conda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic link.
-        * No matter statically or dynamically linking, pyzstd module requires zstd v1.4.0+.
-        * Statically linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
-        * Dynamically linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
-
-    On Linux, dynamically link to zstd library provided by system:
-
     .. sourcecode:: shell
 
+        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
         # build and install
-        sudo pip3 install --install-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
+        pip3 install --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
         # build a redistributable wheel
-        pip3 wheel --build-option="--dynamic-link-zstd" -v pyzstd-0.14.4.tar.gz
+        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
+        # specify more than one option
+        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd --cffi" -v pyzstd-0.15.4.tar.gz
+        # 🟠 legacy commands:
+        # build and install
+        python3 setup.py install --dynamic-link-zstd
+        # build a redistributable wheel
+        python3 setup.py bdist_wheel --dynamic-link-zstd
+
+    Some notes:
+
+        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static linking, the packages on `Anaconda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic linking.
+        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
+        * Static linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
+        * Dynamic linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
 
     On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
 
@@ -1438,3 +1463,9 @@ Build pyzstd module with options
         * %SystemRoot%\System32
 
     Note that the above list doesn't include the current working directory and %PATH% directories.
+
+    3️⃣ Use "multi-phase initialization" on CPython.
+
+    If provide ``--multi-phase-init`` build option, it will build with "multi-phase initialization" (`PEP-489 <https://peps.python.org/pep-0489/>`_) on CPython 3.11+.
+
+    Since it adds a tiny overhead, it's disabled by default. It can be enabled after CPython's `sub-interpreters <https://peps.python.org/pep-0554/>`_ is mature.

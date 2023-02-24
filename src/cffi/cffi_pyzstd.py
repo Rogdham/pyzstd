@@ -13,8 +13,11 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'CParameter', 'DParameter', 'Strategy',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info', 'zstd_support_multithread',
-           'compressionLevel_values')
+           'zstd_version', 'zstd_version_info',
+           'compressionLevel_values', 'PYZSTD_CONFIG')
+
+PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
+                 'cffi', bool(m.pyzstd_static_link), False)
 
 # Used in __init__.py
 _ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()
@@ -82,8 +85,6 @@ class CParameter(IntEnum):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
         return _get_param_bounds(1, self.value)
-
-zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))
 
 class DParameter(IntEnum):
     """Decompression parameters"""
@@ -365,30 +366,29 @@ class _ErrorType:
     ERR_FINALIZE_DICT=9
 
     _TYPE_MSG = (
-        "decompress zstd data",
-        "compress zstd data",
-        "set pledged uncompressed content size",
+        "Unable to decompress zstd data: %s",
+        "Unable to compress zstd data: %s",
+        "Unable to set pledged uncompressed content size: %s",
 
-        "load zstd dictionary for decompression",
-        "load zstd dictionary for compression",
+        "Unable to load zstd dictionary for decompression: %s",
+        "Unable to load zstd dictionary for compression: %s",
 
-        "get zstd compression parameter bounds",
-        "get zstd decompression parameter bounds",
-        "set zstd compression level",
+        "Unable to get zstd compression parameter bounds: %s",
+        "Unable to get zstd decompression parameter bounds: %s",
+        "Unable to set zstd compression level: %s",
 
-        "train zstd dictionary",
-        "finalize zstd dictionary")
+        "Unable to train zstd dictionary: %s",
+        "Unable to finalize zstd dictionary: %s")
 
     @staticmethod
     def get_type_msg(type):
         return _ErrorType._TYPE_MSG[type]
 
-def _set_zstd_error(type, zstd_code):
-    assert m.ZSTD_isError(zstd_code)
+def _set_zstd_error(type, zstd_ret):
+    assert m.ZSTD_isError(zstd_ret)
 
-    type_msg = _ErrorType.get_type_msg(type)
-    msg = "Unable to %s: %s." % \
-          (type_msg, ffi.string(m.ZSTD_getErrorName(zstd_code)).decode('utf-8'))
+    msg = _ErrorType.get_type_msg(type) % \
+          ffi.string(m.ZSTD_getErrorName(zstd_ret)).decode('utf-8')
     raise ZstdError(msg)
 
 def _set_parameter_error(is_compress, pos, key, value):

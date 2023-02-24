@@ -19,7 +19,6 @@ except ImportError:
         from .cffi.cffi_pyzstd import *
         from .cffi.cffi_pyzstd import _train_dict, _finalize_dict, \
                                       _ZSTD_DStreamInSize
-        CFFI_PYZSTD = True
     except ImportError:
         raise ImportError(
             "pyzstd module: Neither C implementation nor CFFI implementation "
@@ -27,11 +26,13 @@ except ImportError:
             "library, make sure not to remove zstd library, and the run-time "
             "zstd library's version can't be lower than that at compile-time.")
 
-__version__ = '0.15.3'
+__version__ = '0.15.4'
 
 __doc__ = '''\
-Python bindings to Zstandard (zstd) compression library, the API is similar to
-Python's bz2/lzma/zlib modules.
+Python bindings to Zstandard (zstd) compression library, the API style is
+similar to Python's bz2/lzma/zlib modules.
+
+Command line interface of this module: python -m pyzstd --help
 
 Documentation: https://pyzstd.readthedocs.io
 GitHub: https://github.com/animalize/pyzstd
@@ -46,6 +47,9 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'get_frame_info', 'get_frame_size', 'ZstdFile', 'open',
            'zstd_version', 'zstd_version_info',
            'zstd_support_multithread', 'compressionLevel_values')
+
+
+zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))
 
 
 def compress(data, level_or_option=None, zstd_dict=None):
@@ -572,6 +576,19 @@ class ZstdFile(io.BufferedIOBase):
             return self._buffer.peek(size)
         except AttributeError:
             self._check_mode(_MODE_READ)
+
+    def __iter__(self):
+        try:
+            self._buffer
+        except AttributeError:
+            self._check_mode(_MODE_READ)
+        return self
+
+    def __next__(self):
+        ret = self._buffer.readline()
+        if ret:
+            return ret
+        raise StopIteration
 
     def tell(self):
         """Return the current file position."""

@@ -1,14 +1,18 @@
 try:
-    from cffi import FFI
+    import cffi
 except ImportError:
     # PyPy includes cffi by default
-    msg = ('To build the CFFI implementation of pyzstd module, need to '
-           'install cffi module like this: "sudo python3 -m pip install '
-           'cffi". On CPython, CFFI implementation is slower than C '
-           'implementation.')
-    raise ImportError(msg)
+    msg = ('\n    To build the CFFI implementation '
+           'of pyzstd module, need cffi module.'
+           '\n    On CPython, CFFI implementation '
+           'is slower than C implementation.\n')
+    print(msg)
 
-ffibuilder = FFI()
+    # Used for PEP-517 get_requires_for_build_wheel hook
+    from setuptools.build_meta import SetupRequirementsError
+    raise SetupRequirementsError(['cffi'])
+
+ffibuilder = cffi.FFI()
 
 ffibuilder.cdef("""
 #define ZSTD_VERSION_NUMBER ...
@@ -162,6 +166,8 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
                                 const void* dictContent, size_t dictContentSize,
                                 const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples,
                                 ZDICT_params_t parameters);
+
+int pyzstd_static_link;
 """)
 
 source = """
@@ -193,6 +199,12 @@ int ZSTD_defaultCLevel(void)
 {
     return ZSTD_CLEVEL_DEFAULT;
 }
+#endif
+
+#ifdef PYZSTD_STATIC_LINK
+pyzstd_static_link = 1;
+#else
+pyzstd_static_link = 0;
 #endif
 """
 

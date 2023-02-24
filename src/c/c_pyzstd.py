@@ -13,7 +13,8 @@ __all__ = (# From this file
            'ZstdDecompressor', 'EndlessZstdDecompressor',
            'ZstdDict', 'ZstdError', 'decompress', 'get_frame_size',
            'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info', 'zstd_support_multithread')
+           'zstd_version', 'zstd_version_info',
+           'PYZSTD_CONFIG')
 
 
 # Used in __init__.py
@@ -24,9 +25,7 @@ _finalize_dict = _zstd._finalize_dict
 
 # compressionLevel_values
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_values(_zstd._ZSTD_defaultCLevel,
-                                     _zstd._ZSTD_minCLevel,
-                                     _zstd._ZSTD_maxCLevel)
+compressionLevel_values = _nt_values(*_zstd._compressionLevel_values)
 
 
 _nt_frame_info = namedtuple('frame_info',
