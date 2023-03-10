@@ -47,11 +47,14 @@ def has_option(option):
 
 class pyzstd_build_ext(build_ext):
     PYZSTD_AVX2 = False
+    PYZSTD_DEBUG = False
     PYZSTD_WARNING_AS_ERROR = False
 
     def build_extensions(self):
         # Accept assembly files
         self.compiler.src_extensions.extend(['.s', '.S'])
+        # Build debug build
+        self.debug = self.PYZSTD_DEBUG
 
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
@@ -67,7 +70,7 @@ class pyzstd_build_ext(build_ext):
                     more_options.append('-Werror')
                 extension.extra_compile_args.extend(more_options)
             elif self.compiler.compiler_type == 'msvc':
-                # Remove .S source files
+                # Remove .S source files, they use gcc/clang syntax.
                 extension.sources = [i for i in extension.sources
                                         if not fnmatch.fnmatch(i, '*.[sS]')]
 
@@ -89,6 +92,7 @@ def do_setup():
     long_description, module_version = read_stuff()
 
     pyzstd_build_ext.PYZSTD_AVX2 = has_option('--avx2')
+    pyzstd_build_ext.PYZSTD_DEBUG = has_option('--debug')
     pyzstd_build_ext.PYZSTD_WARNING_AS_ERROR = has_option('--warning-as-error')
 
     DYNAMIC_LINK = has_option('--dynamic-link-zstd')

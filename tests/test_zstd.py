@@ -95,7 +95,8 @@ def setUpModule():
     SAMPLES = lst
 
     global TRAINED_DICT
-    TRAINED_DICT = train_dict(SAMPLES, 200*1024)
+    TRAINED_DICT = train_dict(SAMPLES, 3*1024)
+    assert len(TRAINED_DICT.dict_content) <= 3*1024
 
 class FunctionsTestCase(unittest.TestCase):
 
@@ -1729,7 +1730,7 @@ class ZstdDictTestCase(unittest.TestCase):
             ZstdDict(dict_content, is_raw=False)
 
     def test_train_dict(self):
-        DICT_SIZE1 = 200*1024
+        DICT_SIZE1 = 3*1024
 
         global TRAINED_DICT
         TRAINED_DICT = pyzstd.train_dict(SAMPLES, DICT_SIZE1)
@@ -1893,7 +1894,7 @@ class ZstdDictTestCase(unittest.TestCase):
             pyzstd._train_dict(concatenation, wrong_size_lst, 100*1024)
 
         # correct size list
-        pyzstd._train_dict(concatenation, correct_size_lst, 100*1024)
+        pyzstd._train_dict(concatenation, correct_size_lst, 3*1024)
 
         # test _finalize_dict
         if zstd_version_info < (1, 4, 5):
@@ -3323,12 +3324,15 @@ class CLITestCase(unittest.TestCase):
     def test_sequence(self):
         # train dict
         DICT_PATH = os.path.join(self.dir_name, 'dict')
+        DICT_SIZE = 3*1024
         cmd = [sys.executable, '-m', 'pyzstd', '--train',
                self.samples_path + os.sep + '*.dat',
-               '-o', DICT_PATH, '--dictID', '1234567']
+               '-o', DICT_PATH, '--dictID', '1234567',
+               '--maxdict', str(DICT_SIZE)]
         result = subprocess.run(cmd, stdout=subprocess.PIPE)
         self.assertRegex(result.stdout,
                          rb'(?s)Training succeeded.*?dict_id=1234567')
+        self.assertLessEqual(os.path.getsize(DICT_PATH), DICT_SIZE)
 
         # compress
         cmd = [sys.executable, '-m', 'pyzstd', '--compress',
