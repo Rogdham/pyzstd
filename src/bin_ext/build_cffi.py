@@ -128,10 +128,12 @@ ZSTD_CDict* ZSTD_createCDict(const void* dictBuffer, size_t dictSize,
                              int compressionLevel);
 size_t ZSTD_CCtx_refCDict(ZSTD_CCtx* cctx, const ZSTD_CDict* cdict);
 size_t ZSTD_freeCDict(ZSTD_CDict* CDict);
+size_t ZSTD_CCtx_refPrefix(ZSTD_CCtx* cctx, const void* prefix, size_t prefixSize);
 
 ZSTD_DDict* ZSTD_createDDict(const void* dictBuffer, size_t dictSize);
 size_t ZSTD_DCtx_refDDict(ZSTD_DCtx* dctx, const ZSTD_DDict* ddict);
 size_t ZSTD_freeDDict(ZSTD_DDict* ddict);
+size_t ZSTD_DCtx_refPrefix(ZSTD_DCtx* dctx, const void* prefix, size_t prefixSize);
 
 unsigned ZSTD_getDictID_fromDict(const void* dict, size_t dictSize);
 

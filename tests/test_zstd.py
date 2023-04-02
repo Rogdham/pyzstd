@@ -93,6 +93,7 @@ def setUpModule():
         lst.append(sample)
     global SAMPLES
     SAMPLES = lst
+    assert len(SAMPLES) > 10
 
     global TRAINED_DICT
     TRAINED_DICT = train_dict(SAMPLES, 3*1024)
@@ -344,6 +345,7 @@ class ClassShapeTestCase(unittest.TestCase):
 
         self.assertEqual(type(zd.dict_content), bytes)
         self.assertEqual(zd.dict_id, 0)
+        zd.as_prefix
 
         # name
         self.assertIn('.ZstdDict', str(type(zd)))
@@ -1912,6 +1914,37 @@ class ZstdDictTestCase(unittest.TestCase):
         # correct size list
         pyzstd._finalize_dict(TRAINED_DICT.dict_content,
                               concatenation, correct_size_lst, 300*1024, 5)
+
+    def test_as_prefix(self):
+        # V1
+        V1 = THIS_FILE_BYTES
+        zd = ZstdDict(V1, True)
+
+        # V2
+        mid = len(V1) // 2
+        V2 = V1[:mid] + \
+             (b'a' if V1[mid] != b'a' else b'b') + \
+             V1[mid+1:]
+
+        # compress
+        dat = richmem_compress(V2, zstd_dict=zd.as_prefix)
+        self.assertEqual(get_frame_info(dat).dictionary_id, 0)
+
+        # decompress
+        self.assertEqual(decompress(dat, zd.as_prefix), V2)
+
+        # use wrong prefix
+        zd2 = ZstdDict(SAMPLES[0], True)
+        try:
+            decompressed = decompress(dat, zd2.as_prefix)
+        except ZstdError: # expected
+            pass
+        else:
+            self.assertNotEqual(decompressed, V2)
+
+        # read only attribute
+        with self.assertRaises(AttributeError):
+            zd.as_prefix = b'1234'
 
 class OutputBufferTestCase(unittest.TestCase):
 

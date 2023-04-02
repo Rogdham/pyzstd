@@ -314,6 +314,13 @@ class ZstdDict:
         """
         return self.__dict_id
 
+    @property
+    def as_prefix(self):
+        """Load as a prefix. It only works for the first frame, then the (de)compressor
+        will return to no prefix state.
+        """
+        return (self, 23)
+
     def __str__(self):
         return '<ZstdDict dict_id=%d dict_size=%d>' % \
                (self.__dict_id, len(self.__dict_content))
@@ -528,28 +535,40 @@ def _set_d_parameters(dctx, option):
             _set_parameter_error(False, posi, key, value)
 
 def _load_c_dict(cctx, zstd_dict, level):
-    # Check dict type
-    if not isinstance(zstd_dict, ZstdDict):
+    if isinstance(zstd_dict, ZstdDict):
+        # Get ZSTD_CDict
+        c_dict = zstd_dict._get_cdict(level)
+
+        # Reference a prepared dictionary
+        zstd_ret = m.ZSTD_CCtx_refCDict(cctx, c_dict)
+    elif isinstance(zstd_dict, tuple) and len(zstd_dict) == 2 and \
+         isinstance(zstd_dict[0], ZstdDict) and zstd_dict[1] == 23:
+        # Reference as prefix
+        zstd_ret = m.ZSTD_CCtx_refPrefix(cctx,
+                                         ffi.from_buffer(zstd_dict[0].dict_content),
+                                         len(zstd_dict[0].dict_content))
+    else:
         raise TypeError("zstd_dict argument should be ZstdDict object.")
 
-    # Get ZSTD_CDict
-    c_dict = zstd_dict._get_cdict(level)
-
-    # Reference a prepared dictionary
-    zstd_ret = m.ZSTD_CCtx_refCDict(cctx, c_dict)
     if m.ZSTD_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_LOAD_C_DICT, zstd_ret)
 
 def _load_d_dict(dctx, zstd_dict):
-    # Check dict type
-    if not isinstance(zstd_dict, ZstdDict):
+    if isinstance(zstd_dict, ZstdDict):
+        # Get ZSTD_DDict
+        d_dict = zstd_dict._get_ddict()
+
+        # Reference a prepared dictionary
+        zstd_ret = m.ZSTD_DCtx_refDDict(dctx, d_dict)
+    elif isinstance(zstd_dict, tuple) and len(zstd_dict) == 2 and \
+         isinstance(zstd_dict[0], ZstdDict) and zstd_dict[1] == 23:
+        # Reference as prefix
+        zstd_ret = m.ZSTD_DCtx_refPrefix(dctx,
+                                         ffi.from_buffer(zstd_dict[0].dict_content),
+                                         len(zstd_dict[0].dict_content))
+    else:
         raise TypeError("zstd_dict argument should be ZstdDict object.")
 
-    # Get ZSTD_DDict
-    d_dict = zstd_dict._get_ddict()
-
-    # Reference a prepared dictionary
-    zstd_ret = m.ZSTD_DCtx_refDDict(dctx, d_dict)
     if m.ZSTD_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_LOAD_D_DICT, zstd_ret)
 

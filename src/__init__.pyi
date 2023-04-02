@@ -62,6 +62,7 @@ class DParameter(IntEnum):
 class ZstdDict:
     dict_content: bytes
     dict_id: int
+    as_prefix: ZstdDict
 
     def __init__(self,
                  dict_content,

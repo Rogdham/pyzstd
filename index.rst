@@ -20,6 +20,7 @@ Features of zstd:
 * If use :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
 * If use pre-trained :ref:`dictionary<zstd_dict>`, the compression ratio on small data (a few KiB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
+* As a :ref:`patching engine<patching_engine>`.
 
 .. note::
     Two other zstd modules on PyPI:
@@ -589,6 +590,20 @@ Dictionary
 
         # use the dictionary to compress
         compressed_dat = compress(raw_dat, zstd_dict=zd)
+
+    .. py:attribute:: as_prefix
+
+        Load the dictionary content to (de)compressor as a "prefix", by passing this attribute as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_prefix)``
+
+        Prefix can be used for :ref:`patching engine<patching_engine>` scenario.
+
+        #. Prefix is compatible with "long distance matching", while dictionary is not.
+        #. Prefix only work for the first frame, then the (de)compressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
+        #. When decompressing, must use the same prefix as when compressing.
+        #. Loading prefix to compressor is costly.
+        #. Loading prefix to decompressor is not costly.
+
+        .. versionadded:: 0.15.7
 
 
 .. py:function:: train_dict(samples, dict_size)
@@ -1383,6 +1398,55 @@ Zstd dictionary ID
     In :py:class:`ZstdDict` class, :py:attr:`ZstdDict.dict_id` attribute == 0 means the dictionary is a "raw content" dictionary, free of any format restriction, used for advanced user. Non-zero means it's an ordinary dictionary, was created by zstd functions, follow the format specification.
 
     In :py:func:`get_frame_info` function, ``dictionary_id`` == 0 means dictionary ID was not recorded in the frame header, the frame may or may not need a dictionary to be decoded, and the ID of such a dictionary is not specified.
+
+
+Use zstd as a patching engine
+>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+
+.. _patching_engine:
+
+.. note:: Use zstd as a patching engine
+
+    Zstd can be used as a great `patching engine <https://github.com/facebook/zstd/wiki/Zstandard-as-a-patching-engine>`_, although it has some limitations.
+
+    In this particular scenario, pass :py:attr:`ZstdDict.as_prefix` as `zstd_dict` argument. "Prefix" is similar to "raw content" dictionary, but zstd internally handles them differently, see `this issue <https://github.com/facebook/zstd/issues/2835>`_.
+
+    Essentially, prefix is like being placed before the data to be compressed. See "ZSTD_c_deterministicRefPrefix" in `this file <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_.
+
+    1, Generating a patch (compress)
+
+    The compressor may use "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to ``1``, and :py:attr:`CParameter.windowLog` must cover prefix length.
+
+    The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, the prefix has a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
+
+    .. sourcecode:: python
+
+        # VER_1, VER_2 are two versions, use VER_1 as prefix.
+        v1 = ZstdDict(VER_1, is_raw=True)
+
+        # enable "long distance matching" and let the window cover prefix length.
+        # don't forget to clamp windowLog to valid range.
+        windowLog = len(VER_1).bit_length()
+        option = {CParameter.enableLongDistanceMatching: 1,
+                  CParameter.windowLog: windowLog}
+
+        # get a very small PATCH
+        PATCH = compress(VER_2, level_or_option=option, zstd_dict=v1.as_prefix)
+
+    2, Applying the patch (decompress)
+
+    Prefix is not dictionary, so the frame header doesn't record a :ref:`dictionary id<dict_id>`. When decompressing, must use the same prefix as when compressing. Otherwise ZstdError exception may be raised with a message like "Data corruption detected".
+
+    .. sourcecode:: python
+
+        # use VER_1 as prefix
+        v1 = ZstdDict(VER_1, is_raw=True)
+
+        # allow large window, the actual windowLog is from frame header.
+        option = {DParameter.windowLogMax: 31}
+
+        # get VER_2 from (VER_1 + PATCH)
+        VER_2 = decompress(PATCH, zstd_dict=v1.as_prefix, option=option)
 
 
 Build pyzstd module with options
