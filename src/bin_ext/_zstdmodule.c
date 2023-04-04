@@ -761,8 +761,8 @@ _get_CDict(ZstdDict *self, int compressionLevel)
         if (cdict == NULL) {
             STATE_FROM_OBJ(self);
             PyErr_SetString(MS_MEMBER(ZstdError),
-                            "Failed to get ZSTD_CDict instance from zstd "
-                            "dictionary content.");
+                            "Failed to create ZSTD_CDict instance from zstd "
+                            "dictionary content. Maybe the content is corrupted.");
             goto error;
         }
 
@@ -796,7 +796,34 @@ success:
 static inline ZSTD_DDict *
 _get_DDict(ZstdDict *self)
 {
-    return self->d_dict;
+    ZSTD_DDict *ret;
+
+    /* Already created */
+    if (self->d_dict != NULL) {
+        return self->d_dict;
+    }
+
+    ACQUIRE_LOCK(self);
+    if (self->d_dict == NULL) {
+        /* Create ZSTD_DDict instance from dictionary content */
+        Py_BEGIN_ALLOW_THREADS
+        self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
+                                        Py_SIZE(self->dict_content));
+        Py_END_ALLOW_THREADS
+
+        if (self->d_dict == NULL) {
+            STATE_FROM_OBJ(self);
+            PyErr_SetString(MS_MEMBER(ZstdError),
+                            "Failed to create ZSTD_DDict instance from zstd "
+                            "dictionary content. Maybe the content is corrupted.");
+        }
+    }
+
+    /* Don't lose any exception */
+    ret = self->d_dict;
+    RELEASE_LOCK(self);
+
+    return ret;
 }
 
 /* Set compressLevel or compression parameters to compression context. */
@@ -1125,23 +1152,9 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
         return -1;
     }
 
-    /* Create ZSTD_DDict instance from dictionary content, also check content
-       integrity to some degree. */
-    Py_BEGIN_ALLOW_THREADS
-    self->d_dict = ZSTD_createDDict(PyBytes_AS_STRING(self->dict_content),
-                                    Py_SIZE(self->dict_content));
-    Py_END_ALLOW_THREADS
-
-    if (self->d_dict == NULL) {
-        STATE_FROM_OBJ(self);
-        PyErr_SetString(MS_MEMBER(ZstdError),
-                        "Failed to get ZSTD_DDict instance from zstd "
-                        "dictionary content. Maybe the content is corrupted.");
-        return -1;
-    }
-
     /* Get dict_id, 0 means "raw content" dictionary. */
-    self->dict_id = ZSTD_getDictID_fromDDict(self->d_dict);
+    self->dict_id = ZSTD_getDictID_fromDict(PyBytes_AS_STRING(self->dict_content),
+                                            Py_SIZE(self->dict_content));
 
     /* Check validity for ordinary dictionary */
     if (!is_raw && self->dict_id == 0) {

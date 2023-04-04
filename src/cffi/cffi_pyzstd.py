@@ -252,6 +252,7 @@ class ZstdDict:
                       specified format.
         """
         self.__cdicts = {}
+        self.__ddict = ffi.NULL
         self.__lock = Lock()
 
         # Check dict_content's type
@@ -265,17 +266,10 @@ class ZstdDict:
         if len(self.__dict_content) < 8:
             raise ValueError('Zstd dictionary content should at least 8 bytes.')
 
-        # Create ZSTD_DDict instance from dictionary content, also check content
-        # integrity to some degree.
-        self.__ddict = m.ZSTD_createDDict(ffi.from_buffer(self.__dict_content),
-                                          len(self.__dict_content))
-        if self.__ddict == ffi.NULL:
-            msg = ("Failed to get ZSTD_DDict instance from zstd "
-                   "dictionary content. Maybe the content is corrupted.")
-            raise ZstdError(msg)
-
         # Get dict_id, 0 means "raw content" dictionary.
-        self.__dict_id = m.ZSTD_getDictID_fromDDict(self.__ddict)
+        self.__dict_id = m.ZSTD_getDictID_fromDict(
+                                    ffi.from_buffer(self.__dict_content),
+                                    len(self.__dict_content))
 
         # Check validity for ordinary dictionary
         if not is_raw and self.__dict_id == 0:
@@ -341,14 +335,29 @@ class ZstdDict:
                 cdict = m.ZSTD_createCDict(ffi.from_buffer(self.__dict_content),
                                            len(self.__dict_content), level)
                 if cdict == ffi.NULL:
-                    msg = ("Failed to get ZSTD_CDict instance from zstd "
-                           "dictionary content.")
+                    msg = ("Failed to create ZSTD_CDict instance from zstd "
+                           "dictionary content. Maybe the content is corrupted.")
                     raise ZstdError(msg)
                 self.__cdicts[level] = cdict
             return cdict
 
     def _get_ddict(self):
-        return self.__ddict
+        # Already created
+        if self.__ddict != ffi.NULL:
+            return self.__ddict
+
+        with self.__lock:
+            # Create ZSTD_DDict instance from dictionary content
+            self.__ddict = m.ZSTD_createDDict(
+                                    ffi.from_buffer(self.__dict_content),
+                                    len(self.__dict_content))
+
+            if self.__ddict == ffi.NULL:
+                msg = ("Failed to create ZSTD_DDict instance from zstd "
+                       "dictionary content. Maybe the content is corrupted.")
+                raise ZstdError(msg)
+
+            return self.__ddict
 
 class _ErrorType:
     ERR_DECOMPRESS=0
