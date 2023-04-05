@@ -6,7 +6,7 @@ on: [push, pull_request]
 env:
   PYTHON_VER: '3.10'        # Python to run test/cibuildwheel
   PYTHON_VER_PEP489: '3.11' # Python to run test with multi-phase init
-  CIBW_BUILD: cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
 
 jobs:
@@ -112,6 +112,13 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VER }}
 
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
+
       - name: Install cibuildwheel & build wheels
         run: |
           python -m pip install -U cibuildwheel
@@ -144,7 +151,7 @@ jobs:
       # manylinux2014  >=19.3   3.7.8+, 3.8.4+, 3.9.0+    2.17 (2012-12-25)
       # manylinux_x_y  >=20.3   3.8.10+, 3.9.5+, 3.10.0+  x.y
       # manylinux2010 images EOL on 2022-08-01, it doesn't support cp311/pp39.
-      CIBW_BUILD: cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
       CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
       CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
       CIBW_ARCHS_LINUX: x86_64
@@ -157,6 +164,13 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VER }}
+
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
 
       - name: Build source distribution & wheels
         run: |
@@ -244,6 +258,13 @@ jobs:
       - uses: actions/setup-python@v4
         with:
           python-version: ${{ env.PYTHON_VER }}
+
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
