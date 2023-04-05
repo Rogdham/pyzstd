@@ -21,7 +21,7 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.15.5  (Apr 5, 2023)**
+**0.15.6  (Apr 5, 2023)**
 
 Update bundled zstd source code from v1.5.4 to `v1.5.5 <https://github.com/facebook/zstd/releases/tag/v1.5.5>`_.
 
