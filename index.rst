@@ -556,9 +556,10 @@ Dictionary
 
     Represents a zstd dictionary, can be used for compression/decompression.
 
-    It has an internal cache for costly digesting, so it's recommended to reuse ``ZstdDict`` object for the same dictionary.
-
     It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
+
+    .. versionchanged:: 0.15.7
+        It's not guaranteed to always use cached dictionary. When there is a big number of data, consider reusing compressor/decompressor objects.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 

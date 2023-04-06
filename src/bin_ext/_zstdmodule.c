@@ -72,6 +72,12 @@ typedef struct {
     /* (nbWorker >= 1) ? 1 : 0 */
     int use_multithread;
 
+    /* Compression level */
+    int compression_level;
+
+    /* Use advanced compression parameters, 0 or 1. */
+    int use_advanced_parameters;
+
     /* __init__ has been called, 0 or 1. */
     int inited;
 
@@ -671,6 +677,12 @@ typedef enum {
     ERR_FINALIZE_DICT
 } error_type;
 
+typedef enum {
+    DICT_TYPE_DIGESTED = 0,
+    DICT_TYPE_UNDIGESTED = 1,
+    DICT_TYPE_PREFIX = 2
+} dictionary_type;
+
 /* Format error message and set ZstdError. */
 FORCE_NO_INLINE void
 set_zstd_error(const _zstd_state* const state,
@@ -828,9 +840,7 @@ _get_DDict(ZstdDict *self)
 
 /* Set compressLevel or compression parameters to compression context */
 static int
-set_c_parameters(ZstdCompressor *self,
-                 PyObject *level_or_option,
-                 int *compress_level)
+set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
 {
     size_t zstd_ret;
     STATE_FROM_OBJ(self);
@@ -844,8 +854,8 @@ set_c_parameters(ZstdCompressor *self,
             return -1;
         }
 
-        /* Save to *compress_level for generating ZSTD_CDICT */
-        *compress_level = level;
+        /* Save for generating ZSTD_CDICT */
+        self->compression_level = level;
 
         /* Set compressionLevel to compression context */
         zstd_ret = ZSTD_CCtx_setParameter(self->cctx,
@@ -889,10 +899,13 @@ set_c_parameters(ZstdCompressor *self,
                 return -1;
             }
 
-            if (key_v == ZSTD_c_compressionLevel) {
-                /* Save to *compress_level for generating ZSTD_CDICT */
-                *compress_level = value_v;
-            } else if (key_v == ZSTD_c_nbWorkers) {
+            switch (key_v)
+            {
+            case ZSTD_c_compressionLevel:
+                /* Save for generating ZSTD_CDICT */
+                self->compression_level = value_v;
+                break;
+            case ZSTD_c_nbWorkers:
                 /* From zstd library doc:
                    1. When nbWorkers >= 1, triggers asynchronous mode when
                       used with ZSTD_compressStream2().
@@ -902,6 +915,23 @@ set_c_parameters(ZstdCompressor *self,
                 if (value_v > 0) {
                     self->use_multithread = 1;
                 }
+                break;
+            case ZSTD_c_windowLog:
+            case ZSTD_c_hashLog:
+            case ZSTD_c_chainLog:
+            case ZSTD_c_searchLog:
+            case ZSTD_c_minMatch:
+            case ZSTD_c_targetLength:
+            case ZSTD_c_strategy:
+            case ZSTD_c_enableLongDistanceMatching:
+            case ZSTD_c_ldmHashLog:
+            case ZSTD_c_ldmMinMatch:
+            case ZSTD_c_ldmBucketSizeLog:
+            case ZSTD_c_ldmHashRateLog:
+                if (value_v != 0) {
+                    self->use_advanced_parameters = 1;
+                }
+                break;
             }
 
             /* Set parameter to compression context */
@@ -921,71 +951,87 @@ set_c_parameters(ZstdCompressor *self,
 
 /* Load dictionary or prefix to compression context */
 static int
-load_c_dict(ZstdCompressor *self, PyObject *dict, int compress_level)
+load_c_dict(ZstdCompressor *self, PyObject *dict)
 {
     size_t zstd_ret;
     STATE_FROM_OBJ(self);
-    int ret;
+    ZstdDict *zd;
+    int type, ret;
 
     /* Check ZstdDict */
     ret = PyObject_IsInstance(dict, (PyObject*)MS_MEMBER(ZstdDict_type));
     if (ret < 0) {
         return -1;
     } else if (ret > 0) {
-        /* Get ZSTD_CDict */
-        ZSTD_CDict *c_dict = _get_CDict((ZstdDict*)dict, compress_level);
-        if (c_dict == NULL) {
-            return -1;
+        zd = (ZstdDict*)dict;
+        if (!self->use_advanced_parameters) {
+            type = DICT_TYPE_DIGESTED;
+        } else {
+            type = DICT_TYPE_UNDIGESTED;
         }
-
-        /* Reference a prepared dictionary */
-        zstd_ret = ZSTD_CCtx_refCDict(self->cctx, c_dict);
-        goto check_zstd_ret;
+        goto load;
     }
 
     /* Check (ZstdDict, type) */
     if (PyTuple_CheckExact(dict) && PyTuple_GET_SIZE(dict) == 2) {
-        ZstdDict *zd;
-        int type;
-
         /* Check ZstdDict */
         ret = PyObject_IsInstance(PyTuple_GET_ITEM(dict, 0),
                                   (PyObject*)MS_MEMBER(ZstdDict_type));
         if (ret < 0) {
             return -1;
-        } else if (ret == 0) {
-            goto type_error;
-        }
-
-        /* Get type */
-        type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
-        if (type < 0) {
-            goto type_error;
-        }
-
-        zd = (ZstdDict*)PyTuple_GET_ITEM(dict, 0);
-        if (type == 23) {
-            /* as_prefix */
-            zstd_ret = ZSTD_CCtx_refPrefix(
-                                self->cctx,
-                                PyBytes_AS_STRING(zd->dict_content),
-                                Py_SIZE(zd->dict_content));
-            goto check_zstd_ret;
+        } else if (ret > 0) {
+            /* type == -1 may indicate an error. */
+            type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
+            if (type == DICT_TYPE_DIGESTED ||
+                type == DICT_TYPE_UNDIGESTED ||
+                type == DICT_TYPE_PREFIX)
+            {
+                assert(type >= 0);
+                zd = (ZstdDict*)PyTuple_GET_ITEM(dict, 0);
+                goto load;
+            }
         }
     }
-    goto type_error;
 
-check_zstd_ret:
+    /* Wrong type */
+    PyErr_SetString(PyExc_TypeError,
+                    "zstd_dict argument should be ZstdDict object.");
+    return -1;
+
+load:
+    if (type == DICT_TYPE_DIGESTED) {
+        /* Get ZSTD_CDict */
+        ZSTD_CDict *c_dict = _get_CDict(zd, self->compression_level);
+        if (c_dict == NULL) {
+            return -1;
+        }
+        /* Reference a prepared dictionary */
+        zstd_ret = ZSTD_CCtx_refCDict(self->cctx, c_dict);
+    } else if (type == DICT_TYPE_UNDIGESTED) {
+        /* Load a dictionary */
+        zstd_ret = ZSTD_CCtx_loadDictionary(
+                            self->cctx,
+                            PyBytes_AS_STRING(zd->dict_content),
+                            Py_SIZE(zd->dict_content));
+    } else if (type == DICT_TYPE_PREFIX) {
+        /* Load a prefix */
+        zstd_ret = ZSTD_CCtx_refPrefix(
+                            self->cctx,
+                            PyBytes_AS_STRING(zd->dict_content),
+                            Py_SIZE(zd->dict_content));
+    } else {
+        /* Impossible code path */
+        PyErr_SetString(PyExc_SystemError,
+                        "load_c_dict() impossible code path");
+        return -1;
+    }
+
+    /* Check error */
     if (ZSTD_isError(zstd_ret)) {
         set_zstd_error(MODULE_STATE, ERR_LOAD_C_DICT, zstd_ret);
         return -1;
     }
     return 0;
-
-type_error:
-    PyErr_SetString(PyExc_TypeError,
-                    "zstd_dict argument should be ZstdDict object.");
-    return -1;
 }
 
 /* Set decompression parameters to decompression context */
@@ -1046,67 +1092,79 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
 {
     size_t zstd_ret;
     STATE_FROM_OBJ(self);
-    int ret;
+    ZstdDict *zd;
+    int type, ret;
 
     /* Check ZstdDict */
     ret = PyObject_IsInstance(dict, (PyObject*)MS_MEMBER(ZstdDict_type));
     if (ret < 0) {
         return -1;
     } else if (ret > 0) {
-        /* Get ZSTD_DDict */
-        ZSTD_DDict *d_dict = _get_DDict((ZstdDict*)dict);
-        if (d_dict == NULL) {
-            return -1;
-        }
-
-        /* Reference a decompress dictionary */
-        zstd_ret = ZSTD_DCtx_refDDict(self->dctx, d_dict);
-        goto check_zstd_ret;
+        zd = (ZstdDict*)dict;
+        type = DICT_TYPE_DIGESTED;
+        goto load;
     }
 
     /* Check (ZstdDict, type) */
     if (PyTuple_CheckExact(dict) && PyTuple_GET_SIZE(dict) == 2) {
-        ZstdDict *zd;
-        int type;
-
         /* Check ZstdDict */
         ret = PyObject_IsInstance(PyTuple_GET_ITEM(dict, 0),
                                   (PyObject*)MS_MEMBER(ZstdDict_type));
         if (ret < 0) {
             return -1;
-        } else if (ret == 0) {
-            goto type_error;
-        }
-
-        /* Get type */
-        type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
-        if (type < 0) {
-            goto type_error;
-        }
-
-        zd = (ZstdDict*)PyTuple_GET_ITEM(dict, 0);
-        if (type == 23) {
-            /* as_prefix */
-            zstd_ret = ZSTD_DCtx_refPrefix(
-                                self->dctx,
-                                PyBytes_AS_STRING(zd->dict_content),
-                                Py_SIZE(zd->dict_content));
-            goto check_zstd_ret;
+        } else if (ret > 0) {
+            /* type == -1 may indicate an error. */
+            type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
+            if (type == DICT_TYPE_DIGESTED ||
+                type == DICT_TYPE_UNDIGESTED ||
+                type == DICT_TYPE_PREFIX)
+            {
+                assert(type >= 0);
+                zd = (ZstdDict*)PyTuple_GET_ITEM(dict, 0);
+                goto load;
+            }
         }
     }
-    goto type_error;
 
-check_zstd_ret:
+    /* Wrong type */
+    PyErr_SetString(PyExc_TypeError,
+                    "zstd_dict argument should be ZstdDict object.");
+    return -1;
+
+load:
+    if (type == DICT_TYPE_DIGESTED) {
+        /* Get ZSTD_DDict */
+        ZSTD_DDict *d_dict = _get_DDict(zd);
+        if (d_dict == NULL) {
+            return -1;
+        }
+        /* Reference a prepared dictionary */
+        zstd_ret = ZSTD_DCtx_refDDict(self->dctx, d_dict);
+    } else if (type == DICT_TYPE_UNDIGESTED) {
+        /* Load a dictionary */
+        zstd_ret = ZSTD_DCtx_loadDictionary(
+                            self->dctx,
+                            PyBytes_AS_STRING(zd->dict_content),
+                            Py_SIZE(zd->dict_content));
+    } else if (type == DICT_TYPE_PREFIX) {
+        /* Load a prefix */
+        zstd_ret = ZSTD_DCtx_refPrefix(
+                            self->dctx,
+                            PyBytes_AS_STRING(zd->dict_content),
+                            Py_SIZE(zd->dict_content));
+    } else {
+        /* Impossible code path */
+        PyErr_SetString(PyExc_SystemError,
+                        "load_d_dict() impossible code path");
+        return -1;
+    }
+
+    /* Check error */
     if (ZSTD_isError(zstd_ret)) {
         set_zstd_error(MODULE_STATE, ERR_LOAD_D_DICT, zstd_ret);
         return -1;
     }
     return 0;
-
-type_error:
-    PyErr_SetString(PyExc_TypeError,
-                    "zstd_dict argument should be ZstdDict object.");
-    return -1;
 }
 
 PyDoc_STRVAR(reduce_cannot_pickle_doc,
@@ -1298,17 +1356,41 @@ static PyMemberDef ZstdDict_members[] = {
     {NULL}
 };
 
+PyDoc_STRVAR(ZstdDict_as_digested_dict_doc,
+"Load as a digested dictionary to compressor/decompressor.");
+
+static PyObject *
+as_digested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
+{
+    return Py_BuildValue("Oi", self, DICT_TYPE_DIGESTED);
+}
+
+PyDoc_STRVAR(ZstdDict_as_undigested_dict_doc,
+"Load as an undigested dictionary to compressor/decompressor.");
+
+static PyObject *
+as_undigested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
+{
+    return Py_BuildValue("Oi", self, DICT_TYPE_UNDIGESTED);
+}
+
 PyDoc_STRVAR(ZstdDict_as_prefix_doc,
-"Load as a prefix. It only works for the first frame, then the (de)compressor\n"
-"will return to no prefix state.");
+"Load as a prefix to compressor/decompressor. It only works for the first "
+"frame, then the compressor/decompressor will return to no prefix state.");
 
 static PyObject *
 as_prefix_get(ZstdDict *self, void *Py_UNUSED(ignored))
 {
-    return Py_BuildValue("Oi", self, 23);
+    return Py_BuildValue("Oi", self, DICT_TYPE_PREFIX);
 }
 
 static PyGetSetDef ZstdDict_getset[] = {
+    {"as_digested_dict", (getter)as_digested_dict_get,
+     NULL, ZstdDict_as_digested_dict_doc},
+
+    {"as_undigested_dict", (getter)as_undigested_dict_get,
+     NULL, ZstdDict_as_undigested_dict_doc},
+
     {"as_prefix", (getter)as_prefix_get,
      NULL, ZstdDict_as_prefix_doc},
 
@@ -1591,6 +1673,8 @@ ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     assert(self->dict == NULL);
     assert(self->use_multithread == 0);
+    assert(self->compression_level == 0);
+    assert(self->use_advanced_parameters == 0);
     assert(self->inited == 0);
 
     /* Keep this first. Set module state to self. */
@@ -1658,8 +1742,6 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
 
-    int compress_level = 0; /* 0 means use zstd's default compression level */
-
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "|OO:ZstdCompressor.__init__", kwlist,
                                      &level_or_option, &zstd_dict)) {
@@ -1675,14 +1757,14 @@ ZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwargs)
 
     /* Set compressLevel/option to compression context */
     if (level_or_option != Py_None) {
-        if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
+        if (set_c_parameters(self, level_or_option) < 0) {
             return -1;
         }
     }
 
     /* Load dictionary to compression context */
     if (zstd_dict != Py_None) {
-        if (load_c_dict(self, zstd_dict, compress_level) < 0) {
+        if (load_c_dict(self, zstd_dict) < 0) {
             return -1;
         }
 
@@ -2058,8 +2140,6 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
     PyObject *level_or_option = Py_None;
     PyObject *zstd_dict = Py_None;
 
-    int compress_level = 0; /* 0 means use zstd's default compression level */
-
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "|OO:RichMemZstdCompressor.__init__", kwlist,
                                      &level_or_option, &zstd_dict)) {
@@ -2075,7 +2155,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
 
     /* Set compressLevel/option to compression context */
     if (level_or_option != Py_None) {
-        if (set_c_parameters(self, level_or_option, &compress_level) < 0) {
+        if (set_c_parameters(self, level_or_option) < 0) {
             return -1;
         }
     }
@@ -2093,7 +2173,7 @@ RichMemZstdCompressor_init(ZstdCompressor *self, PyObject *args, PyObject *kwarg
 
     /* Load dictionary to compression context */
     if (zstd_dict != Py_None) {
-        if (load_c_dict(self, zstd_dict, compress_level) < 0) {
+        if (load_c_dict(self, zstd_dict) < 0) {
             return -1;
         }
 
@@ -3320,7 +3400,6 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
     size_t zstd_ret;
     PyObject *temp;
     ZstdCompressor self = {0};
-    int compress_level = 0; /* 0 means use zstd's default compression level */
     uint64_t pledged_size_value = ZSTD_CONTENTSIZE_UNKNOWN;
     ZSTD_inBuffer in = {.src = NULL};
     ZSTD_outBuffer out = {.dst = NULL};
@@ -3390,13 +3469,13 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 #endif
 
     if (level_or_option != Py_None) {
-        if (set_c_parameters(&self, level_or_option, &compress_level) < 0) {
+        if (set_c_parameters(&self, level_or_option) < 0) {
             goto error;
         }
     }
 
     if (zstd_dict != Py_None) {
-        if (load_c_dict(&self, zstd_dict, compress_level) < 0) {
+        if (load_c_dict(&self, zstd_dict) < 0) {
             goto error;
         }
     }

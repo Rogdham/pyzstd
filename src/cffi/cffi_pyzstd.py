@@ -237,6 +237,10 @@ class _BlocksOutputBuffer:
 
         return bytes(ffi.buffer(final))
 
+_DICT_TYPE_DIGESTED = 0
+_DICT_TYPE_UNDIGESTED = 1
+_DICT_TYPE_PREFIX = 2
+
 class ZstdDict:
     """Zstd dictionary, used for compression/decompression."""
 
@@ -315,11 +319,23 @@ class ZstdDict:
         return self.__dict_id
 
     @property
-    def as_prefix(self):
-        """Load as a prefix. It only works for the first frame, then the (de)compressor
-        will return to no prefix state.
+    def as_digested_dict(self):
+        """Load as a digested dictionary to compressor/decompressor.
         """
-        return (self, 23)
+        return (self, _DICT_TYPE_DIGESTED)
+
+    @property
+    def as_undigested_dict(self):
+        """Load as an undigested dictionary to compressor/decompressor.
+        """
+        return (self, _DICT_TYPE_UNDIGESTED)
+
+    @property
+    def as_prefix(self):
+        """Load as a prefix to compressor/decompressor. It only works for the first
+        frame, then the compressor/decompressor will return to no prefix state.
+        """
+        return (self, _DICT_TYPE_PREFIX)
 
     def __str__(self):
         return '<ZstdDict dict_id=%d dict_size=%d>' % \
@@ -473,7 +489,7 @@ def _check_int32_value(value, name):
     except:
         raise ValueError("%s should be 32-bit signed int value." % name)
 
-# return: (compressionLevel, use_multithread)
+# return: (compressionLevel, use_multithread, use_advanced_parameters)
 def _set_c_parameters(cctx, level_or_option):
     if isinstance(level_or_option, int):
         _check_int32_value(level_or_option, "Compression level")
@@ -484,11 +500,12 @@ def _set_c_parameters(cctx, level_or_option):
         if m.ZSTD_isError(zstd_ret):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
-        return level_or_option, False
+        return level_or_option, False, False
 
     if isinstance(level_or_option, dict):
         level = 0  # 0 means use zstd's default compression level
         use_multithread = False
+        use_advanced_parameters = False
 
         for posi, (key, value) in enumerate(level_or_option.items(), 1):
             # Check key type
@@ -505,13 +522,27 @@ def _set_c_parameters(cctx, level_or_option):
             elif key == m.ZSTD_c_nbWorkers:
                 if value > 0:
                     use_multithread = True
+            elif key in {m.ZSTD_c_windowLog,
+                         m.ZSTD_c_hashLog,
+                         m.ZSTD_c_chainLog,
+                         m.ZSTD_c_searchLog,
+                         m.ZSTD_c_minMatch,
+                         m.ZSTD_c_targetLength,
+                         m.ZSTD_c_strategy,
+                         m.ZSTD_c_enableLongDistanceMatching,
+                         m.ZSTD_c_ldmHashLog,
+                         m.ZSTD_c_ldmMinMatch,
+                         m.ZSTD_c_ldmBucketSizeLog,
+                         m.ZSTD_c_ldmHashRateLog}:
+                if value != 0:
+                    use_advanced_parameters = True
 
             # Set parameter
             zstd_ret = m.ZSTD_CCtx_setParameter(cctx, key, value)
             if m.ZSTD_isError(zstd_ret):
                 _set_parameter_error(True, posi, key, value)
 
-        return level, use_multithread
+        return level, use_multithread, use_advanced_parameters
 
     raise TypeError("level_or_option argument wrong type.")
 
@@ -534,40 +565,81 @@ def _set_d_parameters(dctx, option):
         if m.ZSTD_isError(zstd_ret):
             _set_parameter_error(False, posi, key, value)
 
-def _load_c_dict(cctx, zstd_dict, level):
+def _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters):
     if isinstance(zstd_dict, ZstdDict):
-        # Get ZSTD_CDict
-        c_dict = zstd_dict._get_cdict(level)
-
-        # Reference a prepared dictionary
-        zstd_ret = m.ZSTD_CCtx_refCDict(cctx, c_dict)
-    elif isinstance(zstd_dict, tuple) and len(zstd_dict) == 2 and \
-         isinstance(zstd_dict[0], ZstdDict) and zstd_dict[1] == 23:
-        # Reference as prefix
-        zstd_ret = m.ZSTD_CCtx_refPrefix(cctx,
-                                         ffi.from_buffer(zstd_dict[0].dict_content),
-                                         len(zstd_dict[0].dict_content))
+        zd = zstd_dict
+        if not use_advanced_parameters:
+            type = _DICT_TYPE_DIGESTED
+        else:
+            type = _DICT_TYPE_UNDIGESTED
+    elif isinstance(zstd_dict, tuple) and \
+         len(zstd_dict) == 2 and \
+         isinstance(zstd_dict[0], ZstdDict) and \
+         zstd_dict[1] in {_DICT_TYPE_DIGESTED,
+                          _DICT_TYPE_UNDIGESTED,
+                          _DICT_TYPE_PREFIX}:
+        zd = zstd_dict[0]
+        type = zstd_dict[1]
     else:
         raise TypeError("zstd_dict argument should be ZstdDict object.")
+
+    if type == _DICT_TYPE_DIGESTED:
+        # Get ZSTD_CDict
+        c_dict = zd._get_cdict(level)
+        # Reference a prepared dictionary
+        zstd_ret = m.ZSTD_CCtx_refCDict(cctx, c_dict)
+    elif type == _DICT_TYPE_UNDIGESTED:
+        # Load a dictionary
+        zstd_ret = m.ZSTD_CCtx_loadDictionary(
+                                    cctx,
+                                    ffi.from_buffer(zd.dict_content),
+                                    len(zd.dict_content))
+    elif type == _DICT_TYPE_PREFIX:
+        # Reference as prefix
+        zstd_ret = m.ZSTD_CCtx_refPrefix(
+                                    cctx,
+                                    ffi.from_buffer(zd.dict_content),
+                                    len(zd.dict_content))
+    else:
+        raise SystemError('_load_c_dict() impossible code path')
 
     if m.ZSTD_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_LOAD_C_DICT, zstd_ret)
 
 def _load_d_dict(dctx, zstd_dict):
     if isinstance(zstd_dict, ZstdDict):
-        # Get ZSTD_DDict
-        d_dict = zstd_dict._get_ddict()
-
-        # Reference a prepared dictionary
-        zstd_ret = m.ZSTD_DCtx_refDDict(dctx, d_dict)
-    elif isinstance(zstd_dict, tuple) and len(zstd_dict) == 2 and \
-         isinstance(zstd_dict[0], ZstdDict) and zstd_dict[1] == 23:
-        # Reference as prefix
-        zstd_ret = m.ZSTD_DCtx_refPrefix(dctx,
-                                         ffi.from_buffer(zstd_dict[0].dict_content),
-                                         len(zstd_dict[0].dict_content))
+        zd = zstd_dict
+        type = _DICT_TYPE_DIGESTED
+    elif isinstance(zstd_dict, tuple) and \
+         len(zstd_dict) == 2 and \
+         isinstance(zstd_dict[0], ZstdDict) and \
+         zstd_dict[1] in {_DICT_TYPE_DIGESTED,
+                          _DICT_TYPE_UNDIGESTED,
+                          _DICT_TYPE_PREFIX}:
+        zd = zstd_dict[0]
+        type = zstd_dict[1]
     else:
         raise TypeError("zstd_dict argument should be ZstdDict object.")
+
+    if type == _DICT_TYPE_DIGESTED:
+        # Get ZSTD_DDict
+        d_dict = zd._get_ddict()
+        # Reference a prepared dictionary
+        zstd_ret = m.ZSTD_DCtx_refDDict(dctx, d_dict)
+    elif type == _DICT_TYPE_UNDIGESTED:
+        # Load a dictionary
+        zstd_ret = m.ZSTD_DCtx_loadDictionary(
+                                    dctx,
+                                    ffi.from_buffer(zd.dict_content),
+                                    len(zd.dict_content))
+    elif type == _DICT_TYPE_PREFIX:
+        # Reference as prefix
+        zstd_ret = m.ZSTD_DCtx_refPrefix(
+                                    dctx,
+                                    ffi.from_buffer(zd.dict_content),
+                                    len(zd.dict_content))
+    else:
+        raise SystemError('_load_d_dict() impossible code path')
 
     if m.ZSTD_isError(zstd_ret):
         _set_zstd_error(_ErrorType.ERR_LOAD_D_DICT, zstd_ret)
@@ -577,6 +649,7 @@ class _Compressor:
         self._use_multithread = False
         self._lock = Lock()
         level = 0  # 0 means use zstd's default compression level
+        use_advanced_parameters = False
 
         self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
         if self._singleton_in_buf == ffi.NULL:
@@ -593,12 +666,12 @@ class _Compressor:
 
         # Set compressLevel/option to compression context
         if level_or_option is not None:
-            level, self._use_multithread = _set_c_parameters(self._cctx,
-                                                             level_or_option)
+            level, self._use_multithread, use_advanced_parameters = \
+                  _set_c_parameters(self._cctx, level_or_option)
 
         # Load dictionary to compression context
         if zstd_dict is not None:
-            _load_c_dict(self._cctx, zstd_dict, level)
+            _load_c_dict(self._cctx, zstd_dict, level, use_advanced_parameters)
             self.__dict = zstd_dict
 
     def __del__(self):
@@ -1335,6 +1408,7 @@ def compress_stream(input_stream, output_stream, *,
         int objects, the last two are readonly memoryview objects.
     """
     level = 0  # 0 means use zstd's default compression level
+    use_advanced_parameters = False
     use_multithread = False
     total_input_size = 0
     total_output_size = 0
@@ -1375,9 +1449,10 @@ def compress_stream(input_stream, output_stream, *,
             raise ZstdError("Unable to create ZSTD_CCtx instance.")
 
         if level_or_option is not None:
-            level, use_multithread = _set_c_parameters(cctx, level_or_option)
+            level, use_multithread, use_advanced_parameters = \
+                _set_c_parameters(cctx, level_or_option)
         if zstd_dict is not None:
-            _load_c_dict(cctx, zstd_dict, level)
+            _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters)
 
         if pledged_input_size is not None:
             zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(cctx, pledged_input_size)

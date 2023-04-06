@@ -1946,6 +1946,17 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             zd.as_prefix = b'1234'
 
+    def test_as_digested_dict(self):
+        zd = ZstdDict(TRAINED_DICT.dict_content)
+
+        # test undocumented attr: .as_digested_dict
+        dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_digested_dict)
+        self.assertEqual(decompress(dat, zd.as_digested_dict), SAMPLES[0])
+
+        # test undocumented attr: .as_undigested_dict
+        dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_undigested_dict)
+        self.assertEqual(decompress(dat, zd.as_undigested_dict), SAMPLES[0])
+
 class OutputBufferTestCase(unittest.TestCase):
 
     @classmethod
