@@ -3,7 +3,7 @@ from enum import IntEnum
 from os import PathLike
 from typing import overload, Dict, ByteString, Optional, Union, Callable, \
                    Iterable, Literal, ClassVar, Tuple, NamedTuple, BinaryIO, \
-                   TextIO
+                   TextIO, TypeVar
 
 __version__: str
 zstd_version: str
@@ -59,10 +59,11 @@ class DParameter(IntEnum):
 
     def bounds(self) -> Tuple[int, int]: ...
 
+ZstdDictInfo = TypeVar('ZstdDictInfo')
 class ZstdDict:
     dict_content: bytes
     dict_id: int
-    as_prefix: ZstdDict
+    as_prefix: ZstdDictInfo
 
     def __init__(self,
                  dict_content,
@@ -77,7 +78,7 @@ class ZstdCompressor:
 
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-                 zstd_dict: Optional[ZstdDict] = None) -> None: ...
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> None: ...
 
     def compress(self,
                  data,
@@ -91,7 +92,7 @@ class ZstdCompressor:
 class RichMemZstdCompressor:
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-                 zstd_dict: Optional[ZstdDict] = None) -> None: ...
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> None: ...
 
     def compress(self, data) -> bytes: ...
 
@@ -101,7 +102,7 @@ class ZstdDecompressor:
     unused_data: bytes
 
     def __init__(self,
-                 zstd_dict: Optional[ZstdDict] = None,
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                  option: Optional[Dict[DParameter, int]] = None) -> None: ...
 
     def decompress(self,
@@ -113,7 +114,7 @@ class EndlessZstdDecompressor:
     at_frame_edge: bool
 
     def __init__(self,
-                 zstd_dict: Optional[ZstdDict] = None,
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                  option: Optional[Dict[DParameter, int]] = None) -> None: ...
 
     def decompress(self,
@@ -125,25 +126,25 @@ class ZstdError(Exception):
 
 def compress(data,
              level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-             zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
+             zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> bytes: ...
 
 def richmem_compress(data,
                      level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-                     zstd_dict: Optional[ZstdDict] = None) -> bytes: ...
+                     zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> bytes: ...
 
 def decompress(data: ByteString,
-               zstd_dict: Optional[ZstdDict] = None,
+               zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                option: Optional[Dict[DParameter, int]] = None) -> bytes: ...
 
 def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
                     level_or_option: Union[None, int, Dict[CParameter, int]] = None,
-                    zstd_dict: Optional[ZstdDict] = None,
+                    zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                     pledged_input_size: Optional[int] = None,
                     read_size: int = 131_072, write_size: int = 131_591,
                     callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
 def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
-                      zstd_dict: Optional[ZstdDict] = None,
+                      zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                       option: Optional[Dict[DParameter, int]] = None,
                       read_size: int = 131_075, write_size: int = 131_072,
                       callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
@@ -170,7 +171,7 @@ class ZstdFile(io.BufferedIOBase):
                  mode: str = "r",
                  *,
                  level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-                 zstd_dict: Optional[ZstdDict] = None) -> None: ...
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> None: ...
     def close(self) -> None: ...
 
     def write(self, data) -> int: ...
@@ -204,7 +205,7 @@ def open(filename: Union[str, bytes, PathLike, BinaryIO],
          mode: _BinaryMode = "rb",
          *,
          level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-         zstd_dict: Optional[ZstdDict] = None,
+         zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
          encoding: None = None,
          errors: None = None,
          newline: None = None) -> ZstdFile: ...
@@ -214,7 +215,7 @@ def open(filename: Union[str, bytes, PathLike, BinaryIO],
          mode: _TextMode = ...,
          *,
          level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-         zstd_dict: Optional[ZstdDict] = None,
+         zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
          encoding: Optional[str] = None,
          errors: Optional[str] = None,
          newline: Optional[str] = None) -> TextIO: ...
@@ -224,7 +225,7 @@ def open(filename: Union[str, bytes, PathLike, BinaryIO],
          mode: str = "rb",
          *,
          level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-         zstd_dict: Optional[ZstdDict] = None,
+         zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
          encoding: Optional[str] = None,
          errors: Optional[str] = None,
          newline: Optional[str] = None) -> Union[ZstdFile, TextIO]: ...
