@@ -10,7 +10,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Includes the latest zstd library source code.
 * Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
 * Has a CFFI implementation that can work with PyPy.
-* Has a command line interface, ``python -m pyzstd --help``. (*Added in version 0.15.4*)
+* Has a command line interface, ``python -m pyzstd --help``.
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -20,7 +20,7 @@ Features of zstd:
 * If use :ref:`multi-threaded compression<mt_compression>`, the compression speed improves significantly.
 * If use pre-trained :ref:`dictionary<zstd_dict>`, the compression ratio on small data (a few KiB) improves dramatically.
 * :ref:`Frame and block<frame_block>` allow the use more flexible, suitable for many scenarios.
-* As a :ref:`patching engine<patching_engine>`.
+* Can be used as a :ref:`patching engine<patching_engine>`.
 
 .. note::
     Two other zstd modules on PyPI:
@@ -559,7 +559,7 @@ Dictionary
     It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
     .. versionchanged:: 0.15.7
-        It's not guaranteed to always use cached dictionary. When there is a big number of data, consider reusing compressor/decompressor objects.
+        When compressing, no longer always use cached dictionary. Since digesting a dictionary may be costly, when there is a big number of data, consider reusing compressor object. Also add ``.__len__()`` method that returning content size.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -594,12 +594,12 @@ Dictionary
 
     .. py:attribute:: as_prefix
 
-        Load the dictionary content to (de)compressor as a "prefix", by passing this attribute as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_prefix)``
+        Load the dictionary content to compressor/decompressor as a "prefix", by passing this attribute as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_prefix)``
 
         Prefix can be used for :ref:`patching engine<patching_engine>` scenario.
 
         #. Prefix is compatible with "long distance matching", while dictionary is not.
-        #. Prefix only work for the first frame, then the (de)compressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
+        #. Prefix only work for the first frame, then the compressor/decompressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
         #. When decompressing, must use the same prefix as when compressing.
         #. Loading prefix to compressor is costly.
         #. Loading prefix to decompressor is not costly.
@@ -1416,20 +1416,23 @@ Use zstd as a patching engine
 
     1, Generating a patch (compress)
 
-    The compressor may use "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to ``1``, and :py:attr:`CParameter.windowLog` must cover prefix length.
+    Assuming VER_1 and VER_2 are two versions.
 
-    The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, the prefix has a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
+    Set :py:attr:`CParameter.windowLog` to a value that covers VER_2's length, and enable "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to 1. The ``--patch-from`` option of zstd CLI also uses other parameters, but these two matter the most.
+
+    The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, it have a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
 
     .. sourcecode:: python
 
-        # VER_1, VER_2 are two versions, use VER_1 as prefix.
+        # use VER_1 as prefix.
         v1 = ZstdDict(VER_1, is_raw=True)
 
-        # enable "long distance matching" and let the window cover prefix length.
+        # let the window cover VER_2.
         # don't forget to clamp windowLog to valid range.
-        windowLog = len(VER_1).bit_length()
-        option = {CParameter.enableLongDistanceMatching: 1,
-                  CParameter.windowLog: windowLog}
+        # enable "long distance matching".
+        windowLog = len(VER_2).bit_length()
+        option = {CParameter.windowLog: windowLog,
+                  CParameter.enableLongDistanceMatching: 1}
 
         # get a very small PATCH
         PATCH = compress(VER_2, level_or_option=option, zstd_dict=v1.as_prefix)

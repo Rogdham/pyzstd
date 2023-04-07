@@ -21,6 +21,18 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.7  (xx x, 2023)**
+
+ZstdDict class changes:
+
+#. Fix these advanced compression parameters may be ignored when loading a dictionary: ``windowLog``, ``hashLog``, ``chainLog``, ``searchLog``, ``minMatch``, ``targetLength``, ``strategy``, ``enableLongDistanceMatching``, ``ldmHashLog``, ``ldmMinMatch``, ``ldmBucketSizeLog``, ``ldmHashRateLog``.
+
+#. Now it's not guaranteed to always use cached dictionary for compression. When there is a big number of data, consider reusing compressor object.
+
+#. Add `.as_prefix <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_prefix>`_ attribute. Can use zstd as a `patching engine <https://pyzstd.readthedocs.io/en/latest/#patching-engine>`_.
+
+#. Add ``.__len__()`` method.
+
 **0.15.6  (Apr 5, 2023)**
 
 Update bundled zstd source code from v1.5.4 to `v1.5.5 <https://github.com/facebook/zstd/releases/tag/v1.5.5>`_.

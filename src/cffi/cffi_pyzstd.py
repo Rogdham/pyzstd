@@ -405,8 +405,8 @@ class _ErrorType:
         "Unable to compress zstd data: %s",
         "Unable to set pledged uncompressed content size: %s",
 
-        "Unable to load zstd dictionary for decompression: %s",
-        "Unable to load zstd dictionary for compression: %s",
+        "Unable to load zstd dictionary or prefix for decompression: %s",
+        "Unable to load zstd dictionary or prefix for compression: %s",
 
         "Unable to get zstd compression parameter bounds: %s",
         "Unable to get zstd decompression parameter bounds: %s",
@@ -523,7 +523,7 @@ def _set_c_parameters(cctx, level_or_option):
             if key == m.ZSTD_c_compressionLevel:
                 level = value
             elif key == m.ZSTD_c_nbWorkers:
-                if value > 0:
+                if value != 0:
                     use_multithread = True
             elif key in {m.ZSTD_c_windowLog,
                          m.ZSTD_c_hashLog,
@@ -589,10 +589,12 @@ def _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters):
     if type == _DICT_TYPE_DIGESTED:
         # Get ZSTD_CDict
         c_dict = zd._get_cdict(level)
-        # Reference a prepared dictionary
+        # Reference a prepared dictionary.
+        # It overrides some compression context's parameters.
         zstd_ret = m.ZSTD_CCtx_refCDict(cctx, c_dict)
     elif type == _DICT_TYPE_UNDIGESTED:
-        # Load a dictionary
+        # Load a dictionary.
+        # It doesn't override compression context's parameters.
         zstd_ret = m.ZSTD_CCtx_loadDictionary(
                                     cctx,
                                     ffi.from_buffer(zd.dict_content),

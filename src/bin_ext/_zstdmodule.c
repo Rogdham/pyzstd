@@ -705,10 +705,10 @@ set_zstd_error(const _zstd_state* const state,
         break;
 
     case ERR_LOAD_D_DICT:
-        msg = "Unable to load zstd dictionary for decompression: %s";
+        msg = "Unable to load zstd dictionary or prefix for decompression: %s";
         break;
     case ERR_LOAD_C_DICT:
-        msg = "Unable to load zstd dictionary for compression: %s";
+        msg = "Unable to load zstd dictionary or prefix for compression: %s";
         break;
 
     case ERR_GET_C_BOUNDS:
@@ -899,8 +899,7 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
                 return -1;
             }
 
-            switch (key_v)
-            {
+            switch (key_v) {
             case ZSTD_c_compressionLevel:
                 /* Save for generating ZSTD_CDICT */
                 self->compression_level = value_v;
@@ -912,7 +911,7 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
                    2, Default value is `0`, aka "single-threaded mode" : no
                       worker is spawned, compression is performed inside
                       caller's thread, all invocations are blocking. */
-                if (value_v > 0) {
+                if (value_v != 0) {
                     self->use_multithread = 1;
                 }
                 break;
@@ -1005,10 +1004,12 @@ load:
         if (c_dict == NULL) {
             return -1;
         }
-        /* Reference a prepared dictionary */
+        /* Reference a prepared dictionary.
+           It overrides some compression context's parameters. */
         zstd_ret = ZSTD_CCtx_refCDict(self->cctx, c_dict);
     } else if (type == DICT_TYPE_UNDIGESTED) {
-        /* Load a dictionary */
+        /* Load a dictionary.
+           It doesn't override compression context's parameters. */
         zstd_ret = ZSTD_CCtx_loadDictionary(
                             self->cctx,
                             PyBytes_AS_STRING(zd->dict_content),
@@ -1360,7 +1361,7 @@ PyDoc_STRVAR(ZstdDict_as_digested_dict_doc,
 "Load as a digested dictionary to compressor/decompressor.");
 
 static PyObject *
-as_digested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
+ZstdDict_as_digested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
 {
     return Py_BuildValue("Oi", self, DICT_TYPE_DIGESTED);
 }
@@ -1369,7 +1370,7 @@ PyDoc_STRVAR(ZstdDict_as_undigested_dict_doc,
 "Load as an undigested dictionary to compressor/decompressor.");
 
 static PyObject *
-as_undigested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
+ZstdDict_as_undigested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
 {
     return Py_BuildValue("Oi", self, DICT_TYPE_UNDIGESTED);
 }
@@ -1379,19 +1380,19 @@ PyDoc_STRVAR(ZstdDict_as_prefix_doc,
 "frame, then the compressor/decompressor will return to no prefix state.");
 
 static PyObject *
-as_prefix_get(ZstdDict *self, void *Py_UNUSED(ignored))
+ZstdDict_as_prefix_get(ZstdDict *self, void *Py_UNUSED(ignored))
 {
     return Py_BuildValue("Oi", self, DICT_TYPE_PREFIX);
 }
 
 static PyGetSetDef ZstdDict_getset[] = {
-    {"as_digested_dict", (getter)as_digested_dict_get,
+    {"as_digested_dict", (getter)ZstdDict_as_digested_dict_get,
      NULL, ZstdDict_as_digested_dict_doc},
 
-    {"as_undigested_dict", (getter)as_undigested_dict_get,
+    {"as_undigested_dict", (getter)ZstdDict_as_undigested_dict_get,
      NULL, ZstdDict_as_undigested_dict_doc},
 
-    {"as_prefix", (getter)as_prefix_get,
+    {"as_prefix", (getter)ZstdDict_as_prefix_get,
      NULL, ZstdDict_as_prefix_doc},
 
     {NULL},
