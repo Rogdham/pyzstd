@@ -75,9 +75,6 @@ typedef struct {
     /* Compression level */
     int compression_level;
 
-    /* Use advanced compression parameters, 0 or 1. */
-    int use_advanced_parameters;
-
     /* __init__ has been called, 0 or 1. */
     int inited;
 
@@ -899,12 +896,10 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
                 return -1;
             }
 
-            switch (key_v) {
-            case ZSTD_c_compressionLevel:
+            if (key_v == ZSTD_c_compressionLevel) {
                 /* Save for generating ZSTD_CDICT */
                 self->compression_level = value_v;
-                break;
-            case ZSTD_c_nbWorkers:
+            } else if (key_v == ZSTD_c_nbWorkers) {
                 /* From zstd library doc:
                    1. When nbWorkers >= 1, triggers asynchronous mode when
                       used with ZSTD_compressStream2().
@@ -914,23 +909,6 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
                 if (value_v != 0) {
                     self->use_multithread = 1;
                 }
-                break;
-            case ZSTD_c_windowLog:
-            case ZSTD_c_hashLog:
-            case ZSTD_c_chainLog:
-            case ZSTD_c_searchLog:
-            case ZSTD_c_minMatch:
-            case ZSTD_c_targetLength:
-            case ZSTD_c_strategy:
-            case ZSTD_c_enableLongDistanceMatching:
-            case ZSTD_c_ldmHashLog:
-            case ZSTD_c_ldmMinMatch:
-            case ZSTD_c_ldmBucketSizeLog:
-            case ZSTD_c_ldmHashRateLog:
-                if (value_v != 0) {
-                    self->use_advanced_parameters = 1;
-                }
-                break;
             }
 
             /* Set parameter to compression context */
@@ -962,12 +940,9 @@ load_c_dict(ZstdCompressor *self, PyObject *dict)
     if (ret < 0) {
         return -1;
     } else if (ret > 0) {
+        /* When compressing, use undigested dictionary by default. */
         zd = (ZstdDict*)dict;
-        if (!self->use_advanced_parameters) {
-            type = DICT_TYPE_DIGESTED;
-        } else {
-            type = DICT_TYPE_UNDIGESTED;
-        }
+        type = DICT_TYPE_UNDIGESTED;
         goto load;
     }
 
@@ -1101,6 +1076,7 @@ load_d_dict(ZstdDecompressor *self, PyObject *dict)
     if (ret < 0) {
         return -1;
     } else if (ret > 0) {
+        /* When decompressing, use digested dictionary by default. */
         zd = (ZstdDict*)dict;
         type = DICT_TYPE_DIGESTED;
         goto load;
@@ -1358,7 +1334,14 @@ static PyMemberDef ZstdDict_members[] = {
 };
 
 PyDoc_STRVAR(ZstdDict_as_digested_dict_doc,
-"Load as a digested dictionary to compressor/decompressor.");
+"Load as a digested dictionary to compressor, by passing this attribute as\n"
+"zstd_dict argument: compress(dat, zstd_dict=zd.as_digested_dict)\n"
+"1, Some advanced compression parameters of compressor may be overridden\n"
+"   by parameters of digested dictionary.\n"
+"2, ZstdDict has a digested dictionaries cache for each compression level.\n"
+"   It's faster when loading again a digested dictionary with the same\n"
+"   compression level.\n"
+"3, No need to use this for decompression.");
 
 static PyObject *
 ZstdDict_as_digested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
@@ -1367,7 +1350,12 @@ ZstdDict_as_digested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
 }
 
 PyDoc_STRVAR(ZstdDict_as_undigested_dict_doc,
-"Load as an undigested dictionary to compressor/decompressor.");
+"Load as an undigested dictionary to compressor, by passing this attribute as\n"
+"zstd_dict argument: compress(dat, zstd_dict=zd.as_undigested_dict)\n"
+"1, The advanced compression parameters of compressor will not be overridden.\n"
+"2, Loading an undigested dictionary is costly. If load an undigested dictionary\n"
+"   multiple times, consider reusing a compressor object.\n"
+"3, No need to use this for decompression.");
 
 static PyObject *
 ZstdDict_as_undigested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
@@ -1376,8 +1364,12 @@ ZstdDict_as_undigested_dict_get(ZstdDict *self, void *Py_UNUSED(ignored))
 }
 
 PyDoc_STRVAR(ZstdDict_as_prefix_doc,
-"Load as a prefix to compressor/decompressor. It only works for the first "
-"frame, then the compressor/decompressor will return to no prefix state.");
+"Load as a prefix to compressor/decompressor, by passing this attribute as\n"
+"zstd_dict argument: compress(dat, zstd_dict=zd.as_prefix)\n"
+"1, Prefix is compatible with long distance matching, while dictionary is not.\n"
+"2, It only works for the first frame, then the compressor/decompressor will\n"
+"   return to no prefix state.\n"
+"3, When decompressing, must use the same prefix as when compressing.");
 
 static PyObject *
 ZstdDict_as_prefix_get(ZstdDict *self, void *Py_UNUSED(ignored))
@@ -1683,7 +1675,6 @@ ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
     assert(self->dict == NULL);
     assert(self->use_multithread == 0);
     assert(self->compression_level == 0);
-    assert(self->use_advanced_parameters == 0);
     assert(self->inited == 0);
 
     /* Keep this first. Set module state to self. */

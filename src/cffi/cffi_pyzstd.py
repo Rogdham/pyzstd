@@ -320,20 +320,36 @@ class ZstdDict:
 
     @property
     def as_digested_dict(self):
-        """Load as a digested dictionary to compressor/decompressor.
+        """Load as a digested dictionary to compressor, by passing this attribute as
+        zstd_dict argument: compress(dat, zstd_dict=zd.as_digested_dict)
+        1, Some advanced compression parameters of compressor may be overridden
+           by parameters of digested dictionary.
+        2, ZstdDict has a digested dictionaries cache for each compression level.
+           It's faster when loading again a digested dictionary with the same
+           compression level.
+        3, No need to use this for decompression.
         """
         return (self, _DICT_TYPE_DIGESTED)
 
     @property
     def as_undigested_dict(self):
-        """Load as an undigested dictionary to compressor/decompressor.
+        """Load as an undigested dictionary to compressor, by passing this attribute as
+        zstd_dict argument: compress(dat, zstd_dict=zd.as_undigested_dict)
+        1, The advanced compression parameters of compressor will not be overridden.
+        2, Loading an undigested dictionary is costly. If load an undigested dictionary
+           multiple times, consider reusing a compressor object.
+        3, No need to use this for decompression.
         """
         return (self, _DICT_TYPE_UNDIGESTED)
 
     @property
     def as_prefix(self):
-        """Load as a prefix to compressor/decompressor. It only works for the first
-        frame, then the compressor/decompressor will return to no prefix state.
+        """Load as a prefix to compressor/decompressor, by passing this attribute as
+        zstd_dict argument: compress(dat, zstd_dict=zd.as_prefix)
+        1, Prefix is compatible with long distance matching, while dictionary is not.
+        2, It only works for the first frame, then the compressor/decompressor will
+           return to no prefix state.
+        3, When decompressing, must use the same prefix as when compressing.
         """
         return (self, _DICT_TYPE_PREFIX)
 
@@ -492,7 +508,7 @@ def _check_int32_value(value, name):
     except:
         raise ValueError("%s should be 32-bit signed int value." % name)
 
-# return: (compressionLevel, use_multithread, use_advanced_parameters)
+# return: (compressionLevel, use_multithread)
 def _set_c_parameters(cctx, level_or_option):
     if isinstance(level_or_option, int):
         _check_int32_value(level_or_option, "Compression level")
@@ -503,12 +519,11 @@ def _set_c_parameters(cctx, level_or_option):
         if m.ZSTD_isError(zstd_ret):
             _set_zstd_error(_ErrorType.ERR_SET_C_LEVEL, zstd_ret)
 
-        return level_or_option, False, False
+        return level_or_option, False
 
     if isinstance(level_or_option, dict):
         level = 0  # 0 means use zstd's default compression level
         use_multithread = False
-        use_advanced_parameters = False
 
         for key, value in level_or_option.items():
             # Check key type
@@ -525,27 +540,13 @@ def _set_c_parameters(cctx, level_or_option):
             elif key == m.ZSTD_c_nbWorkers:
                 if value != 0:
                     use_multithread = True
-            elif key in {m.ZSTD_c_windowLog,
-                         m.ZSTD_c_hashLog,
-                         m.ZSTD_c_chainLog,
-                         m.ZSTD_c_searchLog,
-                         m.ZSTD_c_minMatch,
-                         m.ZSTD_c_targetLength,
-                         m.ZSTD_c_strategy,
-                         m.ZSTD_c_enableLongDistanceMatching,
-                         m.ZSTD_c_ldmHashLog,
-                         m.ZSTD_c_ldmMinMatch,
-                         m.ZSTD_c_ldmBucketSizeLog,
-                         m.ZSTD_c_ldmHashRateLog}:
-                if value != 0:
-                    use_advanced_parameters = True
 
             # Set parameter
             zstd_ret = m.ZSTD_CCtx_setParameter(cctx, key, value)
             if m.ZSTD_isError(zstd_ret):
                 _set_parameter_error(True, key, value)
 
-        return level, use_multithread, use_advanced_parameters
+        return level, use_multithread
 
     raise TypeError("level_or_option argument wrong type.")
 
@@ -568,13 +569,11 @@ def _set_d_parameters(dctx, option):
         if m.ZSTD_isError(zstd_ret):
             _set_parameter_error(False, key, value)
 
-def _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters):
+def _load_c_dict(cctx, zstd_dict, level):
     if isinstance(zstd_dict, ZstdDict):
+        # When compressing, use undigested dictionary by default.
         zd = zstd_dict
-        if not use_advanced_parameters:
-            type = _DICT_TYPE_DIGESTED
-        else:
-            type = _DICT_TYPE_UNDIGESTED
+        type = _DICT_TYPE_UNDIGESTED
     elif isinstance(zstd_dict, tuple) and \
          len(zstd_dict) == 2 and \
          isinstance(zstd_dict[0], ZstdDict) and \
@@ -613,6 +612,7 @@ def _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters):
 
 def _load_d_dict(dctx, zstd_dict):
     if isinstance(zstd_dict, ZstdDict):
+        # When decompressing, use digested dictionary by default.
         zd = zstd_dict
         type = _DICT_TYPE_DIGESTED
     elif isinstance(zstd_dict, tuple) and \
@@ -654,7 +654,6 @@ class _Compressor:
         self._use_multithread = False
         self._lock = Lock()
         level = 0  # 0 means use zstd's default compression level
-        use_advanced_parameters = False
 
         self._singleton_in_buf = _new_nonzero("ZSTD_inBuffer *")
         if self._singleton_in_buf == ffi.NULL:
@@ -671,12 +670,12 @@ class _Compressor:
 
         # Set compressLevel/option to compression context
         if level_or_option is not None:
-            level, self._use_multithread, use_advanced_parameters = \
+            level, self._use_multithread = \
                   _set_c_parameters(self._cctx, level_or_option)
 
         # Load dictionary to compression context
         if zstd_dict is not None:
-            _load_c_dict(self._cctx, zstd_dict, level, use_advanced_parameters)
+            _load_c_dict(self._cctx, zstd_dict, level)
             self.__dict = zstd_dict
 
     def __del__(self):
@@ -1413,7 +1412,6 @@ def compress_stream(input_stream, output_stream, *,
         int objects, the last two are readonly memoryview objects.
     """
     level = 0  # 0 means use zstd's default compression level
-    use_advanced_parameters = False
     use_multithread = False
     total_input_size = 0
     total_output_size = 0
@@ -1454,10 +1452,10 @@ def compress_stream(input_stream, output_stream, *,
             raise ZstdError("Unable to create ZSTD_CCtx instance.")
 
         if level_or_option is not None:
-            level, use_multithread, use_advanced_parameters = \
+            level, use_multithread = \
                 _set_c_parameters(cctx, level_or_option)
         if zstd_dict is not None:
-            _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters)
+            _load_c_dict(cctx, zstd_dict, level)
 
         if pledged_input_size is not None:
             zstd_ret = m.ZSTD_CCtx_setPledgedSrcSize(cctx, pledged_input_size)

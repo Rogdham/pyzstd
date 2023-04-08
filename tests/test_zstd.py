@@ -25,9 +25,9 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    compressionLevel_values, get_frame_info, get_frame_size, \
                    ZstdFile, open
 
-PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG
+PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG # type: ignore
 if PYZSTD_CONFIG[1] == 'c':
-    from pyzstd.c import _zstd
+    from pyzstd.c import _zstd       # type: ignore
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None
@@ -346,6 +346,8 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertEqual(type(zd.dict_content), bytes)
         self.assertEqual(zd.dict_id, 0)
         zd.as_prefix
+        zd.as_digested_dict
+        zd.as_undigested_dict
 
         # name
         self.assertIn('.ZstdDict', str(type(zd)))
@@ -1742,7 +1744,7 @@ class ZstdDictTestCase(unittest.TestCase):
 
         zd = ZstdDict(dict_content, is_raw=False)
         with self.assertRaisesRegex(ZstdError, r'ZSTD_CDict.*?corrupted'):
-            ZstdCompressor(zstd_dict=zd)
+            ZstdCompressor(zstd_dict=zd.as_digested_dict)
         with self.assertRaisesRegex(ZstdError, r'ZSTD_DDict.*?corrupted'):
             ZstdDecompressor(zd)
 
@@ -1961,13 +1963,13 @@ class ZstdDictTestCase(unittest.TestCase):
     def test_as_digested_dict(self):
         zd = TRAINED_DICT
 
-        # test undocumented attr: .as_digested_dict
+        # test .as_digested_dict
         dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_digested_dict)
         self.assertEqual(decompress(dat, zd.as_digested_dict), SAMPLES[0])
         with self.assertRaises(AttributeError):
             zd.as_digested_dict = b'1234'
 
-        # test undocumented attr: .as_undigested_dict
+        # test .as_undigested_dict
         dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_undigested_dict)
         self.assertEqual(decompress(dat, zd.as_undigested_dict), SAMPLES[0])
         with self.assertRaises(AttributeError):
@@ -2889,14 +2891,31 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.tell)
 
     def test_file_dict(self):
+        # default
         bi = BytesIO()
         with ZstdFile(bi, 'w', zstd_dict=TRAINED_DICT) as f:
             f.write(SAMPLES[0])
-
         bi.seek(0)
         with ZstdFile(bi, zstd_dict=TRAINED_DICT) as f:
             dat = f.read()
+        self.assertEqual(dat, SAMPLES[0])
 
+        # .as_(un)digested_dict
+        bi = BytesIO()
+        with ZstdFile(bi, 'w', zstd_dict=TRAINED_DICT.as_digested_dict) as f:
+            f.write(SAMPLES[0])
+        bi.seek(0)
+        with ZstdFile(bi, zstd_dict=TRAINED_DICT.as_undigested_dict) as f:
+            dat = f.read()
+        self.assertEqual(dat, SAMPLES[0])
+
+    def test_file_prefix(self):
+        bi = BytesIO()
+        with ZstdFile(bi, 'w', zstd_dict=TRAINED_DICT.as_prefix) as f:
+            f.write(SAMPLES[0])
+        bi.seek(0)
+        with ZstdFile(bi, zstd_dict=TRAINED_DICT.as_prefix) as f:
+            dat = f.read()
         self.assertEqual(dat, SAMPLES[0])
 
     def test_UnsupportedOperation(self):
@@ -3114,14 +3133,39 @@ class OpenTestCase(unittest.TestCase):
         os.remove(TESTFN)
 
     def test_open_dict(self):
+        # default
         bi = BytesIO()
         with open(bi, 'w', zstd_dict=TRAINED_DICT) as f:
             f.write(SAMPLES[0])
-
         bi.seek(0)
         with open(bi, zstd_dict=TRAINED_DICT) as f:
             dat = f.read()
+        self.assertEqual(dat, SAMPLES[0])
 
+        # .as_(un)digested_dict
+        bi = BytesIO()
+        with open(bi, 'w', zstd_dict=TRAINED_DICT.as_digested_dict) as f:
+            f.write(SAMPLES[0])
+        bi.seek(0)
+        with open(bi, zstd_dict=TRAINED_DICT.as_undigested_dict) as f:
+            dat = f.read()
+        self.assertEqual(dat, SAMPLES[0])
+
+        # invalid dictionary
+        bi = BytesIO()
+        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
+            open(bi, 'w', zstd_dict={1:2, 2:3})
+
+        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
+            open(bi, 'w', zstd_dict=b'1234567890')
+
+    def test_open_prefix(self):
+        bi = BytesIO()
+        with open(bi, 'w', zstd_dict=TRAINED_DICT.as_prefix) as f:
+            f.write(SAMPLES[0])
+        bi.seek(0)
+        with open(bi, zstd_dict=TRAINED_DICT.as_prefix) as f:
+            dat = f.read()
         self.assertEqual(dat, SAMPLES[0])
 
     def test_buffer_protocol(self):
@@ -3183,6 +3227,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
             compress_stream(b1, b2, level_or_option='3')
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
             compress_stream(b1, b2, zstd_dict={})
+        with self.assertRaisesRegex(TypeError, r'zstd_dict'):
+            compress_stream(b1, b2, zstd_dict=b'1234567890')
         with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
             compress_stream(b1, b2, pledged_input_size=-1)
         with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
@@ -3269,6 +3315,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
             decompress_stream(b1, 123)
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
             decompress_stream(b1, b2, zstd_dict={})
+        with self.assertRaisesRegex(TypeError, r'zstd_dict'):
+            decompress_stream(b1, b2, zstd_dict=b'1234567890')
         with self.assertRaisesRegex(TypeError, r'option'):
             decompress_stream(b1, b2, option=3)
         with self.assertRaisesRegex(ValueError, r'read_size'):
@@ -3376,6 +3424,47 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # it's a promised behavior.
         compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
         decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+
+    def test_stream_dict(self):
+        zd = ZstdDict(THIS_FILE_BYTES, True)
+
+        # default
+        with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
+            ret = compress_stream(bi, bo, zstd_dict=zd)
+            compressed = bo.getvalue()
+        self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
+
+        with BytesIO(compressed) as bi, BytesIO() as bo:
+            ret = decompress_stream(bi, bo, zstd_dict=zd)
+            decompressed = bo.getvalue()
+        self.assertEqual(ret, (len(compressed), len(decompressed)))
+        self.assertEqual(decompressed, THIS_FILE_BYTES)
+
+        # .as_(un)digested_dict
+        with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
+            ret = compress_stream(bi, bo, zstd_dict=zd.as_undigested_dict)
+            compressed = bo.getvalue()
+        self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
+
+        with BytesIO(compressed) as bi, BytesIO() as bo:
+            ret = decompress_stream(bi, bo, zstd_dict=zd.as_digested_dict)
+            decompressed = bo.getvalue()
+        self.assertEqual(ret, (len(compressed), len(decompressed)))
+        self.assertEqual(decompressed, THIS_FILE_BYTES)
+
+    def test_stream_prefix(self):
+        zd = ZstdDict(THIS_FILE_BYTES, True)
+
+        with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
+            ret = compress_stream(bi, bo, zstd_dict=zd.as_prefix)
+            compressed = bo.getvalue()
+        self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
+
+        with BytesIO(compressed) as bi, BytesIO() as bo:
+            ret = decompress_stream(bi, bo, zstd_dict=zd.as_prefix)
+            decompressed = bo.getvalue()
+        self.assertEqual(ret, (len(compressed), len(decompressed)))
+        self.assertEqual(decompressed, THIS_FILE_BYTES)
 
 class CLITestCase(unittest.TestCase):
     @classmethod

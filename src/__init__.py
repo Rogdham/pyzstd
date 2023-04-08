@@ -328,9 +328,6 @@ class ZstdFile(io.BufferedIOBase):
         self._closefp = False
         self._mode = _MODE_CLOSED
 
-        if not isinstance(zstd_dict, (type(None), ZstdDict)):
-            raise TypeError("zstd_dict argument should be a ZstdDict object.")
-
         # Read or write mode
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):

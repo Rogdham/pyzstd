@@ -63,11 +63,10 @@ ZstdDictInfo = TypeVar('ZstdDictInfo')
 class ZstdDict:
     dict_content: bytes
     dict_id: int
+
+    as_digested_dict: ZstdDictInfo
+    as_undigested_dict: ZstdDictInfo
     as_prefix: ZstdDictInfo
-    # These two undocumented attributes were added in 0.15.7.
-    # Hide them in order not to cause confusion for users.
-    # as_digested_dict: ZstdDictInfo
-    # as_undigested_dict: ZstdDictInfo
 
     def __init__(self,
                  dict_content,

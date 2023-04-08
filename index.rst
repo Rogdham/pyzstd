@@ -559,7 +559,7 @@ Dictionary
     It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
     .. versionchanged:: 0.15.7
-        When compressing, no longer always use cached dictionary. Since digesting a dictionary may be costly, when there is a big number of data, consider reusing compressor object. Also add ``.__len__()`` method that returning content size.
+        When compressing, use undigested dictionary instead of digested dictionary by default, see :ref:`difference <digested_dict>`. Also add ``.__len__()`` method that returning content size.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -589,8 +589,9 @@ Dictionary
             file_content = f.read()
         zd = ZstdDict(file_content)
 
-        # use the dictionary to compress
+        # use the dictionary to compress/decompress
         compressed_dat = compress(raw_dat, zstd_dict=zd)
+        decompressed_dat = decompress(compressed_dat, zstd_dict=zd)
 
     .. py:attribute:: as_prefix
 
@@ -603,6 +604,63 @@ Dictionary
         #. When decompressing, must use the same prefix as when compressing.
         #. Loading prefix to compressor is costly.
         #. Loading prefix to decompressor is not costly.
+
+        .. versionadded:: 0.15.7
+
+.. _digested_dict:
+
+    .. py:attribute:: as_digested_dict
+
+        Load as a digested dictionary, see below.
+
+        .. versionadded:: 0.15.7
+
+    .. py:attribute:: as_undigested_dict
+
+        Load as an undigested dictionary.
+
+        Digesting dictionary is a costly operation. These two attributes can control how the dictionary is loaded to compressor, by passing them as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_digested_dict)``
+
+        If don't specify these two attributes, use undigested dictionary for compression by default: ``compress(dat, zstd_dict=zd)``.
+
+        .. list-table:: Difference for compression
+            :widths: 12 12 12
+            :header-rows: 1
+
+            * -
+              - | Digested
+                | dictionary
+              - | Undigested
+                | dictionary
+            * - | Some advanced
+                | parameters of
+                | compressor may
+                | be overridden
+                | by dictionary's
+                | parameters
+              - | ``windowLog``, ``hashLog``,
+                | ``chainLog``, ``searchLog``,
+                | ``minMatch``, ``targetLength``,
+                | ``strategy``,
+                | ``enableLongDistanceMatching``,
+                | ``ldmHashLog``, ``ldmMinMatch``,
+                | ``ldmBucketSizeLog``,
+                | ``ldmHashRateLog``, and some
+                | non-public parameters.
+              - No
+            * - | ZstdDict has
+                | internal cache
+                | for this
+              - | Yes. It's faster when
+                | loading again a digested
+                | dictionary with the same
+                | compression level.
+              - | No. If load an undigested
+                | dictionary multiple times,
+                | consider reusing a
+                | compressor object.
+
+        For decompression, they have the same effect, so no need to specify them. Pyzstd uses digested dictionary for decompression by default.
 
         .. versionadded:: 0.15.7
 
@@ -1420,7 +1478,7 @@ Use zstd as a patching engine
 
     Set :py:attr:`CParameter.windowLog` to a value that covers VER_2's length, and enable "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to 1. The ``--patch-from`` option of zstd CLI also uses other parameters, but these two matter the most.
 
-    The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, it have a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
+    The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, it has a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
 
     .. sourcecode:: python
 
