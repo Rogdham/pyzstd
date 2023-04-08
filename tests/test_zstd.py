@@ -1957,6 +1957,10 @@ class ZstdDictTestCase(unittest.TestCase):
         dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_undigested_dict)
         self.assertEqual(decompress(dat, zd.as_undigested_dict), SAMPLES[0])
 
+    def test_len(self):
+        self.assertEqual(len(TRAINED_DICT), len(TRAINED_DICT.dict_content))
+        self.assertIn(str(len(TRAINED_DICT)), str(TRAINED_DICT))
+
 class OutputBufferTestCase(unittest.TestCase):
 
     @classmethod

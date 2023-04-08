@@ -341,6 +341,9 @@ class ZstdDict:
         return '<ZstdDict dict_id=%d dict_size=%d>' % \
                (self.__dict_id, len(self.__dict_content))
 
+    def __len__(self):
+        return len(self.__dict_content)
+
     def __reduce__(self):
         msg = ("Intentionally not supporting pickle. If need to save zstd "
                "dictionary to disk, please save .dict_content attribute, "

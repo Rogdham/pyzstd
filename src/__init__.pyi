@@ -64,10 +64,16 @@ class ZstdDict:
     dict_content: bytes
     dict_id: int
     as_prefix: ZstdDictInfo
+    # These two undocumented attributes were added in 0.15.7.
+    # Hide them in order not to cause confusion for users.
+    # as_digested_dict: ZstdDictInfo
+    # as_undigested_dict: ZstdDictInfo
 
     def __init__(self,
                  dict_content,
                  is_raw: bool = False) -> None: ...
+
+    def __len__(self) -> int: ...
 
 class ZstdCompressor:
     CONTINUE: ClassVar[int]

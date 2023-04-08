@@ -1397,6 +1397,13 @@ static PyGetSetDef ZstdDict_getset[] = {
     {NULL},
 };
 
+static Py_ssize_t
+ZstdDict_length(ZstdDict *self)
+{
+    assert(PyBytes_Check(self->dict_content));
+    return Py_SIZE(self->dict_content);
+}
+
 static PyType_Slot zstddict_slots[] = {
     {Py_tp_methods, ZstdDict_methods},
     {Py_tp_members, ZstdDict_members},
@@ -1406,6 +1413,7 @@ static PyType_Slot zstddict_slots[] = {
     {Py_tp_init, ZstdDict_init},
     {Py_tp_str, ZstdDict_str},
     {Py_tp_doc, (char*)ZstdDict_dict_doc},
+    {Py_sq_length, ZstdDict_length},
     {0, 0}
 };
 
