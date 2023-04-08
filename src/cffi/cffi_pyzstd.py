@@ -426,7 +426,7 @@ def _set_zstd_error(type, zstd_ret):
           ffi.string(m.ZSTD_getErrorName(zstd_ret)).decode('utf-8')
     raise ZstdError(msg)
 
-def _set_parameter_error(is_compress, pos, key, value):
+def _set_parameter_error(is_compress, key, value):
     COMPRESS_PARAMETERS = \
     {m.ZSTD_c_compressionLevel: "compressionLevel",
      m.ZSTD_c_windowLog:        "windowLog",
@@ -464,7 +464,7 @@ def _set_parameter_error(is_compress, pos, key, value):
     name = parameters.get(key)
     # Unknown parameter
     if name is None:
-        name = 'the %dth parameter (key %d)' % (pos, key)
+        name = 'unknown parameter (key %d)' % key
 
     # Get parameter bounds
     if is_compress:
@@ -510,7 +510,7 @@ def _set_c_parameters(cctx, level_or_option):
         use_multithread = False
         use_advanced_parameters = False
 
-        for posi, (key, value) in enumerate(level_or_option.items(), 1):
+        for key, value in level_or_option.items():
             # Check key type
             if type(key) == DParameter:
                 raise TypeError("Key of compression option dict should "
@@ -543,7 +543,7 @@ def _set_c_parameters(cctx, level_or_option):
             # Set parameter
             zstd_ret = m.ZSTD_CCtx_setParameter(cctx, key, value)
             if m.ZSTD_isError(zstd_ret):
-                _set_parameter_error(True, posi, key, value)
+                _set_parameter_error(True, key, value)
 
         return level, use_multithread, use_advanced_parameters
 
@@ -553,7 +553,7 @@ def _set_d_parameters(dctx, option):
     if not isinstance(option, dict):
         raise TypeError("option argument should be dict object.")
 
-    for posi, (key, value) in enumerate(option.items(), 1):
+    for key, value in option.items():
         # Check key type
         if type(key) == CParameter:
             raise TypeError("Key of decompression option dict should "
@@ -566,7 +566,7 @@ def _set_d_parameters(dctx, option):
         # Set parameter
         zstd_ret = m.ZSTD_DCtx_setParameter(dctx, key, value)
         if m.ZSTD_isError(zstd_ret):
-            _set_parameter_error(False, posi, key, value)
+            _set_parameter_error(False, key, value)
 
 def _load_c_dict(cctx, zstd_dict, level, use_advanced_parameters):
     if isinstance(zstd_dict, ZstdDict):

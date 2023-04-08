@@ -541,7 +541,7 @@ static const ParameterInfo dp_list[] =
 /* Format an user friendly error message. */
 FORCE_NO_INLINE void
 set_parameter_error(const _zstd_state* const state, int is_compress,
-                    Py_ssize_t pos, int key_v, int value_v)
+                    int key_v, int value_v)
 {
     ParameterInfo const *list;
     int list_size;
@@ -573,7 +573,7 @@ set_parameter_error(const _zstd_state* const state, int is_compress,
     /* Unknown parameter */
     if (name == NULL) {
         PyOS_snprintf(pos_msg, sizeof(pos_msg),
-                      "the %zdth parameter (key %d)", pos, key_v);
+                      "unknown parameter (key %d)", key_v);
         name = pos_msg;
     }
 
@@ -892,7 +892,7 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
                 return -1;
             }
 
-            int value_v = _PyLong_AsInt(value);
+            const int value_v = _PyLong_AsInt(value);
             if (value_v == -1 && PyErr_Occurred()) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Value of option dict should be 32-bit signed int value.");
@@ -936,7 +936,7 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
             /* Set parameter to compression context */
             zstd_ret = ZSTD_CCtx_setParameter(self->cctx, key_v, value_v);
             if (ZSTD_isError(zstd_ret)) {
-                set_parameter_error(MODULE_STATE, 1, pos, key_v, value_v);
+                set_parameter_error(MODULE_STATE, 1, key_v, value_v);
                 return -1;
             }
         }
@@ -1080,7 +1080,7 @@ set_d_parameters(ZstdDecompressor *self, PyObject *option)
 
         /* Check error */
         if (ZSTD_isError(zstd_ret)) {
-            set_parameter_error(MODULE_STATE, 0, pos, key_v, value_v);
+            set_parameter_error(MODULE_STATE, 0, key_v, value_v);
             return -1;
         }
     }
