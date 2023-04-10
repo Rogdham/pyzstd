@@ -532,12 +532,6 @@ Dictionary
 .. note::
     If use pre-trained zstd dictionary, the compression ratio achievable on small data (a few KiB) improves dramatically.
 
-    **Attention**
-
-        #. If you lose a zstd dictionary, then can't decompress the corresponding data.
-        #. Zstd dictionary has negligible effect on large data (multi-MiB) compression.
-        #. There is a possibility that the dictionary content could be maliciously tampered by a third party.
-
     **Background**
 
     The smaller the amount of data to compress, the more difficult it is to compress. This problem is common to all compression algorithms, and reason is, compression algorithms learn from past data how to compress future data. But at the beginning of a new data set, there is no "past" to build upon.
@@ -545,6 +539,12 @@ Dictionary
     Zstd training mode can be used to tune the algorithm for a selected type of data. Training is achieved by providing it with a few samples (one file per sample). The result of this training is stored in a file called "dictionary", which must be loaded before compression and decompression.
 
     See the FAQ in `this file <https://github.com/facebook/zstd/blob/dev/lib/zdict.h>`_ for details.
+
+    .. attention::
+
+        #. If you lose a zstd dictionary, then can't decompress the corresponding data.
+        #. Zstd dictionary has negligible effect on large data (multi-MiB) compression. If want to use large dictionary content, see prefix(:py:attr:`ZstdDict.as_prefix`).
+        #. There is a possibility that the dictionary content could be maliciously tampered by a third party.
 
     **Advanced dictionary training**
 
@@ -558,8 +558,23 @@ Dictionary
 
     It's thread-safe, and can be shared by multiple :py:class:`ZstdCompressor` / :py:class:`ZstdDecompressor` objects.
 
+    .. sourcecode:: python
+
+        # load a zstd dictionary from file
+        with io.open(dict_path, 'rb') as f:
+            file_content = f.read()
+        zd = ZstdDict(file_content)
+
+        # use the dictionary to compress.
+        # if use the same dictionary for compression repeatedly, reusing
+        # a compressor object is faster, see .as_undigested_dict doc.
+        compressed_dat = compress(raw_dat, zstd_dict=zd)
+
+        # use the dictionary to decompress
+        decompressed_dat = decompress(compressed_dat, zstd_dict=zd)
+
     .. versionchanged:: 0.15.7
-        When compressing, use undigested dictionary instead of digested dictionary by default, see :ref:`difference <digested_dict>`. Also add ``.__len__()`` method that returning content size.
+        When compressing, load undigested dictionary instead of digested dictionary by default, see :py:attr:`~ZstdDict.as_digested_dict`. Also add ``.__len__()`` method that returning content size.
 
     .. py:method:: __init__(self, dict_content, is_raw=False)
 
@@ -582,33 +597,6 @@ Dictionary
 
         ``0`` means a "raw content" dictionary, free of any format restriction, used for advanced user. (Note that the meaning of ``0`` is different from ``dictionary_id`` in :py:func:`get_frame_info` function.)
 
-    .. sourcecode:: python
-
-        # load a zstd dictionary from file
-        with io.open(dict_path, 'rb') as f:
-            file_content = f.read()
-        zd = ZstdDict(file_content)
-
-        # use the dictionary to compress/decompress
-        compressed_dat = compress(raw_dat, zstd_dict=zd)
-        decompressed_dat = decompress(compressed_dat, zstd_dict=zd)
-
-    .. py:attribute:: as_prefix
-
-        Load the dictionary content to compressor/decompressor as a "prefix", by passing this attribute as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_prefix)``
-
-        Prefix can be used for :ref:`patching engine<patching_engine>` scenario.
-
-        #. Prefix is compatible with "long distance matching", while dictionary is not.
-        #. Prefix only work for the first frame, then the compressor/decompressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
-        #. When decompressing, must use the same prefix as when compressing.
-        #. Loading prefix to compressor is costly.
-        #. Loading prefix to decompressor is not costly.
-
-        .. versionadded:: 0.15.7
-
-.. _digested_dict:
-
     .. py:attribute:: as_digested_dict
 
         Load as a digested dictionary, see below.
@@ -621,7 +609,7 @@ Dictionary
 
         Digesting dictionary is a costly operation. These two attributes can control how the dictionary is loaded to compressor, by passing them as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_digested_dict)``
 
-        If don't specify these two attributes, use undigested dictionary for compression by default: ``compress(dat, zstd_dict=zd)``.
+        If don't specify these two attributes, use **undigested** dictionary for compression by default: ``compress(dat, zstd_dict=zd)``
 
         .. list-table:: Difference for compression
             :widths: 12 12 12
@@ -660,7 +648,21 @@ Dictionary
                 | consider reusing a
                 | compressor object.
 
-        For decompression, they have the same effect, so no need to specify them. Pyzstd uses digested dictionary for decompression by default.
+        For decompression, they have the same effect. Pyzstd uses **digested** dictionary for decompression by default, which is faster when loading again: ``decompress(dat, zstd_dict=zd)``
+
+        .. versionadded:: 0.15.7
+
+    .. py:attribute:: as_prefix
+
+        Load the dictionary content to compressor/decompressor as a "prefix", by passing this attribute as `zstd_dict` argument: ``compress(dat, zstd_dict=zd.as_prefix)``
+
+        Prefix can be used for :ref:`patching engine<patching_engine>` scenario.
+
+        #. Prefix is compatible with "long distance matching", while dictionary is not.
+        #. Prefix only work for the first frame, then the compressor/decompressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
+        #. When decompressing, must use the same prefix as when compressing.
+        #. Loading prefix to compressor is costly.
+        #. Loading prefix to decompressor is not costly.
 
         .. versionadded:: 0.15.7
 
@@ -1476,7 +1478,7 @@ Use zstd as a patching engine
 
     Assuming VER_1 and VER_2 are two versions.
 
-    Set :py:attr:`CParameter.windowLog` to a value that covers VER_2's length, and enable "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to 1. The ``--patch-from`` option of zstd CLI also uses other parameters, but these two matter the most.
+    Let the "window" cover the longest version, by setting :py:attr:`CParameter.windowLog`. And enable "long distance matching" by setting :py:attr:`CParameter.enableLongDistanceMatching` to 1. The ``--patch-from`` option of zstd CLI also uses other parameters, but these two matter the most.
 
     The valid value of `windowLog` is [10,30] in 32-bit build, [10,31] in 64-bit build. So in 64-bit build, it has a `2GiB length limit <https://github.com/facebook/zstd/issues/2173>`_. Strictly speaking, the limit is (2GiB - ~100KiB). When this limit is exceeded, the patch becomes very large and loses the meaning of a patch.
 
@@ -1485,19 +1487,21 @@ Use zstd as a patching engine
         # use VER_1 as prefix.
         v1 = ZstdDict(VER_1, is_raw=True)
 
-        # let the window cover VER_2.
+        # let the window cover the longest version.
         # don't forget to clamp windowLog to valid range.
         # enable "long distance matching".
-        windowLog = len(VER_2).bit_length()
+        windowLog = max(len(VER_1), len(VER_2)).bit_length()
         option = {CParameter.windowLog: windowLog,
                   CParameter.enableLongDistanceMatching: 1}
 
-        # get a very small PATCH
+        # get a small PATCH
         PATCH = compress(VER_2, level_or_option=option, zstd_dict=v1.as_prefix)
 
     2, Applying the patch (decompress)
 
     Prefix is not dictionary, so the frame header doesn't record a :ref:`dictionary id<dict_id>`. When decompressing, must use the same prefix as when compressing. Otherwise ZstdError exception may be raised with a message like "Data corruption detected".
+
+    Decompressing requires a window of the same size as when compressing, this may be a problem for small memory device. If the window is larger than 128MiB, need to explicitly set :py:attr:`DParameter.windowLogMax` to allow larger window.
 
     .. sourcecode:: python
 

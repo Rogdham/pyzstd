@@ -109,7 +109,10 @@ def do_setup():
         }
     else:  # statically link to zstd lib
         kwargs = {
-            'include_dirs': ['zstd/lib', 'zstd/lib/dictBuilder'],
+            'include_dirs': ['zstd/lib',
+                             # for zstd 1.4.x:
+                             'zstd/lib/common',
+                             'zstd/lib/dictBuilder'],
             'library_dirs': [],
             'libraries': [],
             'sources': get_zstd_files_list(),
@@ -160,6 +163,8 @@ def do_setup():
             "License :: OSI Approved :: BSD License",
             "Programming Language :: Python :: Implementation :: CPython",
             "Programming Language :: Python :: Implementation :: PyPy",
+            "Programming Language :: Python :: 3.5",
+            "Programming Language :: Python :: 3.6",
             "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",

@@ -27,7 +27,7 @@ ZstdDict class changes:
 
 #. Fix these advanced compression parameters may be ignored when loading a dictionary: ``windowLog``, ``hashLog``, ``chainLog``, ``searchLog``, ``minMatch``, ``targetLength``, ``strategy``, ``enableLongDistanceMatching``, ``ldmHashLog``, ``ldmMinMatch``, ``ldmBucketSizeLog``, ``ldmHashRateLog``, and some non-public parameters.
 
-#. No longer load cached dictionary for compression by default. Loading can be controlled by `.as_digested_dict / .as_undigested_dict <https://pyzstd.readthedocs.io/en/latest/#digested-dict>`_ attributes.
+#. When compressing, load undigested dictionary instead of digested dictionary by default. Loading again an undigested is slower, see `doc <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_digested_dict>`_. When decompressing, still load digested dictionary by default.
 
 #. Add `.as_prefix <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_prefix>`_ attribute. Can use zstd as a `patching engine <https://pyzstd.readthedocs.io/en/latest/#patching-engine>`_.
 
