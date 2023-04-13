@@ -2527,10 +2527,10 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             self->in_end = used_now;
         } else if (avail_now < (size_t) data.len) {
             /* Move unconsumed data to the beginning.
-               dst < src, so using memcpy() is safe. */
-            memcpy(self->input_buffer,
-                   self->input_buffer + self->in_begin,
-                   used_now);
+               Overlap is possbile, so use memmove(). */
+            memmove(self->input_buffer,
+                    self->input_buffer + self->in_begin,
+                    used_now);
 
             /* Set begin & end position */
             self->in_begin = 0;
