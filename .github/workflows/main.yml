@@ -86,7 +86,7 @@ jobs:
       - name: Build & test
         run: |
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
-          python -m pip install --config-settings="--build-option=--dynamic-link-zstd" -v .
+          python -m pip install --config-settings="--build-option=--dynamic-link-zstd --warning-as-error" -v .
           python -c "import pyzstd; print('PYZSTD_CONFIG:', pyzstd.PYZSTD_CONFIG)"
           python tests/test_zstd.py
 

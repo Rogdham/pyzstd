@@ -207,9 +207,9 @@ int ZSTD_defaultCLevel(void)
 #endif
 
 #ifdef PYZSTD_STATIC_LINK
-pyzstd_static_link = 1;
+int pyzstd_static_link = 1;
 #else
-pyzstd_static_link = 0;
+int pyzstd_static_link = 0;
 #endif
 """
 
