@@ -9,6 +9,7 @@ import sys
 import array
 import pathlib
 import pickle
+import platform
 import random
 import subprocess
 import tempfile
@@ -23,11 +24,35 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDict, train_dict, finalize_dict, \
                    zstd_version, zstd_version_info, zstd_support_multithread, \
                    compressionLevel_values, get_frame_info, get_frame_size, \
-                   ZstdFile, open
+                   ZstdFile, open, __version__ as pyzstd_version
 
 PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG # type: ignore
 if PYZSTD_CONFIG[1] == 'c':
     from pyzstd.c import _zstd       # type: ignore
+
+build_info = ('Pyzstd build information:\n'
+              ' - Environment:\n'
+              '   * Machine type: {}\n'
+              '   * Bit build: {}\n'
+              '   * OS: {}\n'
+              ' - Pyzstd:\n'
+              '   * Pyzstd version: {}\n'
+              '   * Implementation: {}\n'
+              '   * Enable multi-phase init: {}\n'
+              ' - Zstd:\n'
+              '   * Zstd version: {}\n'
+              '   * Link to zstd library: {}\n'
+              '   * Enable multi-threaded compression: {}\n').format(
+                    platform.machine(), # Environment
+                    PYZSTD_CONFIG[0],
+                    platform.system(),
+                    pyzstd_version,     # Pyzstd
+                    PYZSTD_CONFIG[1].upper(),
+                    PYZSTD_CONFIG[3],
+                    zstd_version,       # Zstd
+                    'Statically link' if PYZSTD_CONFIG[2] else 'Dynamically link',
+                    zstd_support_multithread)
+print(build_info, flush=True)
 
 DECOMPRESSED_DAT = None
 COMPRESSED_DAT = None

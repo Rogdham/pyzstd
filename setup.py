@@ -49,8 +49,12 @@ class pyzstd_build_ext(build_ext):
     PYZSTD_AVX2 = False
     PYZSTD_DEBUG = False
     PYZSTD_WARNING_AS_ERROR = False
+    PYZSTD_CONFIG_MSG = ''
 
     def build_extensions(self):
+        # Print build config message in actual build
+        print(self.PYZSTD_CONFIG_MSG, flush=True)
+
         # Accept assembly files
         self.compiler.src_extensions.extend(['.s', '.S'])
         # Build debug build
@@ -89,8 +93,10 @@ class pyzstd_build_ext(build_ext):
         super().build_extensions()
 
 def do_setup():
+    # read stuff
     long_description, module_version = read_stuff()
 
+    # parse options
     pyzstd_build_ext.PYZSTD_AVX2 = has_option('--avx2')
     pyzstd_build_ext.PYZSTD_DEBUG = has_option('--debug')
     pyzstd_build_ext.PYZSTD_WARNING_AS_ERROR = has_option('--warning-as-error')
@@ -98,6 +104,33 @@ def do_setup():
     DYNAMIC_LINK = has_option('--dynamic-link-zstd')
     CFFI = has_option('--cffi') or platform.python_implementation() == 'PyPy'
     MULTI_PHASE_INIT = has_option('--multi-phase-init')
+
+    # build config message
+    pyzstd_build_ext.PYZSTD_CONFIG_MSG = \
+               ('+--------------------------------------------+\n'
+                '|             Pyzstd build config            |\n'
+                '+-------------------------+------------------+\n'
+                '| Pyzstd version          | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Implementation          | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Enable multi-phase-init | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Link to zstd library    | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Enable AVX2             | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Debug build             | {!s:<16} |\n'
+                '+-------------------------+------------------+\n'
+                '| Warning as error        | {!s:<16} |\n'
+                '+-------------------------+------------------+').format(
+                    module_version,
+                    'CFFI' if CFFI else 'C',
+                    'Not for CFFI' if CFFI else MULTI_PHASE_INIT,
+                    'Dynamically link' if DYNAMIC_LINK else 'Statically link',
+                    pyzstd_build_ext.PYZSTD_AVX2,
+                    pyzstd_build_ext.PYZSTD_DEBUG,
+                    pyzstd_build_ext.PYZSTD_WARNING_AS_ERROR)
 
     if DYNAMIC_LINK:
         kwargs = {
@@ -146,8 +179,9 @@ def do_setup():
     setup(
         name='pyzstd',
         version=module_version,
-        description=("Python bindings to Zstandard (zstd) compression library, "
-                     "the API style is similar to Python's bz2/lzma/zlib modules."),
+        description=("Python bindings to Zstandard (zstd) compression "
+                     "library, the API style is similar to Python's "
+                     "bz2/lzma/zlib modules."),
         long_description=long_description,
         long_description_content_type='text/x-rst',
         author='Ma Lin',
