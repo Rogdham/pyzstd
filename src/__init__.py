@@ -21,10 +21,13 @@ except ImportError:
                                       _ZSTD_DStreamInSize
     except ImportError:
         raise ImportError(
-            "pyzstd module: Neither C implementation nor CFFI implementation "
-            "can be imported. If pyzstd module is dynamically linked to zstd "
-            "library, make sure not to remove zstd library, and the run-time "
-            "zstd library's version can't be lower than that at compile-time.")
+            "\n\npyzstd module: Can't import compiled .so/.pyd file.\n"
+            "1, If pyzstd module is dynamically linked to zstd library: Make sure\n"
+            "   not to remove zstd library, and the run-time zstd library's version\n"
+            "   can't be lower than that at compile-time; On Windows, the directory\n"
+            "   that has libzstd.dll should be added by os.add_dll_directory() function.\n"
+            "2, Please install pyzstd module through pip, to ensure that compiled\n"
+            "   .so/.pyd file matches the architecture/OS/Python.\n")
 
 __version__ = '0.15.6'
 

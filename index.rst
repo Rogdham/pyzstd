@@ -1588,7 +1588,7 @@ Build pyzstd module with options
 
     And put ``libzstd.dll`` into one of these directories:
 
-        * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function.
+        * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function. (The unit-tests and the CLI can't utilize this)
         * Python's root directory that has python.exe.
         * %SystemRoot%\System32
 
