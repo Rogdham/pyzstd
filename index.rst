@@ -1349,7 +1349,7 @@ Rich memory mode
     * The output buffer is larger than input data a little.
     * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
 
-    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.14.2/src/_zstdmodule.c#L135-L160>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.15.6/src/bin_ext/_zstdmodule.c#L215-L240>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
     When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
 
@@ -1501,7 +1501,7 @@ Use zstd as a patching engine
 
     Prefix is not dictionary, so the frame header doesn't record a :ref:`dictionary id<dict_id>`. When decompressing, must use the same prefix as when compressing. Otherwise ZstdError exception may be raised with a message like "Data corruption detected".
 
-    Decompressing requires a window of the same size as when compressing, this may be a problem for small memory device. If the window is larger than 128MiB, need to explicitly set :py:attr:`DParameter.windowLogMax` to allow larger window.
+    Decompressing requires a window of the same size as when compressing, this may be a problem for small RAM device. If the window is larger than 128MiB, need to explicitly set :py:attr:`DParameter.windowLogMax` to allow larger window.
 
     .. sourcecode:: python
 
@@ -1522,7 +1522,7 @@ Build pyzstd module with options
 
 .. note:: Build pyzstd module with options
 
-    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. In GCC/CLANG builds, no significant improvement, or worse.
+    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. GCC/CLANG builds already dynamically dispatch some functions for BMI2 instructions, so no significant improvement.
 
     .. sourcecode:: shell
 

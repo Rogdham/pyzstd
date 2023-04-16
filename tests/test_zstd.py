@@ -370,9 +370,9 @@ class ClassShapeTestCase(unittest.TestCase):
 
         self.assertEqual(type(zd.dict_content), bytes)
         self.assertEqual(zd.dict_id, 0)
-        zd.as_prefix
-        zd.as_digested_dict
-        zd.as_undigested_dict
+        self.assertEqual(zd.as_digested_dict[1], 0)
+        self.assertEqual(zd.as_undigested_dict[1], 1)
+        self.assertEqual(zd.as_prefix[1], 2)
 
         # name
         self.assertIn('.ZstdDict', str(type(zd)))
@@ -381,6 +381,9 @@ class ClassShapeTestCase(unittest.TestCase):
         with self.assertRaisesRegex(TypeError,
                                     r'save \.dict_content attribute'):
             pickle.dumps(zd)
+        with self.assertRaisesRegex(TypeError,
+                                    r'save \.dict_content attribute'):
+            pickle.dumps(zd.as_prefix)
 
         # supports subclass
         class SubClass(ZstdDict):
@@ -1767,11 +1770,31 @@ class ZstdDictTestCase(unittest.TestCase):
         DICT_MAGIC = 0xEC30A437.to_bytes(4, byteorder='little')
         dict_content = DICT_MAGIC + b'abcdefghighlmnopqrstuvwxyz'
 
+        # corrupted
         zd = ZstdDict(dict_content, is_raw=False)
         with self.assertRaisesRegex(ZstdError, r'ZSTD_CDict.*?corrupted'):
             ZstdCompressor(zstd_dict=zd.as_digested_dict)
         with self.assertRaisesRegex(ZstdError, r'ZSTD_DDict.*?corrupted'):
             ZstdDecompressor(zd)
+
+        # wrong type
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdCompressor(zstd_dict=(zd, b'123'))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdCompressor(zstd_dict=(zd, 1, 2))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdCompressor(zstd_dict=(zd, -1))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdCompressor(zstd_dict=(zd, 3))
+
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdDecompressor(zstd_dict=(zd, b'123'))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdDecompressor((zd, 1, 2))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdDecompressor((zd, -1))
+        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+            ZstdDecompressor((zd, 3))
 
     def test_train_dict(self):
         DICT_SIZE1 = 3*1024

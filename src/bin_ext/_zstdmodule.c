@@ -1278,10 +1278,10 @@ ZstdDict_reduce(ZstdDict *self)
     /* return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content); */
 
     PyErr_SetString(PyExc_TypeError,
-                    "Intentionally not supporting pickle. If need to save zstd "
-                    "dictionary to disk, please save .dict_content attribute, "
-                    "it's a bytes object. So that the zstd dictionary can be "
-                    "used with other programs.");
+                    "ZstdDict object intentionally doesn't support pickle. If need "
+                    "to save zstd dictionary to disk, please save .dict_content "
+                    "attribute, it's a bytes object. So that the zstd dictionary "
+                    "can be used with other programs.");
     return NULL;
 }
 

@@ -149,8 +149,8 @@ def do_setup():
             'library_dirs': [],
             'libraries': [],
             'sources': get_zstd_files_list(),
-            'define_macros': [('ZSTD_MULTITHREAD', None),
-                              ('PYZSTD_STATIC_LINK', None)]
+            'define_macros': [('PYZSTD_STATIC_LINK', None),
+                              ('ZSTD_MULTITHREAD', None)]
         }
 
     if CFFI:

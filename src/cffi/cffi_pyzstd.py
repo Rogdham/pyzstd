@@ -361,10 +361,10 @@ class ZstdDict:
         return len(self.__dict_content)
 
     def __reduce__(self):
-        msg = ("Intentionally not supporting pickle. If need to save zstd "
-               "dictionary to disk, please save .dict_content attribute, "
-               "it's a bytes object. So that the zstd dictionary can be "
-               "used with other programs.")
+        msg = ("ZstdDict object intentionally doesn't support pickle. If need "
+               "to save zstd dictionary to disk, please save .dict_content "
+               "attribute, it's a bytes object. So that the zstd dictionary "
+               "can be used with other programs.")
         raise TypeError(msg)
 
     def _get_cdict(self, level):
