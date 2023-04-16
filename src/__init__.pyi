@@ -3,7 +3,7 @@ from enum import IntEnum
 from os import PathLike
 from typing import overload, Dict, ByteString, Optional, Union, Callable, \
                    Iterable, Literal, ClassVar, Tuple, NamedTuple, BinaryIO, \
-                   TextIO, TypeVar
+                   TextIO
 
 __version__: str
 zstd_version: str
@@ -59,7 +59,7 @@ class DParameter(IntEnum):
 
     def bounds(self) -> Tuple[int, int]: ...
 
-ZstdDictInfo = TypeVar('ZstdDictInfo')
+ZstdDictInfo = Tuple['ZstdDict', int]
 class ZstdDict:
     dict_content: bytes
     dict_id: int
