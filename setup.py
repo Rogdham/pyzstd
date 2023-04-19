@@ -66,13 +66,18 @@ class pyzstd_build_ext(build_ext):
                 #   Level 0 produces no debug information at all. This reduces
                 #   the size of GCC wheels. By default CPython won't print any
                 #   C stack trace, so -g0 and -g2 are same for most users.
-                more_options = ['-g0']
+                # -flto:
+                #   This option runs the standard link-time optimizer. To use the
+                #   link-time optimizer, -flto and optimization options should be
+                #   specified at compile time and during the final link.
+                more_options = ['-g0', '-flto']
                 if self.PYZSTD_AVX2:
                     instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
                     more_options.extend(instrs)
                 if self.PYZSTD_WARNING_AS_ERROR:
                     more_options.append('-Werror')
                 extension.extra_compile_args.extend(more_options)
+                extension.extra_link_args.extend(['-g0', '-flto'])
             elif self.compiler.compiler_type == 'msvc':
                 # Remove .S source files, they use gcc/clang syntax.
                 extension.sources = [i for i in extension.sources
@@ -118,7 +123,7 @@ def do_setup():
                 '+-------------------------+------------------+\n'
                 '| Link to zstd library    | {!s:<16} |\n'
                 '+-------------------------+------------------+\n'
-                '| Enable AVX2             | {!s:<16} |\n'
+                '| Enable AVX2/BMI2        | {!s:<16} |\n'
                 '+-------------------------+------------------+\n'
                 '| Debug build             | {!s:<16} |\n'
                 '+-------------------------+------------------+\n'
@@ -150,6 +155,7 @@ def do_setup():
             'libraries': [],
             'sources': get_zstd_files_list(),
             'define_macros': [('PYZSTD_STATIC_LINK', None),
+                              # enable multi-threaded compression
                               ('ZSTD_MULTITHREAD', None)]
         }
 
