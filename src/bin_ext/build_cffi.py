@@ -172,7 +172,7 @@ size_t ZDICT_finalizeDictionary(void* dstDictBuffer, size_t maxDictSize,
                                 const void* samplesBuffer, const size_t* samplesSizes, unsigned nbSamples,
                                 ZDICT_params_t parameters);
 
-int pyzstd_static_link;
+extern int pyzstd_static_link;
 """)
 
 source = """
