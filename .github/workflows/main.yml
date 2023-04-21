@@ -263,6 +263,9 @@ jobs:
     name: Publish to PyPI
     needs: [build_wheels, build_in_manylinux2010, build_arch_wheels]
     runs-on: ubuntu-latest
+    permissions:
+      # This permission is mandatory for trusted publishing
+      id-token: write
 
     steps:
       # Build source distribution
@@ -289,7 +292,6 @@ jobs:
       - name: Upload to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          password: ${{ secrets.PYPI_TOKEN }}
           skip_existing: true
           verbose: true
           print_hash: true

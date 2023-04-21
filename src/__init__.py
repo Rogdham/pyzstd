@@ -29,7 +29,7 @@ except ImportError:
             "2, Please install pyzstd module through pip, to ensure that compiled\n"
             "   .so/.pyd file matches the architecture/OS/Python.\n")
 
-__version__ = '0.15.6'
+__version__ = '0.15.7'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API style is

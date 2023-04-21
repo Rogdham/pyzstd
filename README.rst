@@ -21,25 +21,25 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.15.7  (xx x, 2023)**
+**0.15.7  (Apr 21, 2023)**
 
 ZstdDict class changes:
 
 #. Fix these advanced compression parameters may be ignored when loading a dictionary: ``windowLog``, ``hashLog``, ``chainLog``, ``searchLog``, ``minMatch``, ``targetLength``, ``strategy``, ``enableLongDistanceMatching``, ``ldmHashLog``, ``ldmMinMatch``, ``ldmBucketSizeLog``, ``ldmHashRateLog``, and some non-public parameters.
 
-#. When compressing, load undigested dictionary instead of digested dictionary by default. Loading again an undigested is slower, see `doc <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_digested_dict>`_. When decompressing, still load digested dictionary by default.
+#. When compressing, load undigested dictionary instead of digested dictionary by default. Loading again an undigested is slower, see `differences <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_digested_dict>`_.
 
 #. Add `.as_prefix <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_prefix>`_ attribute. Can use zstd as a `patching engine <https://pyzstd.readthedocs.io/en/latest/#patching-engine>`_.
 
 **0.15.6  (Apr 5, 2023)**
 
-Update bundled zstd source code from v1.5.4 to `v1.5.5 <https://github.com/facebook/zstd/releases/tag/v1.5.5>`_.
+Upgrade zstd source code from v1.5.4 to `v1.5.5 <https://github.com/facebook/zstd/releases/tag/v1.5.5>`_.
 
 **0.15.4  (Feb 24, 2023)**
 
-#. Update bundled zstd source code from v1.5.2 to `v1.5.4 <https://github.com/facebook/zstd/releases/tag/v1.5.4>`_. v1.5.3 is a non-public release.
+#. Upgrade zstd source code from v1.5.2 to `v1.5.4 <https://github.com/facebook/zstd/releases/tag/v1.5.4>`_. v1.5.3 is a non-public release.
 
-#. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `doc <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+#. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `build commands <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 
 #. Support "multi-phase initialization" (PEP-489) on CPython 3.11+, can work with CPython sub-interpreters in the future. Currently this build option is disabled by default.
 
@@ -51,11 +51,11 @@ Fix ``ZstdError`` object can't be pickled.
 
 **0.15.2  (Jan 22, 2022)**
 
-Update bundled zstd source code from v1.5.1 to `v1.5.2 <https://github.com/facebook/zstd/releases/tag/v1.5.2>`_.
+Upgrade zstd source code from v1.5.1 to `v1.5.2 <https://github.com/facebook/zstd/releases/tag/v1.5.2>`_.
 
 **0.15.1  (Dec 25, 2021)**
 
-#. Update bundled zstd source code from v1.5.0 to `v1.5.1 <https://github.com/facebook/zstd/releases/tag/v1.5.1>`_.
+#. Upgrade zstd source code from v1.5.0 to `v1.5.1 <https://github.com/facebook/zstd/releases/tag/v1.5.1>`_.
 
 #. Fix ``ZstdFile.write()`` / ``train_dict()`` / ``finalize_dict()`` may use wrong length for some buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
 
@@ -67,11 +67,11 @@ Update bundled zstd source code from v1.5.1 to `v1.5.2 <https://github.com/faceb
 
 #. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
 
-#. Add a setup.py option ``--avx2``, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+#. Add a setup.py option ``--avx2``, see `build options <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 
 **0.15.0  (May 18, 2021)**
 
-#. Update bundled zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
+#. Upgrade zstd source code from v1.4.9 to `v1.5.0 <https://github.com/facebook/zstd/releases/tag/v1.5.0>`_.
 
 #. Some improvements, no API changes.
 
@@ -83,7 +83,7 @@ Update bundled zstd source code from v1.5.1 to `v1.5.2 <https://github.com/faceb
 
 **0.14.3  (Mar 4, 2021)**
 
-Update bundled zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
+Upgrade zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zstd/releases/tag/v1.4.9>`_.
 
 **0.14.2  (Feb 24, 2021)**
 
@@ -93,7 +93,7 @@ Update bundled zstd source code from v1.4.8 to `v1.4.9 <https://github.com/faceb
 
 **0.14.1  (Dec 19, 2020)**
 
-#. Update bundled zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
+#. Upgrade zstd source code from v1.4.5 to `v1.4.8 <https://github.com/facebook/zstd/releases/tag/v1.4.8>`_.
 
     * v1.4.6 is a non-public release for Linux kernel.
 

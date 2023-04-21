@@ -1349,7 +1349,7 @@ Rich memory mode
     * The output buffer is larger than input data a little.
     * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
 
-    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.15.6/src/bin_ext/_zstdmodule.c#L215-L240>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.15.7/src/bin_ext/_zstdmodule.c#L218-L243>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
     When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
 
