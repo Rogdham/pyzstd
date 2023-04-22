@@ -72,7 +72,7 @@ class pyzstd_build_ext(build_ext):
                 #   specified at compile time and during the final link.
                 more_options = ['-g0', '-flto']
                 if self.PYZSTD_AVX2:
-                    instrs = ['-mavx2', '-mbmi', '-mbmi2', '-mlzcnt']
+                    instrs = ['-mavx2', '-mlzcnt', '-mbmi', '-mbmi2']
                     more_options.extend(instrs)
                 if self.PYZSTD_WARNING_AS_ERROR:
                     more_options.append('-Werror')

@@ -33,24 +33,29 @@ if PYZSTD_CONFIG[1] == 'c':
 build_info = ('Pyzstd build information:\n'
               ' - Environment:\n'
               '   * Machine type: {}\n'
-              '   * Bit build: {}\n'
               '   * OS: {}\n'
+              '   * Python: {} {}, {}-bit build ({})\n'
               ' - Pyzstd:\n'
               '   * Pyzstd version: {}\n'
               '   * Implementation: {}\n'
               '   * Enable multi-phase init: {}\n'
+              '   * Link to zstd library: {}\n'
               ' - Zstd:\n'
               '   * Zstd version: {}\n'
-              '   * Link to zstd library: {}\n'
               '   * Enable multi-threaded compression: {}\n').format(
                     platform.machine(), # Environment
-                    PYZSTD_CONFIG[0],
                     platform.system(),
+                    platform.python_implementation(),
+                    platform.python_version(),
+                    PYZSTD_CONFIG[0],
+                    platform.python_compiler(),
                     pyzstd_version,     # Pyzstd
                     PYZSTD_CONFIG[1].upper(),
-                    PYZSTD_CONFIG[3],
-                    zstd_version,       # Zstd
+                    'Not for CFFI implementation' \
+                        if PYZSTD_CONFIG[1] == 'cffi' \
+                        else PYZSTD_CONFIG[3],
                     'Statically link' if PYZSTD_CONFIG[2] else 'Dynamically link',
+                    zstd_version,       # Zstd
                     zstd_support_multithread)
 print(build_info, flush=True)
 

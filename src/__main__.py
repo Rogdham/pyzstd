@@ -377,7 +377,9 @@ def parse_arg():
     p = argparse.ArgumentParser(
                     prog = 'CLI of pyzstd module',
                     description = ("The command style is similar to zstd's "
-                                   "CLI, but there are some differences."),
+                                   "CLI, but there are some differences.\n"
+                                   "Zstd's CLI should be faster, it has "
+                                   "some I/O optimizations."),
                     epilog=('Examples of use:\n'
                             '  compress a file:\n'
                             '    python -m pyzstd -c IN_FILE -o OUT_FILE\n'

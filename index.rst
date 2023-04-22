@@ -566,7 +566,7 @@ Dictionary
         zd = ZstdDict(file_content)
 
         # use the dictionary to compress.
-        # if use the same dictionary for compression repeatedly, reusing
+        # if use a dictionary for compressor multiple times, reusing
         # a compressor object is faster, see .as_undigested_dict doc.
         compressed_dat = compress(raw_dat, zstd_dict=zd)
 
@@ -1123,7 +1123,7 @@ Advanced parameters
 
     .. py:attribute:: checksumFlag
 
-        A 4-byte checksum of uncompressed content is written at the end of frame.
+        A 4-byte checksum (XXH64) of uncompressed content is written at the end of frame.
 
         Default value is ``0``, can be ``1``.
 
@@ -1470,7 +1470,7 @@ Use zstd as a patching engine
 
     Zstd can be used as a great `patching engine <https://github.com/facebook/zstd/wiki/Zstandard-as-a-patching-engine>`_, although it has some limitations.
 
-    In this particular scenario, pass :py:attr:`ZstdDict.as_prefix` as `zstd_dict` argument. "Prefix" is similar to "raw content" dictionary, but zstd internally handles them differently, see `this issue <https://github.com/facebook/zstd/issues/2835>`_.
+    In this particular scenario, pass :py:attr:`ZstdDict.as_prefix` attribute as `zstd_dict` argument. "Prefix" is similar to "raw content" dictionary, but zstd internally handles them differently, see `this issue <https://github.com/facebook/zstd/issues/2835>`_.
 
     Essentially, prefix is like being placed before the data to be compressed. See "ZSTD_c_deterministicRefPrefix" in `this file <https://github.com/facebook/zstd/blob/release/lib/zstd.h>`_.
 
@@ -1484,7 +1484,7 @@ Use zstd as a patching engine
 
     .. sourcecode:: python
 
-        # use VER_1 as prefix.
+        # use VER_1 as prefix
         v1 = ZstdDict(VER_1, is_raw=True)
 
         # let the window cover the longest version.
@@ -1522,7 +1522,7 @@ Build pyzstd module with options
 
 .. note:: Build pyzstd module with options
 
-    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. GCC/CLANG builds already dynamically dispatch some functions for BMI2 instructions, so no significant improvement.
+    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. GCC/CLANG builds already dynamically dispatch some functions for BMI2 instructions, so no significant improvement, or worse.
 
     .. sourcecode:: shell
 

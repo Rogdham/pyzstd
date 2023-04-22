@@ -844,7 +844,7 @@ set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
-        int level = _PyLong_AsInt(level_or_option);
+        const int level = _PyLong_AsInt(level_or_option);
         if (level == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Compression level should be 32-bit signed int value.");
@@ -1275,8 +1275,10 @@ ZstdDict_init(ZstdDict *self, PyObject *args, PyObject *kwargs)
 static PyObject *
 ZstdDict_reduce(ZstdDict *self)
 {
-    /* return Py_BuildValue("O(O)", Py_TYPE(self), self->dict_content); */
-
+    /* return Py_BuildValue("O(On)", Py_TYPE(self),
+                            self->dict_content,
+                            self->dict_id == 0);
+       v0.15.7 added .as_* attributes, pickle will cause more confusion. */
     PyErr_SetString(PyExc_TypeError,
                     "ZstdDict object intentionally doesn't support pickle. If need "
                     "to save zstd dictionary to disk, please save .dict_content "
@@ -2527,7 +2529,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
             self->in_end = used_now;
         } else if (avail_now < (size_t) data.len) {
             /* Move unconsumed data to the beginning.
-               Overlap is possbile, so use memmove(). */
+               Overlap is possible, so use memmove(). */
             memmove(self->input_buffer,
                     self->input_buffer + self->in_begin,
                     used_now);
