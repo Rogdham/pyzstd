@@ -2806,6 +2806,22 @@ class FileTestCase(unittest.TestCase):
             expected = comp.compress(THIS_FILE_BYTES) + comp.flush()
             self.assertEqual(dst.getvalue(), expected)
 
+    def test_write_empty(self):
+        # .FLUSH_FRAME generates an empty content frame
+        c = ZstdCompressor()
+        self.assertNotEqual(c.flush(), b'')
+
+        # ZstdFile generates empty content frame
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            pass
+        self.assertNotEqual(bo.getvalue(), b'')
+
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            f.write(b'')
+        self.assertNotEqual(bo.getvalue(), b'')
+
     def test_write_101(self):
         with BytesIO() as dst:
             with ZstdFile(dst, "w") as f:
