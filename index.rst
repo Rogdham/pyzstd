@@ -862,7 +862,7 @@ ZstdFile class and open() function
         * `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_
         * `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_
         * `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_
-        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if ``.seek()`` to "previous position" or "position relative to EOF (the first time)", the decompression has to be restarted from zero.
+        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if seek to a position before the current position, or seek to a position relative to the end of the file (the first time), the decompression has to be restarted from zero.
         * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
         * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
 
@@ -1410,7 +1410,7 @@ Use with tarfile module
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
 
-    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to previous positions, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and read from it. This code encapsulates the process:
+    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to a position before the current position, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and read from it. This code encapsulates the process:
 
     .. sourcecode:: python
 
