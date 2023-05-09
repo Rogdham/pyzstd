@@ -393,7 +393,7 @@ class ZstdFile(io.BufferedIOBase):
                     self._buffer = None
             elif self._mode == _MODE_WRITE:
                 try:
-                    self._fp.write(self._compressor.flush())
+                    self.flush(ZstdCompressor.FLUSH_FRAME)
                 finally:
                     # Set to None for ._check_mode()
                     self._compressor = None
@@ -453,28 +453,33 @@ class ZstdFile(io.BufferedIOBase):
         self._pos += length
         return length
 
-    def flush(self):
+    def flush(self, mode=ZstdCompressor.FLUSH_BLOCK):
         """Flush remaining data to the underlying stream.
 
-        It uses ZstdCompressor.FLUSH_BLOCK mode. Abuse of this method will
-        reduce compression ratio, use it only when necessary.
+        The mode argument can be ZstdCompressor.FLUSH_BLOCK,
+        ZstdCompressor.FLUSH_FRAME. Abuse of this method will reduce
+        compression ratio, use it only when necessary.
 
         If the program is interrupted afterwards, all data can be recovered.
         To ensure saving to disk, also need to use os.fsync(fd).
 
         This method does nothing in reading mode.
         """
-        # Like IOBase.flush(), do nothing in reading mode.
-        # TextIOWrapper.close() relies on this behavior.
-        if self._mode == _MODE_READ:
-            return
-
-        # Flush zstd block
-        try:
-            compressed = self._compressor.flush(ZstdCompressor.FLUSH_BLOCK)
-        except AttributeError:
+        if self._mode != _MODE_WRITE:
+            # Like IOBase.flush(), do nothing in reading mode.
+            # TextIOWrapper.close() relies on this behavior.
+            if self._mode == _MODE_READ:
+                return
             # Closed, raise ValueError.
             self._check_mode()
+
+        # Don't generate empty content frame
+        if mode == self._compressor.last_mode and \
+           mode != ZstdCompressor.CONTINUE:
+            return
+
+        # Flush zstd block/frame
+        compressed = self._compressor.flush(mode)
 
         # Write to file
         if compressed:
