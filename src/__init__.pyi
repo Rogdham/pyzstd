@@ -75,13 +75,11 @@ class ZstdDict:
     def __len__(self) -> int: ...
 
 class ZstdCompressor:
-    CONTINUE: ClassVar[int]
-    FLUSH_BLOCK: ClassVar[int]
-    FLUSH_FRAME: ClassVar[int]
+    CONTINUE:    ClassVar[Literal[0]]
+    FLUSH_BLOCK: ClassVar[Literal[1]]
+    FLUSH_FRAME: ClassVar[Literal[2]]
 
-    last_mode: Union[ZstdCompressor.CONTINUE,
-                     ZstdCompressor.FLUSH_BLOCK,
-                     ZstdCompressor.FLUSH_FRAME]
+    last_mode: Literal[0, 1, 2]
 
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
@@ -89,13 +87,10 @@ class ZstdCompressor:
 
     def compress(self,
                  data,
-                 mode: Union[ZstdCompressor.CONTINUE,
-                             ZstdCompressor.FLUSH_BLOCK,
-                             ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.CONTINUE) -> bytes: ...
+                 mode: Literal[0, 1, 2] = ZstdCompressor.CONTINUE) -> bytes: ...
 
     def flush(self,
-              mode: Union[ZstdCompressor.FLUSH_BLOCK,
-                          ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.FLUSH_FRAME) -> bytes: ...
+              mode: Literal[1, 2] = ZstdCompressor.FLUSH_FRAME) -> bytes: ...
 
     def _set_pledged_input_size(self, size: Union[int, None]) -> None: ...
 
@@ -186,8 +181,7 @@ class ZstdFile(io.BufferedIOBase):
 
     def write(self, data) -> int: ...
     def flush(self,
-              mode: Union[ZstdCompressor.FLUSH_BLOCK,
-                          ZstdCompressor.FLUSH_FRAME] = ZstdCompressor.FLUSH_BLOCK) -> None: ...
+              mode: Literal[1, 2] = ZstdCompressor.FLUSH_BLOCK) -> None: ...
 
     def read(self, size: int = -1) -> bytes: ...
     def read1(self, size: int = -1) -> bytes: ...
