@@ -3118,11 +3118,16 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(f.tell(), len(DAT))
 
     def test_zstdfile_flush_mode(self):
+        self.assertEqual(ZstdFile.FLUSH_BLOCK, ZstdCompressor.FLUSH_BLOCK)
+        self.assertEqual(ZstdFile.FLUSH_FRAME, ZstdCompressor.FLUSH_FRAME)
+        with self.assertRaises(AttributeError):
+            ZstdFile.CONTINUE
+
         bo = BytesIO()
         with ZstdFile(bo, 'w') as f:
             # flush block
             f.write(b'123')
-            self.assertIsNone(f.flush(ZstdCompressor.FLUSH_BLOCK))
+            self.assertIsNone(f.flush(f.FLUSH_BLOCK))
             p1 = bo.tell()
             # mode == .last_mode, should return
             self.assertIsNone(f.flush())
@@ -3130,13 +3135,13 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(p1, p2)
             # flush frame
             f.write(b'456')
-            self.assertIsNone(f.flush(mode=ZstdCompressor.FLUSH_FRAME))
+            self.assertIsNone(f.flush(mode=f.FLUSH_FRAME))
             # flush frame
             f.write(b'789')
-            self.assertIsNone(f.flush(ZstdCompressor.FLUSH_FRAME))
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
             p1 = bo.tell()
             # mode == .last_mode, should return
-            self.assertIsNone(f.flush(ZstdCompressor.FLUSH_FRAME))
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
             p2 = bo.tell()
             self.assertEqual(p1, p2)
         self.assertEqual(decompress(bo.getvalue()), b'123456789')
@@ -3144,14 +3149,18 @@ class FileTestCase(unittest.TestCase):
         bo = BytesIO()
         with ZstdFile(bo, 'w') as f:
             f.write(b'123')
-            with self.assertRaises(TypeError):
-                f.flush(m0de=ZstdCompressor.CONTINUE)
             with self.assertRaisesRegex(ValueError, r'\.FLUSH_.*?\.FLUSH_'):
                 f.flush(ZstdCompressor.CONTINUE)
+            with self.assertRaises(ValueError):
+                f.flush(-1)
+            with self.assertRaises(ValueError):
+                f.flush(123456)
+            with self.assertRaises(TypeError):
+                f.flush(node=ZstdCompressor.CONTINUE)
             with self.assertRaises((TypeError, ValueError)):
                 f.flush('FLUSH_FRAME')
             with self.assertRaises(TypeError):
-                f.flush(b'456', ZstdCompressor.FLUSH_BLOCK)
+                f.flush(b'456', f.FLUSH_BLOCK)
 
     def test_zstdfile_truncate(self):
         with ZstdFile(BytesIO(), 'w') as f:

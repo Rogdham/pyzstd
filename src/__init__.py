@@ -297,6 +297,9 @@ _MODE_WRITE  = 2
 #      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
 #      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
+    FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
+    FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
+
     _READER_CLASS = ZstdDecompressReader
 
     """A file object providing transparent zstd (de)compression.
@@ -395,7 +398,7 @@ class ZstdFile(io.BufferedIOBase):
                     self._buffer = None
             elif self._mode == _MODE_WRITE:
                 try:
-                    self.flush(ZstdCompressor.FLUSH_FRAME)
+                    self.flush(self.FLUSH_FRAME)
                 finally:
                     # Set to None for ._check_mode()
                     self._compressor = None
@@ -455,12 +458,12 @@ class ZstdFile(io.BufferedIOBase):
         self._pos += length
         return length
 
-    def flush(self, mode=ZstdCompressor.FLUSH_BLOCK):
+    def flush(self, mode=FLUSH_BLOCK):
         """Flush remaining data to the underlying stream.
 
-        The mode argument can be ZstdCompressor.FLUSH_BLOCK,
-        ZstdCompressor.FLUSH_FRAME. Abuse of this method will reduce
-        compression ratio, use it only when necessary.
+        The mode argument can be ZstdFile.FLUSH_BLOCK, ZstdFile.FLUSH_FRAME.
+        Abuse of this method will reduce compression ratio, use it only when
+        necessary.
 
         If the program is interrupted afterwards, all data can be recovered.
         To ensure saving to disk, also need to use os.fsync(fd).
