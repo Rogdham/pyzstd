@@ -463,6 +463,43 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertEqual(type(PYZSTD_CONFIG[2]), bool)
         self.assertEqual(type(PYZSTD_CONFIG[3]), bool)
 
+    def test_ZstdFile_extend(self):
+        # These classes and variables can be used to extend ZstdFile,
+        # such as SeekableZstdFile(ZstdFile), so pin them down.
+        self.assertTrue(issubclass(ZstdFile, io.BufferedIOBase))
+        self.assertTrue(issubclass(pyzstd.ZstdDecompressReader,
+                                   _compression.DecompressReader))
+        self.assertIs(ZstdFile._READER_CLASS, pyzstd.ZstdDecompressReader)
+
+        # mode
+        self.assertEqual(pyzstd._MODE_CLOSED, 0)
+        self.assertEqual(pyzstd._MODE_READ, 1)
+        self.assertEqual(pyzstd._MODE_WRITE, 2)
+
+        # file object
+        bio = BytesIO()
+        with ZstdFile(bio, 'r') as f:
+            self.assertTrue(hasattr(f, '_fp'))
+            self.assertTrue(hasattr(f, '_mode'))
+            self.assertTrue(hasattr(f, '_buffer'))
+        with ZstdFile(bio, 'w') as f:
+            self.assertTrue(hasattr(f, '_fp'))
+            self.assertTrue(hasattr(f, '_mode'))
+            self.assertTrue(hasattr(f, '_compressor'))
+
+        # file
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            PATH = tmp_f.name
+        with ZstdFile(PATH, 'r') as f:
+            self.assertTrue(hasattr(f, '_fp'))
+            self.assertTrue(hasattr(f, '_mode'))
+            self.assertTrue(hasattr(f, '_buffer'))
+        with ZstdFile(PATH, 'w') as f:
+            self.assertTrue(hasattr(f, '_fp'))
+            self.assertTrue(hasattr(f, '_mode'))
+            self.assertTrue(hasattr(f, '_compressor'))
+        os.remove(PATH)
+
 class CompressorDecompressorTestCase(unittest.TestCase):
 
     def test_simple_bad_args(self):

@@ -297,6 +297,8 @@ _MODE_WRITE  = 2
 #      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
 #      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
+    _READER_CLASS = ZstdDecompressReader
+
     """A file object providing transparent zstd (de)compression.
 
     A ZstdFile can act as a wrapper for an existing file object, or refer
@@ -368,9 +370,9 @@ class ZstdFile(io.BufferedIOBase):
 
         # ZstdDecompressReader
         if mode_code == _MODE_READ:
-            raw = ZstdDecompressReader(self._fp, EndlessZstdDecompressor,
-                                       trailing_error=ZstdError,
-                                       zstd_dict=zstd_dict, option=level_or_option)
+            raw = self._READER_CLASS(self._fp, EndlessZstdDecompressor,
+                                     trailing_error=ZstdError,
+                                     zstd_dict=zstd_dict, option=level_or_option)
             self._buffer = io.BufferedReader(raw, _32_KiB)
 
     def close(self):
