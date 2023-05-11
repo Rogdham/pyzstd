@@ -244,13 +244,13 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
     # Copied from base class, except use 32 KiB instead of
     # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
-    def seek(self, offset, whence=io.SEEK_SET):
+    def seek(self, offset, whence=0):
         # Recalculate offset as an absolute file position.
-        if whence == io.SEEK_SET:
+        if whence == 0:   # SEEK_SET
             pass
-        elif whence == io.SEEK_CUR:
+        elif whence == 1: # SEEK_CUR
             offset = self._pos + offset
-        elif whence == io.SEEK_END:
+        elif whence == 2: # SEEK_END
             # Seeking relative to EOF - we need to know the file's size.
             if self._size < 0:
                 while self.read(_32_KiB):
@@ -339,16 +339,16 @@ class ZstdFile(io.BufferedIOBase):
         # Read or write mode
         if mode in ("r", "rb"):
             if not isinstance(level_or_option, (type(None), dict)):
-                msg = ("In read mode (decompression), level_or_option argument "
-                       "should be a dict object, that represents decompression "
-                       "option. It doesn't support int type compression level "
-                       "in this case.")
-                raise TypeError(msg)
+                raise TypeError(
+                    ("In read mode (decompression), level_or_option argument "
+                     "should be a dict object, that represents decompression "
+                     "option. It doesn't support int type compression level "
+                     "in this case."))
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
-                msg = "level_or_option argument should be int or dict object."
-                raise TypeError(msg)
+                raise TypeError(("level_or_option argument "
+                                 "should be int or dict object."))
             mode_code = _MODE_WRITE
             self._compressor = ZstdCompressor(level_or_option, zstd_dict)
             self._pos = 0
