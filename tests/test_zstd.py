@@ -467,14 +467,15 @@ class ClassShapeTestCase(unittest.TestCase):
         # These classes and variables can be used to extend ZstdFile,
         # such as SeekableZstdFile(ZstdFile), so pin them down.
         self.assertTrue(issubclass(ZstdFile, io.BufferedIOBase))
-        self.assertTrue(issubclass(pyzstd.ZstdDecompressReader,
+        self.assertTrue(issubclass(pyzstd.zstdfile.ZstdDecompressReader,
                                    _compression.DecompressReader))
-        self.assertIs(ZstdFile._READER_CLASS, pyzstd.ZstdDecompressReader)
+        self.assertIs(ZstdFile._READER_CLASS,
+                      pyzstd.zstdfile.ZstdDecompressReader)
 
         # mode
-        self.assertEqual(pyzstd._MODE_CLOSED, 0)
-        self.assertEqual(pyzstd._MODE_READ, 1)
-        self.assertEqual(pyzstd._MODE_WRITE, 2)
+        self.assertEqual(pyzstd.zstdfile._MODE_CLOSED, 0)
+        self.assertEqual(pyzstd.zstdfile._MODE_READ, 1)
+        self.assertEqual(pyzstd.zstdfile._MODE_WRITE, 2)
 
         # file object
         bio = BytesIO()
@@ -2602,9 +2603,10 @@ class FileTestCase(unittest.TestCase):
         self.assertRaises(ValueError, f.writable)
 
     def test_ZstdDecompressReader(self):
-        r = pyzstd.ZstdDecompressReader(BytesIO(self.FRAME_42),
-                                        EndlessZstdDecompressor,
-                                        trailing_error=ZstdError)
+        r = pyzstd.zstdfile.ZstdDecompressReader(
+                            BytesIO(self.FRAME_42),
+                            EndlessZstdDecompressor,
+                            trailing_error=ZstdError)
         self.assertEqual(r.read(0), b'')
         self.assertEqual(r.read(42), self.DECOMPRESSED_42)
         self.assertEqual(r.read(10), b'')
