@@ -7,7 +7,7 @@ env:
   PYTHON_VER: '3.10'        # Python to run test/cibuildwheel
   PYTHON_VER_PEP489: '3.11' # Python to run test with multi-phase init
   CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
-  CIBW_TEST_COMMAND: python {project}/tests/test_zstd.py
+  CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
@@ -35,7 +35,7 @@ jobs:
       - name: Run test
         run: |
           python -m pip install --config-settings="--build-option=--warning-as-error" -vv .
-          python tests/test_zstd.py
+          python -m unittest discover tests
 
   # Run test with multi-phase init on Ubuntu/macOS/Windows
   run_test_with_multi_phase_init:
@@ -62,7 +62,7 @@ jobs:
       - name: Run test with multi-phase init
         run: |
           python -m pip install --config-settings="--build-option=--warning-as-error --multi-phase-init" -vv .
-          python tests/test_zstd.py
+          python -m unittest discover tests
 
   # Run test on PyPy for every commit
   test_on_pypy:
@@ -85,7 +85,7 @@ jobs:
         run: |
           sudo apt-get install -q -y zstd libzstd1 libzstd-dev
           python -m pip install --config-settings="--build-option=--dynamic-link-zstd --warning-as-error" -v .
-          python tests/test_zstd.py
+          python -m unittest discover tests
 
   # Build Linux/macOS/Windows wheels
   build_wheels:
@@ -256,7 +256,7 @@ jobs:
 
           run: |
             python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
-            python3 tests/test_zstd.py
+            python -m unittest discover tests
 
   # Upload to PyPI
   upload_pypi:

@@ -7,10 +7,11 @@ Pyzstd module provides classes and functions for compressing and decompressing d
 
 The API style is similar to Python's bz2/lzma/zlib modules.
 
-* Includes the latest zstd library source code.
+* Includes the latest zstd library source code
 * Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
-* Has a CFFI implementation that can work with PyPy.
+* Has a CFFI implementation that can work with PyPy
 * Has a command line interface, ``python -m pyzstd --help``.
+* Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
@@ -33,7 +34,7 @@ Exception
 
 .. py:exception:: ZstdError
 
-    This exception is raised when an error occurs when calling the underlying zstd library.
+    This exception is raised when an error occurs when calling the underlying zstd library. Subclass of ``Exception``.
 
 
 Simple compression/decompression
@@ -822,7 +823,7 @@ Module-level variables
 
 
 ZstdFile class and open() function
----------------------------------------
+----------------------------------
 
     This section contains:
 
@@ -862,7 +863,7 @@ ZstdFile class and open() function
         * `.readinto(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto>`_
         * `.readinto1(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.readinto1>`_
         * `.readline(size=-1) <https://docs.python.org/3/library/io.html#io.IOBase.readline>`_
-        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if seek to a position before the current position, or seek to a position relative to the end of the file (the first time), the decompression has to be restarted from zero.
+        * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if seek to a position before the current position, or seek to a position relative to the end of the file (the first time), the decompression has to be restarted from zero. If seek, consider using :py:class:`SeekableZstdFile` class.
         * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
         * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
 
@@ -891,6 +892,49 @@ ZstdFile class and open() function
     In binary mode, a :py:class:`ZstdFile` object is returned.
 
     In text mode, a :py:class:`ZstdFile` object is created, and wrapped in an `io.TextIOWrapper <https://docs.python.org/3/library/io.html#io.TextIOWrapper>`_ object with the specified encoding, error handling behavior, and line ending(s).
+
+SeekableZstdFile class
+----------------------
+
+    This section contains facilities supporting `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_:
+
+        * exception :py:class:`SeekableFormatError`
+        * class :py:class:`SeekableZstdFile`
+
+.. py:exception:: SeekableFormatError
+
+    An error related to "Zstandard Seekable Format". Subclass of ``Exception``.
+
+    .. versionadded:: 0.15.8
+
+.. py:class:: SeekableZstdFile
+
+    Subclass of :py:class:`ZstdFile`. This class **only** supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file or 0-size file.
+
+    Note that it doesn't verify/write the XXH64 checksum field, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
+
+    :py:class:`ZstdFile` can also read "Zstandard Seekable Format" file, but doesn't have fast seeking ability.
+
+    .. versionadded:: 0.15.8
+
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, max_frame_content_size=1024*1024*1024)
+
+        Same as :py:meth:`ZstdFile.__init__`. Except in appending mode ("a" or "ab"), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
+
+        In writing/appending modes (compression), when the uncompressed data size reaches *max_frame_content_size*, a :ref:`frame<frame_block>` is generated. If the size is small, it will increase seeking speed but reduce compression ratio. If the size is large, it will reduce seeking speed but increase compression ratio. You can also manually generate a frame using ``f.flush(f.FLUSH_FRAME)``.
+
+    .. sourcecode:: python
+
+        # Convert an existing zstd file to Zstandard Seekable Format file.
+        # 10 MiB per frame.
+        with ZstdFile(IN_FILE, 'rb') as ifh:
+            with SeekableZstdFile(OUT_FILE, 'wb',
+                                  max_frame_content_size=10*1024*1024) as ofh:
+                while True:
+                    dat = ifh.read(30*1024*1024)
+                    if not dat:
+                        break
+                    ofh.write(dat)
 
 Advanced parameters
 -------------------

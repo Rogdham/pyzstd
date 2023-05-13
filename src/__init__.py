@@ -17,6 +17,7 @@ except ImportError:
             "2, Please install pyzstd module through pip, to ensure that compiled\n"
             "   .so/.pyd file matches the architecture/OS/Python.\n")
 from .zstdfile import *
+from .seekable_zstdfile import *
 
 __version__ = '0.15.7'
 
@@ -38,7 +39,8 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'ZstdDict', 'train_dict', 'finalize_dict',
            'get_frame_info', 'get_frame_size', 'ZstdFile', 'open',
            'zstd_version', 'zstd_version_info',
-           'zstd_support_multithread', 'compressionLevel_values')
+           'zstd_support_multithread', 'compressionLevel_values',
+           'SeekableZstdFile', 'SeekableFormatError')
 
 
 zstd_support_multithread = (CParameter.nbWorkers.bounds() != (0, 0))

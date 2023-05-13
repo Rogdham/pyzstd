@@ -9,7 +9,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 * Has a CFFI implementation that can work with PyPy
 * Has a command line interface: ``python -m pyzstd --help``
-
+* Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 
 Links
 -----------
@@ -21,6 +21,10 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.8  (xxx xx, 2023)**
+
+Add `SeekableZstdFile <https://pyzstd.readthedocs.io/en/latest/#SeekableZstdFile>`_ class that supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
+
 **0.15.7  (Apr 21, 2023)**
 
 ZstdDict class changes:
