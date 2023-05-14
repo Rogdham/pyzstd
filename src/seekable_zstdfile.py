@@ -334,7 +334,20 @@ class SeekableZstdFile(ZstdFile):
         self._closefp = False
         self._mode = _MODE_CLOSED
 
-        if mode in ("w", "wb", "a", "ab", "x", "xb"):
+        if mode in ("r", "rb"):
+            if not isinstance(filename, (str, bytes, PathLike)) and \
+               not (hasattr(filename, 'readable') and filename.readable() and \
+                    hasattr(filename, "seekable") and filename.seekable()):
+                raise TypeError(
+                        ("In SeekableZstdFile's reading mode, filename "
+                         "argument must be a str/bytes/PathLike object, "
+                         "or a file object that is readable and seekable."))
+
+            # Specified max_frame_content_size argument
+            if max_frame_content_size != 1024*1024*1024:
+                raise ValueError(('max_frame_content_size argument '
+                                  'is only valid in writing mode.'))
+        elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             self._seek_table = SeekTable()
 
             # Load seek table in appending mode
@@ -343,7 +356,7 @@ class SeekableZstdFile(ZstdFile):
                     with io.open(filename, "rb") as f:
                         self._seek_table.load_seek_table(f, seek_to_0=False)
                 else:
-                    raise ValueError(
+                    raise TypeError(
                             ("SeekableZstdFile's appending mode "
                              "('a'/'ab') only accepts file path "
                              "(str/bytes/PathLike) as filename "
@@ -357,10 +370,6 @@ class SeekableZstdFile(ZstdFile):
                     (self.FRAME_MAX_D_SIZE, max_frame_content_size))
             self._max_frame_content_size = max_frame_content_size
             self._reset_frame_sizes()
-        else:
-            if max_frame_content_size != 1024*1024*1024:
-                raise ValueError(('max_frame_content_size argument '
-                                  'is only valid in writing mode.'))
 
         super().__init__(filename, mode,
                          level_or_option=level_or_option,
@@ -486,16 +495,15 @@ class SeekableZstdFile(ZstdFile):
         if isinstance(filename, (str, bytes, PathLike)):
             fp = io.open(filename, 'rb')
             is_file_path = True
-        elif hasattr(filename, "read") and \
-             hasattr(filename, "seekable") and \
-             filename.seekable():
+        elif hasattr(filename, 'readable') and filename.readable() and \
+             hasattr(filename, "seekable") and filename.seekable():
             fp = filename
             is_file_path = False
-            current_pos = fp.tell()
+            orig_pos = fp.tell()
         else:
-            raise TypeError(('filename must be a str/bytes/PathLike '
-                             'object, or a file object that has '
-                             '.read() method and be seekable.'))
+            raise TypeError(
+                ('filename argument must be a str/bytes/PathLike object, '
+                 'or a file object that is readable and seekable.'))
 
         # Read/Parse the seek table
         table = SeekTable()
@@ -510,6 +518,6 @@ class SeekableZstdFile(ZstdFile):
         if is_file_path:
             fp.close()
         else:
-            fp.seek(current_pos)
+            fp.seek(orig_pos)
 
         return ret

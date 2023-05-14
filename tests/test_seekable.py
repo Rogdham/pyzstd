@@ -442,6 +442,38 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.flush(f.FLUSH_FRAME), None)
             self.assertIn('items: 2', f.seek_table_info)
 
+    def test_init_argument(self):
+        # not readable
+        class C:
+            def readable(self):
+                return False
+            def seekable(self):
+                return True
+        obj = C()
+        with self.assertRaisesRegex(TypeError, 'readable'):
+            SeekableZstdFile(obj, 'r')
+
+        # not seekable
+        class C:
+            def readable(self):
+                return True
+            def seekable(self):
+                return False
+        obj = C()
+        with self.assertRaisesRegex(TypeError, 'readable'):
+            SeekableZstdFile(obj, 'r')
+
+        # append mode
+        b = BytesIO(self.two_frames)
+        with self.assertRaisesRegex(TypeError,
+                                    "Can't accept file object"):
+            SeekableZstdFile(b, 'ab')
+
+        # specify max_frame_content_size in reading mode
+        with self.assertRaisesRegex(ValueError,
+                                    'only valid in writing mode'):
+            SeekableZstdFile(b, 'r', max_frame_content_size=100)
+
     def test_load(self):
         # empty
         b = BytesIO()
@@ -590,7 +622,8 @@ class SeekableZstdFileCase(unittest.TestCase):
 
     def test_bad_append(self):
         # can't accept file object
-        with self.assertRaisesRegex(ValueError, 'file object'):
+        with self.assertRaisesRegex(TypeError,
+                                    "Can't accept file object"):
             SeekableZstdFile(BytesIO(self.two_frames), 'ab')
 
         # two frames NOT seekable format file
@@ -641,16 +674,38 @@ class SeekableZstdFileCase(unittest.TestCase):
             True)
         os.remove(filename)
 
+        # not readable
+        class C:
+            def readable(self):
+                return False
+            def seekable(self):
+                return True
+        obj = C()
+        with self.assertRaisesRegex(TypeError, 'readable'):
+            SeekableZstdFile.is_seekable_format_file(obj)
+
+        # not seekable
+        class C:
+            def readable(self):
+                return True
+            def seekable(self):
+                return False
+        obj = C()
+        with self.assertRaisesRegex(TypeError, 'readable'):
+            SeekableZstdFile.is_seekable_format_file(obj)
+
         # raise exception
         class C:
-            def seek(self, offset, whence=io.SEEK_SET):
-                raise OSError
+            def readable(self):
+                return True
+            def seekable(self):
+                return True
             def read(self, size=-1):
+                raise OSError
+            def seek(self, offset, whence=io.SEEK_SET):
                 raise OSError
             def tell(self):
                 return 1
-            def seekable(self):
-                return True
         obj = C()
         with self.assertRaises(OSError):
             SeekableZstdFile.is_seekable_format_file(obj)
