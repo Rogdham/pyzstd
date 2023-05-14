@@ -615,5 +615,53 @@ class SeekableZstdFileCase(unittest.TestCase):
                     pass
             os.remove(filename)
 
+    def test_is_seekable_format_file(self):
+        # file object
+        self.assertEqual(
+            SeekableZstdFile.is_seekable_format_file(BytesIO(b'')),
+            True)
+        self.assertEqual(
+            SeekableZstdFile.is_seekable_format_file(BytesIO(self.two_frames)),
+            True)
+        self.assertEqual(
+            SeekableZstdFile.is_seekable_format_file(BytesIO(COMPRESSED)),
+            False)
+        self.assertEqual(
+            SeekableZstdFile.is_seekable_format_file(BytesIO(COMPRESSED*100)),
+            False)
+
+        # file path
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = tmp_f.name
+        with io.open(filename, 'wb') as f:
+            f.write(self.two_frames)
+
+        self.assertEqual(
+            SeekableZstdFile.is_seekable_format_file(filename),
+            True)
+        os.remove(filename)
+
+        # raise exception
+        class C:
+            def seek(self, offset, whence=io.SEEK_SET):
+                raise OSError
+            def read(self, size=-1):
+                raise OSError
+            def tell(self):
+                return 1
+            def seekable(self):
+                return True
+        obj = C()
+        with self.assertRaises(OSError):
+            SeekableZstdFile.is_seekable_format_file(obj)
+
+        # seek back for file object
+        b = BytesIO(COMPRESSED*3)
+        POS = 5
+        self.assertEqual(b.seek(POS), POS)
+        self.assertEqual(b.tell(), POS)
+        self.assertEqual(SeekableZstdFile.is_seekable_format_file(b), False)
+        self.assertEqual(b.tell(), POS)
+
 if __name__ == "__main__":
     unittest.main()

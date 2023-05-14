@@ -474,3 +474,42 @@ class SeekableZstdFile(ZstdFile):
             return self._buffer.raw.get_seek_table_info()
         else:
             return 'SeekableZstdFile object has been closed'
+
+    @staticmethod
+    def is_seekable_format_file(filename):
+        """Check if a file is in Zstandard Seekable Format, return True or False.
+
+        filename can be either a file path (str/bytes/PathLike), or can be an
+        existing file object in reading mode.
+        """
+        # Check argument
+        if isinstance(filename, (str, bytes, PathLike)):
+            fp = io.open(filename, 'rb')
+            is_file_path = True
+        elif hasattr(filename, "read") and \
+             hasattr(filename, "seekable") and \
+             filename.seekable():
+            fp = filename
+            is_file_path = False
+            current_pos = fp.tell()
+        else:
+            raise TypeError(('filename must be a str/bytes/PathLike '
+                             'object, or a file object that has '
+                             '.read() method and be seekable.'))
+
+        # Read/Parse the seek table
+        table = SeekTable()
+        try:
+            table.load_seek_table(fp, seek_to_0=False)
+        except SeekableFormatError:
+            ret = False
+        else:
+            ret = True
+
+        # Post process
+        if is_file_path:
+            fp.close()
+        else:
+            fp.seek(current_pos)
+
+        return ret

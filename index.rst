@@ -923,6 +923,17 @@ SeekableZstdFile class
 
         In writing/appending modes (compression), when the uncompressed data size reaches *max_frame_content_size*, a :ref:`frame<frame_block>` is generated. If the size is small, it will increase seeking speed but reduce compression ratio. If the size is large, it will reduce seeking speed but increase compression ratio. You can also manually generate a frame using ``f.flush(f.FLUSH_FRAME)``.
 
+    .. py:staticmethod:: is_seekable_format_file(filename)
+
+        Check if a file is in valid "Zstandard Seekable Format".
+
+        It reads/parses the seek table at the end of the file.
+
+        :param filename: A file to be checked
+        :type filename: File path (str/bytes/PathLike), or file object in reading mode.
+        :return: Result
+        :rtype: bool
+
     .. sourcecode:: python
 
         # Convert an existing zstd file to Zstandard Seekable Format file.
@@ -935,6 +946,9 @@ SeekableZstdFile class
                     if not dat:
                         break
                     ofh.write(dat)
+
+        # This static method returns True
+        SeekableZstdFile.is_seekable_format_file(OUT_FILE)
 
 Advanced parameters
 -------------------
