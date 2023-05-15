@@ -108,7 +108,7 @@ class SeekTable:
         # Parse seek table
         offset = 8
         checksum = None
-        for _ in range(frames_number):
+        for idx in range(frames_number):
             if self._has_checksum:
                 compressed_size, decompressed_size, checksum = \
                     self._s_3uint32.unpack_from(skippable_frame, offset)
@@ -122,7 +122,7 @@ class SeekTable:
             if compressed_size == 0 and decompressed_size != 0:
                 msg = ('Wrong seek table. The index %d frame (0-based) '
                        'is 0 size, but decompressed size is non-zero, '
-                       'this is impossible.') % len(self._frames)
+                       'this is impossible.') % idx
                 raise SeekableFormatError(msg)
 
             # Append to seek table
@@ -132,7 +132,7 @@ class SeekTable:
             if self._cumulated_c_size[-1] > fsize - skippable_frame_size:
                 msg = ('Wrong seek table. Since index %d frame (0-based), '
                        'the cumulated compressed size is greater than '
-                       'file size.') % (len(self._frames)-1)
+                       'file size.') % idx
                 raise SeekableFormatError(msg)
 
         # Check format
@@ -141,6 +141,14 @@ class SeekTable:
             raise SeekableFormatError('The cumulated compressed size is wrong')
 
     def append_entry(self, compressed_size, decompressed_size, checksum=None):
+        if compressed_size == 0:
+            if decompressed_size == 0:
+                # (0, 0) frame is no sense
+                return
+            else:
+                # Impossible frame
+                raise ValueError
+
         if self._frames:
             cumulated_c_size = self._cumulated_c_size[-1] + compressed_size
             cumulated_d_size = self._cumulated_d_size[-1] + decompressed_size
