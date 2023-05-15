@@ -476,6 +476,8 @@ class SeekableZstdFileCase(unittest.TestCase):
                 return False
             def seekable(self):
                 return True
+            def read(self, size=-1):
+                return b''
         obj = C()
         with self.assertRaisesRegex(TypeError, 'readable'):
             SeekableZstdFile(obj, 'r')
@@ -486,8 +488,10 @@ class SeekableZstdFileCase(unittest.TestCase):
                 return True
             def seekable(self):
                 return False
+            def read(self, size=-1):
+                return b''
         obj = C()
-        with self.assertRaisesRegex(TypeError, 'readable'):
+        with self.assertRaisesRegex(TypeError, 'seekable'):
             SeekableZstdFile(obj, 'r')
 
         # append mode
@@ -535,6 +539,26 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.read(), DECOMPRESSED*2)
             self.assertEqual(f.seek(20), 20)
             self.assertEqual(f.read(), b'')
+
+    def test_read_not_seekable(self):
+        class C:
+            def readable(self):
+                return True
+            def seekable(self):
+                return False
+            def read(self, size=-1):
+                return b''
+        obj = C()
+        with self.assertRaisesRegex(TypeError, 'using ZstdFile class'):
+            SeekableZstdFile(obj, 'r')
+
+    def test_read_fp_not_at_0(self):
+        b = BytesIO(self.two_frames)
+        b.seek(3)
+        # it will seek b to 0
+        with SeekableZstdFile(b, 'r') as f:
+            self.assertEqual(b.tell(), 0)
+            self.assertEqual(f.read(), DECOMPRESSED*2)
 
     def test_write(self):
         # write
@@ -717,8 +741,10 @@ class SeekableZstdFileCase(unittest.TestCase):
                 return True
             def seekable(self):
                 return False
+            def read(self, size=-1):
+                return b''
         obj = C()
-        with self.assertRaisesRegex(TypeError, 'readable'):
+        with self.assertRaisesRegex(TypeError, 'seekable'):
             SeekableZstdFile.is_seekable_format_file(obj)
 
         # raise exception
@@ -737,13 +763,13 @@ class SeekableZstdFileCase(unittest.TestCase):
         with self.assertRaises(OSError):
             SeekableZstdFile.is_seekable_format_file(obj)
 
-        # seek back for file object
+        # not seek back
         b = BytesIO(COMPRESSED*3)
         POS = 5
         self.assertEqual(b.seek(POS), POS)
         self.assertEqual(b.tell(), POS)
         self.assertEqual(SeekableZstdFile.is_seekable_format_file(b), False)
-        self.assertEqual(b.tell(), POS)
+        self.assertNotEqual(b.tell(), POS)
 
 if __name__ == "__main__":
     unittest.main()

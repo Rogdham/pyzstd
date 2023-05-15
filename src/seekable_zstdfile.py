@@ -50,6 +50,22 @@ class SeekTable:
         self._cumulated_d_size = []
 
     def load_seek_table(self, fp, seek_to_0=True):
+        # Check fp readable/seekable
+        if not (hasattr(fp, 'readable') and hasattr(fp, "seekable")):
+            raise TypeError(
+                'The file object should have .readable()/.seekable() methods.')
+        if not fp.readable():
+            raise TypeError(
+                ('To load the seek table of Zstandard Seekable Format, '
+                 'the file object should be readable.'))
+        if not fp.seekable():
+            raise TypeError(
+                ("To load the seek table of Zstandard Seekable Format, "
+                 "the file object should be seekable. In SeekableZstdFile's "
+                 "reading mode, the file object must be seekable. If the "
+                 "file object is not seekable, it can be read sequentially "
+                 "using ZstdFile class."))
+
         # Get file size
         fsize = fp.seek(0, 2) # 2 is SEEK_END
         if fsize == 0:
@@ -101,7 +117,8 @@ class SeekTable:
             msg = "Seek table frame's Frame_Size is wrong."
             raise SeekableFormatError(msg)
 
-        # Seek for subsequent operation
+        # For reading mode, seeking to 0 is necessary.
+        # No more fp operations.
         if seek_to_0:
             fp.seek(0)
 
@@ -251,6 +268,14 @@ class SeekableDecompressReader(ZstdDecompressReader):
         super().__init__(fp, decomp_factory, trailing_error, **decomp_args)
         self._size = self._seek_table.get_full_d_size()
 
+    # The parent class returns self._fp.seekable().
+    # In .__init__() method, seekable has been checked in load_seek_table().
+    # BufferedReader.seek() checks this in each invoke, if self._fp.seekable()
+    # becomes False at runtime, self._fp.seek() just raise OSError instead of
+    # io.UnsupportedOperation.
+    def seekable(self):
+        return True
+
     def seek(self, offset, whence=0):
         # Recalculate offset as an absolute file position.
         # If offset < 0 or offset >= EOF, the code can handle them correctly.
@@ -343,14 +368,6 @@ class SeekableZstdFile(ZstdFile):
         self._mode = _MODE_CLOSED
 
         if mode in ("r", "rb"):
-            if not isinstance(filename, (str, bytes, PathLike)) and \
-               not (hasattr(filename, 'readable') and filename.readable() and \
-                    hasattr(filename, "seekable") and filename.seekable()):
-                raise TypeError(
-                        ("In SeekableZstdFile's reading mode, filename "
-                         "argument must be a str/bytes/PathLike object, "
-                         "or a file object that is readable and seekable."))
-
             # Specified max_frame_content_size argument
             if max_frame_content_size != 1024*1024*1024:
                 raise ValueError(('max_frame_content_size argument '
@@ -503,11 +520,9 @@ class SeekableZstdFile(ZstdFile):
         if isinstance(filename, (str, bytes, PathLike)):
             fp = io.open(filename, 'rb')
             is_file_path = True
-        elif hasattr(filename, 'readable') and filename.readable() and \
-             hasattr(filename, "seekable") and filename.seekable():
+        elif hasattr(filename, 'read'):
             fp = filename
             is_file_path = False
-            orig_pos = fp.tell()
         else:
             raise TypeError(
                 ('filename argument must be a str/bytes/PathLike object, '
@@ -525,7 +540,5 @@ class SeekableZstdFile(ZstdFile):
         # Post process
         if is_file_path:
             fp.close()
-        else:
-            fp.seek(orig_pos)
 
         return ret

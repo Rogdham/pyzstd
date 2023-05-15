@@ -2978,6 +2978,20 @@ class FileTestCase(unittest.TestCase):
             self.assertRaises(TypeError, f.seek, None)
             self.assertRaises(TypeError, f.seek, b"derp")
 
+    def test_seek_not_seekable(self):
+        class C(BytesIO):
+            def seekable(self):
+                return False
+        obj = C(COMPRESSED_100_PLUS_32KB)
+        with ZstdFile(obj, 'r') as f:
+            d = f.read(1)
+            self.assertFalse(f.seekable())
+            with self.assertRaisesRegex(io.UnsupportedOperation,
+                                        'not seekable'):
+                f.seek(0)
+            d += f.read()
+            self.assertEqual(d, DECOMPRESSED_100_PLUS_32KB)
+
     def test_tell(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             pos = 0
