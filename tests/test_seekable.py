@@ -1,11 +1,14 @@
-from io import BytesIO
-from math import ceil
 import io
 import os
 import tempfile
 import unittest
 
-from pyzstd import compress, ZstdCompressor, \
+from io import BytesIO
+from math import ceil
+from unittest.mock import patch
+
+from pyzstd import compress, decompress, \
+                   ZstdCompressor, get_frame_size, \
                    SeekableZstdFile, SeekableFormatError
 from pyzstd.seekable_zstdfile import SeekTable
 
@@ -668,6 +671,91 @@ class SeekableZstdFileCase(unittest.TestCase):
 
             self.assertEqual(f.seek(fsize-15), fsize-15)
             self.assertEqual(f.read(), (DECOMPRESSED*4)[-15:])
+
+        # [frame1, frame2, frame3, seek_table]
+        with io.open(filename, 'rb') as f:
+            dat = f.read()
+        pos = 0
+        lst = []
+        while pos < len(dat):
+            frame_len = get_frame_size(dat[pos:])
+            if frame_len == 0:
+                break
+            lst.append(len(
+                            decompress(
+                                dat[pos:pos+frame_len]
+                                      )
+                          )
+                      )
+            pos += frame_len
+        self.assertEqual(lst, [10, 10, 20, 0])
+        self.assertEqual(decompress(dat), DECOMPRESSED*4)
+
+        os.remove(filename)
+
+    def test_append_not_seekable(self):
+        # in append mode, and the file is not seekable, the
+        # current seek table frame can't be overwritten.
+
+        # get a temp file name
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = tmp_f.name
+
+        # mock io.open, return False in append mode.
+        def mock_open():
+            def get_file(*args, **kwargs):
+                f = open(*args, **kwargs)
+                if len(args) > 1 and args[1] == 'ab':
+                    def seekable(*args, **kwargs):
+                        return False
+                    f.seekable = seekable
+                return f
+            return get_file
+
+        # append 1
+        with patch("io.open", mock_open()):
+            with self.assertWarnsRegex(RuntimeWarning,
+                                       (r"at the end of the file "
+                                        r"can't be overwritten"
+                                        r".*?, 0 bytes")):
+                f = SeekableZstdFile(filename, 'a')
+            f.write(DECOMPRESSED)
+            f.flush(f.FLUSH_FRAME)
+            f.write(DECOMPRESSED)
+            f.close()
+
+        # append 2
+        with patch("io.open", mock_open()):
+            with self.assertWarnsRegex(RuntimeWarning,
+                                       (r"at the end of the file "
+                                        r"can't be overwritten"
+                                        r".*?\d\d+ bytes")):
+                f = SeekableZstdFile(filename, 'a')
+            f.write(DECOMPRESSED)
+            f.close()
+
+        # verify content
+        with SeekableZstdFile(filename, 'r') as f:
+            self.assertEqual(f.read(), DECOMPRESSED*3)
+
+        # [frame1, frame2, seek_table, frame3, seek_table]
+        with io.open(filename, 'rb') as f:
+            dat = f.read()
+        pos = 0
+        lst = []
+        while pos < len(dat):
+            frame_len = get_frame_size(dat[pos:])
+            if frame_len == 0:
+                break
+            lst.append(len(
+                            decompress(
+                                dat[pos:pos+frame_len]
+                                      )
+                          )
+                      )
+            pos += frame_len
+        self.assertEqual(lst, [10, 10, 0, 10, 0])
+        self.assertEqual(decompress(dat), DECOMPRESSED*3)
 
         os.remove(filename)
 

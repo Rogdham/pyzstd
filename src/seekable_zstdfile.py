@@ -1,5 +1,6 @@
 from bisect import bisect_right
 from struct import Struct
+from warnings import warn
 
 from pyzstd.zstdfile import ZstdDecompressReader, ZstdFile, \
                             _MODE_CLOSED, _MODE_READ, _MODE_WRITE, \
@@ -48,6 +49,9 @@ class SeekTable:
         # The length is same as ._frames
         self._cumulated_c_size = []
         self._cumulated_d_size = []
+
+        # Size of the seek table frame
+        self._seek_frame_size = 0
 
     def load_seek_table(self, fp, seek_to_0=True):
         # Check fp readable/seekable
@@ -157,6 +161,9 @@ class SeekTable:
            self._cumulated_c_size[-1] != fsize - skippable_frame_size:
             raise SeekableFormatError('The cumulated compressed size is wrong')
 
+        # Parsed successfully, save for future use.
+        self._seek_frame_size = skippable_frame_size
+
     def append_entry(self, compressed_size, decompressed_size, checksum=None):
         if compressed_size == 0:
             if decompressed_size == 0:
@@ -252,6 +259,10 @@ class SeekTable:
     def __len__(self):
         return len(self._frames)
 
+    @property
+    def seek_frame_size(self):
+        return self._seek_frame_size
+
     def get_info(self):
         return ('Seek table:\n'
                 ' - items: {}\n'
@@ -322,6 +333,10 @@ class SeekableDecompressReader(ZstdDecompressReader):
     def get_seek_table_info(self):
         return self._seek_table.get_info()
 
+# Compared to ZstdFile class, it's important to handle the seekable
+# of underlying file object carefully. Need to check seekable in
+# each situation. For example, there may be a CD-R file system that
+# is seekable when reading, but not seekable when appending.
 class SeekableZstdFile(ZstdFile):
     # If flush block a lot, the frame may exceed
     # the 4GiB limit, so set a max size.
@@ -402,7 +417,23 @@ class SeekableZstdFile(ZstdFile):
 
         # Overwrite seek table in appending mode
         if mode in ("a", "ab"):
-            self._fp.seek(self._seek_table.get_full_c_size())
+            if self._fp.seekable():
+                self._fp.seek(self._seek_table.get_full_c_size())
+                self._fp.truncate()
+            else:
+                # Add the seek table frame
+                self._seek_table.append_entry(
+                        self._seek_table.seek_frame_size, 0)
+                # Emit a warning
+                warn(("SeekableZstdFile is opened in appending mode "
+                      "('a'/'ab'), but the underlying file object is "
+                      "not seekable. Therefore the seek table (a zstd "
+                      "skippable frame) at the end of the file can't "
+                      "be overwritten. Each time open such file in "
+                      "appending mode, it will waste some storage "
+                      "space, %d bytes were wasted this time.") % \
+                        self._seek_table.seek_frame_size,
+                     RuntimeWarning, 2)
 
     def _reset_frame_sizes(self):
         self._current_c_size = 0
