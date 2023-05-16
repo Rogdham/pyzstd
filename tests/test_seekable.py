@@ -855,13 +855,13 @@ class SeekableZstdFileCase(unittest.TestCase):
         with self.assertRaises(OSError):
             SeekableZstdFile.is_seekable_format_file(obj)
 
-        # not seek back
+        # seek back
         b = BytesIO(COMPRESSED*3)
         POS = 5
         self.assertEqual(b.seek(POS), POS)
         self.assertEqual(b.tell(), POS)
         self.assertEqual(SeekableZstdFile.is_seekable_format_file(b), False)
-        self.assertNotEqual(b.tell(), POS)
+        self.assertEqual(b.tell(), POS)
 
 if __name__ == "__main__":
     unittest.main()

@@ -557,9 +557,11 @@ class SeekableZstdFile(ZstdFile):
         if isinstance(filename, (str, bytes, PathLike)):
             fp = io.open(filename, 'rb')
             is_file_path = True
-        elif hasattr(filename, 'read'):
+        elif hasattr(filename, 'readable') and filename.readable() and \
+             hasattr(filename, "seekable") and filename.seekable():
             fp = filename
             is_file_path = False
+            orig_pos = fp.tell()
         else:
             raise TypeError(
                 ('filename argument must be a str/bytes/PathLike object, '
@@ -577,5 +579,7 @@ class SeekableZstdFile(ZstdFile):
         # Post process
         if is_file_path:
             fp.close()
+        else:
+            fp.seek(orig_pos)
 
         return ret
