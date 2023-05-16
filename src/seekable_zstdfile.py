@@ -192,17 +192,23 @@ class SeekTable:
         lst = self._frames
         self._clear_seek_table()
 
-        # Add Entries
-        step = (len(lst) // max_frames) + \
-               (0 if len(lst) % max_frames == 0 else 1)
-        for i in range(0, len(lst), step):
-            frames = lst[i:i+step]
+        # Merge frames
+        pos = 0
+        a, b = divmod(len(lst), max_frames)
+        for i in range(max_frames):
+            # Get slice
+            length = a + (1 if i < b else 0)
+            frames = lst[pos:pos+length]
+
+            # Merge
             c_size = sum(c for c, _, _ in frames)
             d_size = sum(d for _, d, _ in frames)
             self.append_entry(c_size, d_size)
 
+            pos += length
+
     def write_seek_table(self, fp):
-        # Merge frames
+        # Exceeded format limit
         if len(self._frames) > 0xFFFFFFFF:
             self._merge_frames(0xFFFFFFFF)
 

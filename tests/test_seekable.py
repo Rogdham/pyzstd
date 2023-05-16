@@ -236,10 +236,11 @@ class SeekTableCase(unittest.TestCase):
 
         t = self.create_table(lst)
         t._merge_frames(4)
-        self.assertEqual(len(t), 3)
+        self.assertEqual(len(t), 4)
         self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
+        self.assertEqual(t._frames[1], (9, 10, None))
         self.assertEqual(t._frames[2], (9, 10, None))
+        self.assertEqual(t._frames[3], (9, 10, None))
 
     def test_merge_frames2(self):
         lst = [(9, 10), (9, 10), (9, 10),
@@ -265,17 +266,20 @@ class SeekTableCase(unittest.TestCase):
 
         t = self.create_table(lst)
         t._merge_frames(4)
-        self.assertEqual(len(t), 3)
+        self.assertEqual(len(t), 4)
         self.assertEqual(t._frames[0], (18, 20, None))
         self.assertEqual(t._frames[1], (18, 20, None))
-        self.assertEqual(t._frames[2], (18, 20, None))
+        self.assertEqual(t._frames[2], (9, 10, None))
+        self.assertEqual(t._frames[3], (9, 10, None))
 
         t = self.create_table(lst)
         t._merge_frames(5)
-        self.assertEqual(len(t), 3)
+        self.assertEqual(len(t), 5)
         self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
-        self.assertEqual(t._frames[2], (18, 20, None))
+        self.assertEqual(t._frames[1], (9, 10, None))
+        self.assertEqual(t._frames[2], (9, 10, None))
+        self.assertEqual(t._frames[3], (9, 10, None))
+        self.assertEqual(t._frames[4], (9, 10, None))
 
     def test_load_empty(self):
         # empty
