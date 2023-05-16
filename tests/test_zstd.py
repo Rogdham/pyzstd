@@ -2474,7 +2474,7 @@ class FileTestCase(unittest.TestCase):
             f.close()
             self.assertFalse(src.closed)
 
-        # Test with a real file on disk, opened directly by LZMAFile.
+        # Test with a real file on disk, opened directly by ZstdFile.
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
             if sys.version_info >= (3, 6):
                 filename = pathlib.Path(tmp_f.name)

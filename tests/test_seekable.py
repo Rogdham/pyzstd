@@ -1,5 +1,7 @@
 import io
 import os
+import pathlib
+import sys
 import tempfile
 import unittest
 
@@ -7,14 +9,15 @@ from io import BytesIO
 from math import ceil
 from unittest.mock import patch
 
-from pyzstd import compress, decompress, \
-                   ZstdCompressor, get_frame_size, \
-                   SeekableZstdFile, SeekableFormatError
+from pyzstd import *
+from pyzstd import PYZSTD_CONFIG
 from pyzstd.seekable_zstdfile import SeekTable
 
+BIT_BUILD = PYZSTD_CONFIG[0]
 DECOMPRESSED = b'1234567890'
 assert len(DECOMPRESSED) == 10
 COMPRESSED = compress(DECOMPRESSED)
+DICT = ZstdDict(b'a'*1024, is_raw=True)
 
 class SeekTableCase(unittest.TestCase):
     def create_table(self, sizes_lst):
@@ -433,6 +436,26 @@ class SeekTableCase(unittest.TestCase):
                                     'cumulated compressed size'):
             t.load_seek_table(b)
 
+    @unittest.skipIf(BIT_BUILD == 32, 'skip in 32-bit build')
+    def test_write_table(self):
+        class MockError(Exception):
+            pass
+        class Mock:
+            def __len__(self):
+                return 0xFFFFFFFF + 1
+            def __getitem__(self, key):
+                raise MockError
+        t = self.create_table([])
+        t._frames = Mock()
+        try:
+            with self.assertWarnsRegex(RuntimeWarning,
+                                       '4294967296 entries'):
+                t.write_seek_table(BytesIO())
+        except MockError:
+            pass
+        else:
+            self.assertTrue(False, 'impossible code path')
+
 class SeekableZstdFileCase(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
@@ -452,6 +475,17 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.flush(f.FLUSH_FRAME)
             f.write(DECOMPRESSED)
         cls.two_frames = b.getvalue()
+
+    @staticmethod
+    def get_decompressed_sizes_list(dat):
+        pos = 0
+        lst = []
+        while pos < len(dat):
+            frame_len = get_frame_size(dat[pos:])
+            size = len(decompress(dat[pos:pos+frame_len]))
+            lst.append(size)
+            pos += frame_len
+        return lst
 
     def test_class_shape(self):
         self.assertEqual(SeekableZstdFile.FLUSH_BLOCK,
@@ -475,6 +509,155 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
             self.assertEqual(f.flush(f.FLUSH_FRAME), None)
             self.assertIn('items: 2', f.seek_table_info)
+
+    def test_init(self):
+        with SeekableZstdFile(BytesIO(self.two_frames)) as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "w") as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "x") as f:
+            pass
+        with self.assertRaisesRegex(TypeError, 'file path'):
+            with SeekableZstdFile(BytesIO(), "a") as f:
+                pass
+
+        with SeekableZstdFile(BytesIO(), "w", level_or_option=12) as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "w", level_or_option={CParameter.checksumFlag:1}) as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "w", level_or_option={}) as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "w", level_or_option=20, zstd_dict=DICT) as f:
+            pass
+
+        with SeekableZstdFile(BytesIO(), "r", level_or_option={DParameter.windowLogMax:25}) as f:
+            pass
+        with SeekableZstdFile(BytesIO(), "r", level_or_option={}, zstd_dict=DICT) as f:
+            pass
+
+    def test_init_with_PathLike_filename(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
+
+        with SeekableZstdFile(filename, "a") as f:
+            f.write(DECOMPRESSED)
+        with SeekableZstdFile(filename) as f:
+            self.assertEqual(f.read(), DECOMPRESSED)
+
+        with SeekableZstdFile(filename, "a") as f:
+            f.write(DECOMPRESSED)
+        with SeekableZstdFile(filename) as f:
+            self.assertEqual(f.read(), DECOMPRESSED * 2)
+
+        os.remove(filename)
+
+    def test_init_with_filename(self):
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
+
+        with SeekableZstdFile(filename) as f:
+            pass
+        with SeekableZstdFile(filename, "w") as f:
+            pass
+        with SeekableZstdFile(filename, "a") as f:
+            pass
+
+        os.remove(filename)
+
+    def test_init_mode(self):
+        bi = BytesIO()
+
+        with SeekableZstdFile(bi, "r"):
+            pass
+        with SeekableZstdFile(bi, "rb"):
+            pass
+        with SeekableZstdFile(bi, "w"):
+            pass
+        with SeekableZstdFile(bi, "wb"):
+            pass
+        with self.assertRaisesRegex(TypeError, 'file path'):
+            SeekableZstdFile(bi, "a")
+        with self.assertRaisesRegex(TypeError, 'file path'):
+            SeekableZstdFile(bi, "ab")
+
+    def test_init_with_x_mode(self):
+        with tempfile.NamedTemporaryFile() as tmp_f:
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
+
+        for mode in ("x", "xb"):
+            with SeekableZstdFile(filename, mode):
+                pass
+            with self.assertRaises(FileExistsError):
+                with SeekableZstdFile(filename, mode):
+                    pass
+            os.remove(filename)
+
+    def test_init_bad_mode(self):
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), (3, "x"))
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "xt")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "x+")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "rx")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "wx")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "rt")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "r+")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "wt")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "w+")
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "rw")
+
+        with self.assertRaisesRegex(TypeError, r"NOT be CParameter"):
+            SeekableZstdFile(BytesIO(), 'rb', level_or_option={CParameter.compressionLevel:5})
+        with self.assertRaisesRegex(TypeError, r"NOT be DParameter"):
+            SeekableZstdFile(BytesIO(), 'wb', level_or_option={DParameter.windowLogMax:21})
+
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(COMPRESSED), "r", level_or_option=12)
+
+    def test_init_bad_check(self):
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(), "w", level_or_option='asd')
+        # CHECK_UNKNOWN and anything above CHECK_ID_MAX should be invalid.
+        with self.assertRaises(ZstdError):
+            SeekableZstdFile(BytesIO(), "w", level_or_option={999:9999})
+        with self.assertRaises(ZstdError):
+            SeekableZstdFile(BytesIO(), "w", level_or_option={CParameter.windowLog:99})
+
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(self.two_frames), "r", level_or_option=33)
+
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(self.two_frames),
+                             level_or_option={DParameter.windowLogMax:2**31})
+
+        with self.assertRaises(ZstdError):
+            SeekableZstdFile(BytesIO(self.two_frames),
+                             level_or_option={444:333})
+
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(self.two_frames), zstd_dict={1:2})
+
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(self.two_frames), zstd_dict=b'dict123456')
 
     def test_init_argument(self):
         # not readable
@@ -534,6 +717,10 @@ class SeekableZstdFileCase(unittest.TestCase):
 
     def test_seek(self):
         with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
+            # get d size
+            self.assertEqual(f.seek(0, io.SEEK_END), len(DECOMPRESSED)*2)
+            self.assertEqual(f.tell(), len(DECOMPRESSED)*2)
+
             self.assertEqual(f.seek(1), 1)
             self.assertEqual(f.read(), DECOMPRESSED[1:]+DECOMPRESSED)
             self.assertEqual(f.seek(-1), 0)
@@ -576,6 +763,9 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.flush(f.FLUSH_FRAME)
             f.write(b'xyz')
             f.flush(f.FLUSH_FRAME)
+        dat = b.getvalue()
+        lst = self.get_decompressed_sizes_list(dat)
+        self.assertEqual(lst, [10, 3, 0])
 
         # closed file
         with self.assertRaisesRegex(ValueError,
@@ -590,6 +780,23 @@ class SeekableZstdFileCase(unittest.TestCase):
             with self.assertRaisesRegex(io.UnsupportedOperation,
                                         'File not open for writing'):
                 f.write(b'1234')
+
+    def test_write_arg(self):
+        b = BytesIO()
+        with SeekableZstdFile(b, 'w') as f:
+            f.write(DECOMPRESSED)
+            f.write(data=b'123')
+
+            with self.assertRaises(TypeError):
+                f.write()
+            with self.assertRaises(TypeError):
+                f.write(0)
+            with self.assertRaises(TypeError):
+                f.write('123')
+            with self.assertRaises(TypeError):
+                f.write(b'123', f.FLUSH_BLOCK)
+            with self.assertRaises(TypeError):
+                f.write(dat=b'123')
 
     def test_flush(self):
         b = BytesIO()
@@ -615,6 +822,50 @@ class SeekableZstdFileCase(unittest.TestCase):
         with SeekableZstdFile(b, 'r') as f:
             f.flush()
             f.flush(f.FLUSH_FRAME)
+
+    def test_flush_arg(self):
+        b = BytesIO()
+        with SeekableZstdFile(b, 'w') as f:
+            f.flush()
+            f.flush(f.FLUSH_BLOCK)
+            f.flush(f.FLUSH_FRAME)
+            f.flush(mode=f.FLUSH_FRAME)
+
+            with self.assertRaises((TypeError, ValueError)):
+                f.flush(b'123')
+            with self.assertRaises(TypeError):
+                f.flush(b'123', f.FLUSH_BLOCK)
+            with self.assertRaises(ValueError):
+                f.flush(0) # CONTINUE
+            with self.assertRaises(TypeError):
+                f.flush(node=f.FLUSH_FRAME)
+
+    def test_close(self):
+        with BytesIO(self.two_frames) as src:
+            f = SeekableZstdFile(src)
+            f.close()
+            # SeekableSeekableZstdFile.close() should not close the underlying file object.
+            self.assertFalse(src.closed)
+            # Try closing an already-closed SeekableZstdFile.
+            f.close()
+            self.assertFalse(src.closed)
+
+        # Test with a real file on disk, opened directly by SeekableZstdFile.
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            if sys.version_info >= (3, 6):
+                filename = pathlib.Path(tmp_f.name)
+            else:
+                filename = tmp_f.name
+
+        f = SeekableZstdFile(filename)
+        fp = f._fp
+        f.close()
+        # Here, SeekableZstdFile.close() *should* close the underlying file object.
+        self.assertTrue(fp.closed)
+        # Try closing an already-closed SeekableZstdFile.
+        f.close()
+
+        os.remove(filename)
 
     def test_wrong_max_frame_content_size(self):
         with self.assertRaises(TypeError):
@@ -652,7 +903,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             filename = tmp_f.name
 
         # two frames seekable format file
-        with open(filename, 'wb') as f:
+        with io.open(filename, 'wb') as f:
             f.write(self.two_frames)
 
         # append
@@ -679,19 +930,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         # [frame1, frame2, frame3, seek_table]
         with io.open(filename, 'rb') as f:
             dat = f.read()
-        pos = 0
-        lst = []
-        while pos < len(dat):
-            frame_len = get_frame_size(dat[pos:])
-            if frame_len == 0:
-                break
-            lst.append(len(
-                            decompress(
-                                dat[pos:pos+frame_len]
-                                      )
-                          )
-                      )
-            pos += frame_len
+        lst = self.get_decompressed_sizes_list(dat)
         self.assertEqual(lst, [10, 10, 20, 0])
         self.assertEqual(decompress(dat), DECOMPRESSED*4)
 
@@ -706,9 +945,9 @@ class SeekableZstdFileCase(unittest.TestCase):
             filename = tmp_f.name
 
         # mock io.open, return False in append mode.
-        def mock_open():
+        def mock_open(io_open):
             def get_file(*args, **kwargs):
-                f = open(*args, **kwargs)
+                f = io_open(*args, **kwargs)
                 if len(args) > 1 and args[1] == 'ab':
                     def seekable(*args, **kwargs):
                         return False
@@ -717,7 +956,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             return get_file
 
         # append 1
-        with patch("io.open", mock_open()):
+        with patch("io.open", mock_open(io.open)):
             with self.assertWarnsRegex(RuntimeWarning,
                                        (r"at the end of the file "
                                         r"can't be overwritten"
@@ -729,7 +968,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.close()
 
         # append 2
-        with patch("io.open", mock_open()):
+        with patch("io.open", mock_open(io.open)):
             with self.assertWarnsRegex(RuntimeWarning,
                                        (r"at the end of the file "
                                         r"can't be overwritten"
@@ -745,19 +984,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         # [frame1, frame2, seek_table, frame3, seek_table]
         with io.open(filename, 'rb') as f:
             dat = f.read()
-        pos = 0
-        lst = []
-        while pos < len(dat):
-            frame_len = get_frame_size(dat[pos:])
-            if frame_len == 0:
-                break
-            lst.append(len(
-                            decompress(
-                                dat[pos:pos+frame_len]
-                                      )
-                          )
-                      )
-            pos += frame_len
+        lst = self.get_decompressed_sizes_list(dat)
         self.assertEqual(lst, [10, 10, 0, 10, 0])
         self.assertEqual(decompress(dat), DECOMPRESSED*3)
 

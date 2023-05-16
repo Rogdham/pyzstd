@@ -72,6 +72,8 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
     # Copied from base class, except use 32 KiB instead of
     # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
+    # If the new position is within BufferedReader's buffer,
+    # this method may not be called.
     def seek(self, offset, whence=0):
         # Recalculate offset as an absolute file position.
         if whence == 0:   # SEEK_SET
@@ -125,11 +127,6 @@ _MODE_WRITE  = 2
 #      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
 #      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
-    FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
-    FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
-
-    _READER_CLASS = ZstdDecompressReader
-
     """A file object providing transparent zstd (de)compression.
 
     A ZstdFile can act as a wrapper for an existing file object, or refer
@@ -138,6 +135,10 @@ class ZstdFile(io.BufferedIOBase):
     Note that ZstdFile provides a *binary* file interface - data read is
     returned as bytes, and data to be written must be given as bytes.
     """
+    FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
+    FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
+
+    _READER_CLASS = ZstdDecompressReader
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None):

@@ -909,11 +909,11 @@ SeekableZstdFile class
 
 .. py:class:: SeekableZstdFile
 
-    Subclass of :py:class:`ZstdFile`. This class **only** supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file or 0-size file.
+    Subclass of :py:class:`ZstdFile`. This class **only** supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file or 0-size file. It provides relatively fast seeking ability.
 
-    Note that it doesn't verify/write the XXH64 checksum field, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
+    Note that it doesn't verify/write the XXH64 checksum fields, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
 
-    :py:class:`ZstdFile` can also read "Zstandard Seekable Format" file, but doesn't have fast seeking ability.
+    :py:class:`ZstdFile` can also read "Zstandard Seekable Format" file, but no fast seeking ability.
 
     .. versionadded:: 0.15.8
 
@@ -925,9 +925,9 @@ SeekableZstdFile class
 
     .. py:staticmethod:: is_seekable_format_file(filename)
 
-        Check if a file is in valid "Zstandard Seekable Format".
+        Check if a file is a valid "Zstandard Seekable Format" file or 0-size file.
 
-        It reads/parses the seek table at the end of the file.
+        It parses the seek table at the end of the file, returns ``True`` if no format error.
 
         :param filename: A file to be checked
         :type filename: File path (str/bytes/PathLike), or file object in reading mode.
@@ -938,8 +938,8 @@ SeekableZstdFile class
 
         # Convert an existing zstd file to Zstandard Seekable Format file.
         # 10 MiB per frame.
-        with ZstdFile(IN_FILE, 'rb') as ifh:
-            with SeekableZstdFile(OUT_FILE, 'wb',
+        with ZstdFile(IN_FILE, 'r') as ifh:
+            with SeekableZstdFile(OUT_FILE, 'w',
                                   max_frame_content_size=10*1024*1024) as ofh:
                 while True:
                     dat = ifh.read(30*1024*1024)
@@ -1468,7 +1468,10 @@ Use with tarfile module
         with ZstdTarFile('archive.tar.zst', mode='r') as tar:
             # do something
 
-    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to a position before the current position, then the decompression has to be restarted from zero. If this slows down the operations, the archive can be decompressed to a temporary file, and read from it. This code encapsulates the process:
+    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to a position before the current position, then the decompression has to be restarted from zero. If this slows down the operations, you can:
+
+        #. Use :py:class:`SeekableZstdFile` class to create/read .tar.zst file.
+        #. Decompress the archive to a temporary file, and read from it. This code encapsulates the process:
 
     .. sourcecode:: python
 

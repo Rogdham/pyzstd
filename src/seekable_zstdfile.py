@@ -9,6 +9,7 @@ from pyzstd.zstdfile import ZstdDecompressReader, ZstdFile, \
 __all__ = ('SeekableFormatError', 'SeekableZstdFile')
 
 class SeekableFormatError(Exception):
+    '''An error related to Zstandard Seekable Format.'''
     pass
 
 __doc__ = '''\
@@ -60,11 +61,11 @@ class SeekTable:
                 'The file object should have .readable()/.seekable() methods.')
         if not fp.readable():
             raise TypeError(
-                ('To load the seek table of Zstandard Seekable Format, '
+                ('To load the seek table of "Zstandard Seekable Format", '
                  'the file object should be readable.'))
         if not fp.seekable():
             raise TypeError(
-                ("To load the seek table of Zstandard Seekable Format, "
+                ("To load the seek table of \"Zstandard Seekable Format\", "
                  "the file object should be seekable. In SeekableZstdFile's "
                  "reading mode, the file object must be seekable. If the "
                  "file object is not seekable, it can be read sequentially "
@@ -76,7 +77,7 @@ class SeekTable:
             return
         elif fsize < 17: # 17=4+4+9
             msg = ('File size is less than the minimal size '
-                   '(17 bytes) of zstd seekable format.')
+                   '(17 bytes) of "Zstandard Seekable Format".')
             raise SeekableFormatError(msg)
 
         # Read footer
@@ -88,14 +89,16 @@ class SeekTable:
             msg = (r'The last 4 bytes of the file is not Zstandard '
                    r'Seekable Format Magic Number (b"\xb1\xea\x92\x8f)". '
                    r'SeekableZstdFile class only supports "Zstandard '
-                   r'Seekable Format" or 0-size files.')
+                   r'Seekable Format" file or 0-size file. To read a '
+                   r'zstd file that is not in "Zstandard Seekable '
+                   r'Format", use ZstdFile class.')
             raise SeekableFormatError(msg)
 
         # Seek_Table_Descriptor
         self._has_checksum = \
            descriptor & 0b10000000
         if descriptor & 0b01111100:
-            msg = ('In Zstandard Seekable Format version %s, the '
+            msg = ('In "Zstandard Seekable Format" version %s, the '
                    'Reserved_Bits in Seek_Table_Descriptor must be 0.') \
                     % __format_version__
             raise SeekableFormatError(msg)
@@ -210,6 +213,15 @@ class SeekTable:
     def write_seek_table(self, fp):
         # Exceeded format limit
         if len(self._frames) > 0xFFFFFFFF:
+            # Emit a warning
+            warn(('The seek table of "Zstandard Seekable Format" '
+                  'has %d entries, which exceeds the maximum value '
+                  'allowed by the format (0xFFFFFFFF). The entries '
+                  'will be merged into 0xFFFFFFFF entries, this may '
+                  'reduce seeking performance.') % len(self._frames),
+                 RuntimeWarning, 3)
+
+            # Merge frames
             self._merge_frames(0xFFFFFFFF)
 
         # The skippable frame
@@ -288,11 +300,13 @@ class SeekableDecompressReader(ZstdDecompressReader):
     # The parent class returns self._fp.seekable().
     # In .__init__() method, seekable has been checked in load_seek_table().
     # BufferedReader.seek() checks this in each invoke, if self._fp.seekable()
-    # becomes False at runtime, self._fp.seek() just raise OSError instead of
+    # becomes False at runtime, .seek() method just raise OSError instead of
     # io.UnsupportedOperation.
     def seekable(self):
         return True
 
+    # If the new position is within BufferedReader's buffer,
+    # this method may not be called.
     def seek(self, offset, whence=0):
         # Recalculate offset as an absolute file position.
         # If offset < 0 or offset >= EOF, the code can handle them correctly.
@@ -305,7 +319,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
         else:
             raise ValueError("Invalid value for whence: {}".format(whence))
 
-        # Get frame index
+        # Get new frame index
         new_frame = self._seek_table.find_seek_frame(offset)
         if new_frame is None:
             # offset >= EOF
@@ -314,7 +328,10 @@ class SeekableDecompressReader(ZstdDecompressReader):
             self._fp.seek(self._seek_table.get_full_c_size())
             return self._pos
 
-        # Seek to frame
+        # Get old frame index. If search through compressed_position,
+        # it's advantageous when there are 0 decompressed_size frames.
+        # If search through decompressed_position, it's advantageous
+        # when there are non-0 decompressed_size frames. Use the latter.
         old_frame = self._seek_table.find_seek_frame(self._pos)
         if new_frame == old_frame and offset >= self._pos:
             pass
@@ -344,6 +361,9 @@ class SeekableDecompressReader(ZstdDecompressReader):
 # each situation. For example, there may be a CD-R file system that
 # is seekable when reading, but not seekable when appending.
 class SeekableZstdFile(ZstdFile):
+    """This class only supports Zstandard Seekable Format file or 0-size file.
+    It provides relatively fast seeking ability.
+    """
     # If flush block a lot, the frame may exceed
     # the 4GiB limit, so set a max size.
     FRAME_MAX_C_SIZE = 2*1024*1024*1024
@@ -548,7 +568,11 @@ class SeekableZstdFile(ZstdFile):
 
     @staticmethod
     def is_seekable_format_file(filename):
-        """Check if a file is in Zstandard Seekable Format, return True or False.
+        """Check if a file is a valid Zstandard Seekable Format file or 0-size
+        file.
+
+        It parses the seek table at the end of the file, returns True if no
+        format error.
 
         filename can be either a file path (str/bytes/PathLike), or can be an
         existing file object in reading mode.
