@@ -1,6 +1,7 @@
 import io
 import os
 import pathlib
+import random
 import sys
 import tempfile
 import unittest
@@ -758,10 +759,10 @@ class SeekableZstdFileCase(unittest.TestCase):
         # write
         b = BytesIO()
         with SeekableZstdFile(b, 'w') as f:
-            f.write(DECOMPRESSED)
-            f.flush(f.FLUSH_BLOCK)
-            f.flush(f.FLUSH_FRAME)
-            f.write(b'xyz')
+            self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
+            self.assertIsNone(f.flush(f.FLUSH_BLOCK))
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.write(b'xyz'), 3)
             f.flush(f.FLUSH_FRAME)
         dat = b.getvalue()
         lst = self.get_decompressed_sizes_list(dat)
@@ -881,22 +882,31 @@ class SeekableZstdFileCase(unittest.TestCase):
                              max_frame_content_size=1*1024*1024*1024+1)
 
     def test_write_max_content_size(self):
-        TAIL = b'XYZ123'
+        TAIL = b'12345'
 
         b = BytesIO()
         with SeekableZstdFile(b, 'w',
-                              max_frame_content_size=3) as f:
-            f.write(DECOMPRESSED)
-            f.flush(f.FLUSH_BLOCK)
-            f.flush(f.FLUSH_FRAME)
-            f.write(TAIL)
-            f.flush(f.FLUSH_FRAME)
-        frames_number = ceil(len(DECOMPRESSED + TAIL) / 3)
+                              max_frame_content_size=4) as f:
+            self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
+            self.assertIsNone(f.flush(f.FLUSH_BLOCK))
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.write(TAIL), len(TAIL))
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.write(DECOMPRESSED+TAIL),
+                             len(DECOMPRESSED+TAIL))
+        frames = [4, 4, 2,
+                  4, 1,
+                  4, 4, 4, 3,
+                  0]
+        self.assertEqual(self.get_decompressed_sizes_list(b.getvalue()),
+                         frames)
 
         b.seek(0)
         with SeekableZstdFile(b, 'r') as f:
-            self.assertEqual(f.read(), DECOMPRESSED + TAIL)
-            self.assertEqual(len(f._buffer.raw._seek_table), frames_number)
+            self.assertEqual(f.read(),
+                             DECOMPRESSED + TAIL + DECOMPRESSED + TAIL)
+            # 1 is the skip table
+            self.assertEqual(len(f._buffer.raw._seek_table), len(frames)-1)
 
     def test_append_mode(self):
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
@@ -1089,6 +1099,128 @@ class SeekableZstdFileCase(unittest.TestCase):
         self.assertEqual(b.tell(), POS)
         self.assertEqual(SeekableZstdFile.is_seekable_format_file(b), False)
         self.assertEqual(b.tell(), POS)
+
+    def test_skip_large_skippable_frame(self):
+        # generate test file, has a 10 MiB skippable frame
+        CSIZE = len(COMPRESSED)
+        DSIZE = len(DECOMPRESSED)
+        _10MiB = 10*1024*1024
+        sf = (0x184D2A50).to_bytes(4, byteorder='little') + \
+                (_10MiB).to_bytes(4, byteorder='little') + \
+                b'a' * _10MiB
+        t = SeekTable()
+        t.append_entry(CSIZE, DSIZE)
+        t.append_entry(len(sf), 0)
+        t.append_entry(CSIZE, DSIZE)
+
+        content = BytesIO()
+        content.write(COMPRESSED)
+        content.write(sf)
+        content.write(COMPRESSED)
+        t.write_seek_table(content)
+        b = content.getvalue()
+        self.assertGreater(len(b), 2*CSIZE + _10MiB)
+
+        # read all
+        content.seek(0)
+        with ZstdFile(content, 'r') as f:
+            self.assertEqual(f.read(), DECOMPRESSED*2)
+        with SeekableZstdFile(content, 'r') as f:
+            self.assertEqual(f.read(), DECOMPRESSED*2)
+
+        class B(BytesIO):
+            def read(self, size=-1):
+                if CSIZE + 1024*1024 < self.tell() < CSIZE + _10MiB:
+                    raise Exception('should skip the skippable frame')
+                return super().read(size)
+
+        # |--data1--|--skippable--|--data2--|
+        #           ^P1             ^P2
+        with SeekableZstdFile(B(b)) as f:
+            t = f._buffer.raw._seek_table
+            # to P1
+            self.assertEqual(f.read(DSIZE), DECOMPRESSED)
+            self.assertEqual(f.tell(), DSIZE)
+            self.assertEqual(t.index_by_dpos(DSIZE), 2)
+            self.assertLess(f._fp.tell(), 5*1024*1024)
+
+            # new position
+            # if new_frame == old_frame and offset >= self._pos and \
+            #    c_pos - self._fp.tell() < 1*1024*1024:
+            #     pass
+            # else:
+            #     do_jump
+            NEW_POS = DSIZE + 3
+            self.assertEqual(t.index_by_dpos(NEW_POS), 2)
+            self.assertGreaterEqual(NEW_POS, f.tell())
+            c_pos, d_pos = t.get_frame_sizes(2)
+            self.assertGreaterEqual(c_pos - f._fp.tell(),
+                                    1024*1024)
+
+            # cross the skippable frame
+            self.assertEqual(f.seek(NEW_POS), NEW_POS)
+            self.assertGreater(f._fp.tell(), _10MiB)
+            self.assertEqual(f.read(), DECOMPRESSED[3:])
+
+    def test_real_data(self):
+        _100KiB = 100*1024
+        _1MiB = 1*1024*1024
+        b = bytes([random.randint(0, 255) for _ in range(128*1024)])
+        b *= 8
+        self.assertEqual(len(b), _1MiB)
+
+        # write
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w',
+                              level_or_option=
+                                    {CParameter.compressionLevel:-100000,
+                                     CParameter.checksumFlag:1},
+                              max_frame_content_size=_100KiB) as f:
+            self.assertEqual(f.write(b), len(b))
+
+        # frames
+        self.assertEqual(self.get_decompressed_sizes_list(bo.getvalue()),
+                         [102400, 102400, 102400, 102400, 102400, 102400,
+                          102400, 102400, 102400, 102400, 24576, 0])
+
+        # ZstdFile
+        bo.seek(0)
+        with ZstdFile(bo, 'r') as f:
+            self.assertEqual(f.read(), b)
+
+        # read, automatically seek to 0.
+        with SeekableZstdFile(bo, 'r') as f:
+            # frames number
+            self.assertEqual(len(f._buffer.raw._seek_table), ceil(_1MiB/_100KiB))
+            # read 1
+            OFFSET1 = 23
+            OFFSET2 = 3 * _100KiB + 1234
+            self.assertEqual(f.seek(OFFSET1), OFFSET1)
+            self.assertEqual(f.seek(OFFSET2, 1), OFFSET1+OFFSET2)
+            self.assertEqual(f.tell(), OFFSET1+OFFSET2)
+            self.assertEqual(f.read(300),
+                             b[OFFSET1+OFFSET2:OFFSET1+OFFSET2+300])
+            # > EOF
+            self.assertEqual(f.seek(_1MiB+_100KiB), _1MiB)
+            self.assertEqual(f.tell(), _1MiB)
+            self.assertEqual(f.read(), b'')
+            # read 2
+            self.assertEqual(f.seek(-123), 0)
+            self.assertEqual(f.tell(), 0)
+            self.assertEqual(f.read(300), b[:300])
+            # readlines
+            self.assertEqual(f.seek(-_100KiB, 2), _1MiB-_100KiB)
+            self.assertEqual(f.tell(), _1MiB-_100KiB)
+            self.assertEqual(f.readlines(),
+                             BytesIO(b[-_100KiB:]).readlines())
+            # read 3
+            self.assertEqual(f.seek(123), 123)
+            self.assertEqual(f.tell(), 123)
+            self.assertEqual(f.read(_100KiB*2), b[123:123+_100KiB*2])
+            # read 4
+            self.assertEqual(f.seek(0), 0)
+            self.assertEqual(f.tell(), 0)
+            self.assertEqual(f.read(), b)
 
 if __name__ == "__main__":
     unittest.main()

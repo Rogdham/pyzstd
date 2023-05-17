@@ -271,7 +271,8 @@ class SeekTable:
 
     def get_frame_sizes(self, i):
         if i > 0:
-            return self._cumulated_c_size[i-1], self._cumulated_d_size[i-1]
+            return (self._cumulated_c_size[i-1],
+                    self._cumulated_d_size[i-1])
         else:
             return 0, 0
 
@@ -322,22 +323,27 @@ class SeekableDecompressReader(ZstdDecompressReader):
 
         # Get new frame index
         new_frame = self._seek_table.index_by_dpos(offset)
+        # offset >= EOF
         if new_frame is None:
-            # offset >= EOF
             self._eof = True
             self._pos = self._size
             self._fp.seek(self._seek_table.get_full_c_size())
             return self._pos
 
-        # Get old frame index. If search through compressed_position,
-        # it's advantageous when there are 0 decompressed_size frames.
-        # If search through decompressed_position, it's advantageous
-        # when there are non-0 decompressed_size frames. Use the latter.
+        # Prepare to jump
         old_frame = self._seek_table.index_by_dpos(self._pos)
-        if new_frame == old_frame and offset >= self._pos:
+        c_pos, d_pos = self._seek_table.get_frame_sizes(new_frame)
+
+        # If at P1, and the skippable frame is large, seeking to P2
+        # will unnecessarily read the entire skippable frame. So skip
+        # large skippable frame (>= 1 MiB).
+        #       |--data1--|--skippable--|--data2--|
+        # cpos:             ^P1
+        # dpos:           ^P1             ^P2
+        if new_frame == old_frame and offset >= self._pos and \
+           c_pos - self._fp.tell() < 1*1024*1024:
             pass
         else:
-            c_pos, d_pos = self._seek_table.get_frame_sizes(new_frame)
             self._eof = False
             self._pos = d_pos
             self._fp.seek(c_pos)
