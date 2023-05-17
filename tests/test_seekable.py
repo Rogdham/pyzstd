@@ -40,17 +40,17 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(2), (18, 20))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(-1), 0)
-        self.assertEqual(t.find_seek_frame(0), 0)
-        self.assertEqual(t.find_seek_frame(1), 0)
+        self.assertEqual(t.index_by_dpos(-1), 0)
+        self.assertEqual(t.index_by_dpos(0), 0)
+        self.assertEqual(t.index_by_dpos(1), 0)
 
-        self.assertEqual(t.find_seek_frame(9), 0)
-        self.assertEqual(t.find_seek_frame(10), 1)
-        self.assertEqual(t.find_seek_frame(11), 1)
+        self.assertEqual(t.index_by_dpos(9), 0)
+        self.assertEqual(t.index_by_dpos(10), 1)
+        self.assertEqual(t.index_by_dpos(11), 1)
 
-        self.assertEqual(t.find_seek_frame(29), 2)
-        self.assertEqual(t.find_seek_frame(30), None)
-        self.assertEqual(t.find_seek_frame(31), None)
+        self.assertEqual(t.index_by_dpos(29), 2)
+        self.assertEqual(t.index_by_dpos(30), None)
+        self.assertEqual(t.index_by_dpos(31), None)
 
     def test_add_00_entry(self):
         # don't add (0, 0) entry to internal table
@@ -67,17 +67,17 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(1), (9, 10))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(-1), 0)
-        self.assertEqual(t.find_seek_frame(0), 0)
-        self.assertEqual(t.find_seek_frame(1), 0)
+        self.assertEqual(t.index_by_dpos(-1), 0)
+        self.assertEqual(t.index_by_dpos(0), 0)
+        self.assertEqual(t.index_by_dpos(1), 0)
 
-        self.assertEqual(t.find_seek_frame(9), 0)
-        self.assertEqual(t.find_seek_frame(10), 1)
-        self.assertEqual(t.find_seek_frame(11), 1)
+        self.assertEqual(t.index_by_dpos(9), 0)
+        self.assertEqual(t.index_by_dpos(10), 1)
+        self.assertEqual(t.index_by_dpos(11), 1)
 
-        self.assertEqual(t.find_seek_frame(19), 1)
-        self.assertEqual(t.find_seek_frame(20), None)
-        self.assertEqual(t.find_seek_frame(21), None)
+        self.assertEqual(t.index_by_dpos(19), 1)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_empty(self):
         # empty
@@ -93,9 +93,9 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(0), (0, 0))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(-1), None)
-        self.assertEqual(t.find_seek_frame(0), None)
-        self.assertEqual(t.find_seek_frame(1), None)
+        self.assertEqual(t.index_by_dpos(-1), None)
+        self.assertEqual(t.index_by_dpos(0), None)
+        self.assertEqual(t.index_by_dpos(1), None)
 
     def test_case_0_decompressed_size(self):
         # 0 d_size
@@ -112,13 +112,13 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(2), (18, 10))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(9), 0)
-        self.assertEqual(t.find_seek_frame(10), 2)
-        self.assertEqual(t.find_seek_frame(11), 2)
+        self.assertEqual(t.index_by_dpos(9), 0)
+        self.assertEqual(t.index_by_dpos(10), 2)
+        self.assertEqual(t.index_by_dpos(11), 2)
 
-        self.assertEqual(t.find_seek_frame(19), 2)
-        self.assertEqual(t.find_seek_frame(20), None)
-        self.assertEqual(t.find_seek_frame(21), None)
+        self.assertEqual(t.index_by_dpos(19), 2)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_0_size_middle(self):
         # 0 size
@@ -134,13 +134,13 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(2), (18, 10))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(9), 0)
-        self.assertEqual(t.find_seek_frame(10), 3)
-        self.assertEqual(t.find_seek_frame(11), 3)
+        self.assertEqual(t.index_by_dpos(9), 0)
+        self.assertEqual(t.index_by_dpos(10), 3)
+        self.assertEqual(t.index_by_dpos(11), 3)
 
-        self.assertEqual(t.find_seek_frame(19), 3)
-        self.assertEqual(t.find_seek_frame(20), None)
-        self.assertEqual(t.find_seek_frame(21), None)
+        self.assertEqual(t.index_by_dpos(19), 3)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_0_size_at_begin(self):
         # 0 size at begin
@@ -159,17 +159,17 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(3), (27, 10))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(-1), 2)
-        self.assertEqual(t.find_seek_frame(0), 2)
-        self.assertEqual(t.find_seek_frame(1), 2)
+        self.assertEqual(t.index_by_dpos(-1), 2)
+        self.assertEqual(t.index_by_dpos(0), 2)
+        self.assertEqual(t.index_by_dpos(1), 2)
 
-        self.assertEqual(t.find_seek_frame(9), 2)
-        self.assertEqual(t.find_seek_frame(10), 3)
-        self.assertEqual(t.find_seek_frame(11), 3)
+        self.assertEqual(t.index_by_dpos(9), 2)
+        self.assertEqual(t.index_by_dpos(10), 3)
+        self.assertEqual(t.index_by_dpos(11), 3)
 
-        self.assertEqual(t.find_seek_frame(19), 3)
-        self.assertEqual(t.find_seek_frame(20), None)
-        self.assertEqual(t.find_seek_frame(21), None)
+        self.assertEqual(t.index_by_dpos(19), 3)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_0_size_at_end(self):
         # 0 size at end
@@ -187,13 +187,13 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(3), (27, 20))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(9), 0)
-        self.assertEqual(t.find_seek_frame(10), 1)
-        self.assertEqual(t.find_seek_frame(11), 1)
+        self.assertEqual(t.index_by_dpos(9), 0)
+        self.assertEqual(t.index_by_dpos(10), 1)
+        self.assertEqual(t.index_by_dpos(11), 1)
 
-        self.assertEqual(t.find_seek_frame(19), 1)
-        self.assertEqual(t.find_seek_frame(20), None)
-        self.assertEqual(t.find_seek_frame(21), None)
+        self.assertEqual(t.index_by_dpos(19), 1)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_0_size_all(self):
         # 0 size frames
@@ -211,9 +211,9 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(2), (2, 0))
 
         # find frame index
-        self.assertEqual(t.find_seek_frame(-1), None)
-        self.assertEqual(t.find_seek_frame(0), None)
-        self.assertEqual(t.find_seek_frame(1), None)
+        self.assertEqual(t.index_by_dpos(-1), None)
+        self.assertEqual(t.index_by_dpos(0), None)
+        self.assertEqual(t.index_by_dpos(1), None)
 
     def test_merge_frames1(self):
         lst = [(9, 10), (9, 10), (9, 10),

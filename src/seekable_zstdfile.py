@@ -255,7 +255,8 @@ class SeekTable:
         else:
             return 0
 
-    def find_seek_frame(self, pos):
+    # Find frame index by decompressed position
+    def index_by_dpos(self, pos):
         # This is necessary when 0 decompressed_size
         # frames are at the beginning
         if pos < 0:
@@ -320,7 +321,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
             raise ValueError("Invalid value for whence: {}".format(whence))
 
         # Get new frame index
-        new_frame = self._seek_table.find_seek_frame(offset)
+        new_frame = self._seek_table.index_by_dpos(offset)
         if new_frame is None:
             # offset >= EOF
             self._eof = True
@@ -332,7 +333,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
         # it's advantageous when there are 0 decompressed_size frames.
         # If search through decompressed_position, it's advantageous
         # when there are non-0 decompressed_size frames. Use the latter.
-        old_frame = self._seek_table.find_seek_frame(self._pos)
+        old_frame = self._seek_table.index_by_dpos(self._pos)
         if new_frame == old_frame and offset >= self._pos:
             pass
         else:
@@ -445,6 +446,7 @@ class SeekableZstdFile(ZstdFile):
         if mode in ("a", "ab"):
             if self._fp.seekable():
                 self._fp.seek(self._seek_table.get_full_c_size())
+                # Necessary if the current table has a lot of (0, 0) frames
                 self._fp.truncate()
             else:
                 # Add the seek table frame
