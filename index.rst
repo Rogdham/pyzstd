@@ -896,7 +896,7 @@ ZstdFile class and open() function
 SeekableZstdFile class
 ----------------------
 
-    This section contains facilities supporting `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_:
+    This section contains facilities that supporting `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_:
 
         * exception :py:class:`SeekableFormatError`
         * class :py:class:`SeekableZstdFile`
@@ -909,7 +909,7 @@ SeekableZstdFile class
 
 .. py:class:: SeekableZstdFile
 
-    Subclass of :py:class:`ZstdFile`. This class **only** supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file or 0-size file. It provides relatively fast seeking ability.
+    Subclass of :py:class:`ZstdFile`. This class can **only** create/write/read `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file, or read 0-size file. It provides relatively fast seeking ability in read mode.
 
     Note that it doesn't verify/write the XXH64 checksum fields, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
 
@@ -919,13 +919,25 @@ SeekableZstdFile class
 
     .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, max_frame_content_size=1024*1024*1024)
 
-        Same as :py:meth:`ZstdFile.__init__`. Except in appending mode ("a" or "ab"), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
+        Same as :py:meth:`ZstdFile.__init__`. Except in append mode (a, ab), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
 
-        In writing/appending modes (compression), when the uncompressed data size reaches *max_frame_content_size*, a :ref:`frame<frame_block>` is generated. If the size is small, it will increase seeking speed but reduce compression ratio. If the size is large, it will reduce seeking speed but increase compression ratio. You can also manually generate a frame using ``f.flush(f.FLUSH_FRAME)``.
+        .. attention::
+
+            *max_frame_content_size* argument is used for compression modes (w, wb, a, ab, x, xb).
+
+            When the uncompressed data size reaches *max_frame_content_size*, a :ref:`frame<frame_block>` is generated automatically.
+
+            The default value (1 GiB) is almost useless. User should set this value based on the data and seeking requirement.
+
+            To retrieve a byte, need to decompress all data before this byte in that frame. So if the size is small, it will increase seeking speed, but reduce compression ratio. If the size is large, it will reduce seeking speed, but increase compression ratio.
+
+            Avoid really tiny frame sizes (<1 KiB), that would hurt compression ratio considerably.
+
+            You can also manually generate a frame using ``f.flush(f.FLUSH_FRAME)``.
 
     .. py:staticmethod:: is_seekable_format_file(filename)
 
-        Check if a file is a valid "Zstandard Seekable Format" file or 0-size file.
+        This static method checks if a file is a valid "Zstandard Seekable Format" file or 0-size file.
 
         It parses the seek table at the end of the file, returns ``True`` if no format error.
 
@@ -947,7 +959,7 @@ SeekableZstdFile class
                         break
                     ofh.write(dat)
 
-        # This static method returns True
+        # return True
         SeekableZstdFile.is_seekable_format_file(OUT_FILE)
 
 Advanced parameters

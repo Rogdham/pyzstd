@@ -206,7 +206,7 @@ def do_setup():
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
         ],
-        keywords='zstandard zstd compression decompression compress decompress',
+        keywords='zstandard zstd zst compress tar seekable file',
 
         package_dir={'pyzstd': 'src'},
         packages=packages,

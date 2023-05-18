@@ -368,8 +368,9 @@ class SeekableDecompressReader(ZstdDecompressReader):
 # each situation. For example, there may be a CD-R file system that
 # is seekable when reading, but not seekable when appending.
 class SeekableZstdFile(ZstdFile):
-    """This class only supports Zstandard Seekable Format file or 0-size file.
-    It provides relatively fast seeking ability.
+    """This class can only create/write/read Zstandard Seekable Format file,
+    or read 0-size file.
+    It provides relatively fast seeking ability in read mode.
     """
     # If flush block a lot, the frame may exceed
     # the 4GiB limit, so set a max size.
@@ -452,7 +453,7 @@ class SeekableZstdFile(ZstdFile):
         if mode in ("a", "ab"):
             if self._fp.seekable():
                 self._fp.seek(self._seek_table.get_full_c_size())
-                # Necessary if the current table has a lot of (0, 0) frames
+                # Necessary if the current table has many (0, 0) entries
                 self._fp.truncate()
             else:
                 # Add the seek table frame
@@ -499,7 +500,7 @@ class SeekableZstdFile(ZstdFile):
             self._check_mode(_MODE_WRITE)
 
         # Accept any data that supports the buffer protocol.
-        # memoryview's subview is faster than slice.
+        # And memoryview's subview is faster than slice.
         data = memoryview(data).cast('B')
         nbytes = data.nbytes
         pos = 0

@@ -709,12 +709,33 @@ class SeekableZstdFileCase(unittest.TestCase):
             SeekableZstdFile(b, 'r')
 
     def test_read(self):
+        with SeekableZstdFile(BytesIO(b''), 'r') as f:
+            self.assertEqual(f.read(), b'')
         with SeekableZstdFile(BytesIO(self.zero_frame), 'r') as f:
             self.assertEqual(f.read(), b'')
         with SeekableZstdFile(BytesIO(self.one_frame), 'r') as f:
             self.assertEqual(f.read(), DECOMPRESSED)
         with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
             self.assertEqual(f.read(), DECOMPRESSED*2)
+
+        # bad file
+        with self.assertRaisesRegex(SeekableFormatError,
+                                    'size is less than'):
+            SeekableZstdFile(BytesIO(b'1'), 'r')
+        with self.assertRaisesRegex(SeekableFormatError,
+                                    'The last 4 bytes'):
+            SeekableZstdFile(BytesIO(COMPRESSED*30), 'r')
+
+        # write mode
+        with SeekableZstdFile(BytesIO(), 'w') as f:
+            f.write(DECOMPRESSED)
+            with self.assertRaisesRegex(io.UnsupportedOperation,
+                                        "File not open for reading"):
+                f.read(100)
+        # closed
+        with self.assertRaisesRegex(ValueError,
+                                    "I/O operation on closed file"):
+            f.read(100)
 
     def test_seek(self):
         with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
@@ -768,6 +789,11 @@ class SeekableZstdFileCase(unittest.TestCase):
         lst = self.get_decompressed_sizes_list(dat)
         self.assertEqual(lst, [10, 3, 0])
 
+        # read mode
+        with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
+            with self.assertRaisesRegex(io.UnsupportedOperation,
+                                        'File not open for writing'):
+                f.write(b'1234')
         # closed file
         with self.assertRaisesRegex(ValueError,
                                     'I/O operation on closed file'):
@@ -798,6 +824,21 @@ class SeekableZstdFileCase(unittest.TestCase):
                 f.write(b'123', f.FLUSH_BLOCK)
             with self.assertRaises(TypeError):
                 f.write(dat=b'123')
+
+    def test_write_empty(self):
+        # don't generate empty content frame
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_FRAME)
+        # 17 is a seek table without entry, 4+4+9
+        self.assertEqual(len(bo.getvalue()), 17)
+
+        # if .write(b''), generate empty content frame
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.write(b'')
+        # SeekableZstdFile.write() do nothing if length is 0
+        self.assertEqual(len(bo.getvalue()), 17)
 
     def test_flush(self):
         b = BytesIO()
