@@ -40,24 +40,61 @@ class SeekTable:
     _s_2uint32 = Struct('<II')
     _s_3uint32 = Struct('<III')
 
-    def __init__(self):
+    def __init__(self, read_mode=True):
+        self._read_mode = read_mode
         self._clear_seek_table()
 
     def _clear_seek_table(self):
-        self._frames_count = 0
-        # Array item: (c_size1, d_size1,
-        #              c_size2, d_size2,
-        #              c_size3, d_size2,
-        #              ...)
-        # I is uint32_t.
-        self._frames = array('I')
-        # Array item: cumulated_size. Q is uint64_t.
-        self._cumulated_c_size = array('Q')
-        self._cumulated_d_size = array('Q')
-
         self._has_checksum = False
         # Size of the seek table frame, used for append mode.
         self._seek_frame_size = 0
+
+        self._frames_count = 0
+        self._full_c_size = 0
+        self._full_d_size = 0
+
+        if self._read_mode:
+            # Array item: cumulated_size. Q is uint64_t.
+            self._cumulated_c_size = array('Q')
+            self._cumulated_d_size = array('Q')
+        else:
+            # Array item: (c_size1, d_size1,
+            #              c_size2, d_size2,
+            #              c_size3, d_size2,
+            #              ...)
+            # I is uint32_t.
+            self._frames = array('I')
+
+    def append_entry(self, compressed_size, decompressed_size):
+        if compressed_size == 0:
+            if decompressed_size == 0:
+                # (0, 0) frame is no sense
+                return
+            else:
+                # Impossible frame
+                raise ValueError
+
+        if self._read_mode:
+            # Cumulated compressed size
+            if self._cumulated_c_size:
+                self._cumulated_c_size.append(self._cumulated_c_size[-1] + \
+                                              compressed_size)
+            else:
+                self._cumulated_c_size.append(compressed_size)
+
+            # Cumulated decompressed size
+            if self._cumulated_d_size:
+                self._cumulated_d_size.append(self._cumulated_d_size[-1] + \
+                                              decompressed_size)
+            else:
+                self._cumulated_d_size.append(decompressed_size)
+        else:
+            self._frames.append(compressed_size)
+            self._frames.append(decompressed_size)
+
+        self._frames_count += 1
+        self._full_c_size += compressed_size
+        self._full_d_size += decompressed_size
 
     def load_seek_table(self, fp, seek_to_0=True):
         # Check fp readable/seekable
@@ -157,49 +194,45 @@ class SeekTable:
             self.append_entry(compressed_size, decompressed_size)
 
             # Check format
-            if self._cumulated_c_size[-1] > fsize - skippable_frame_size:
+            if self._full_c_size > fsize - skippable_frame_size:
                 msg = ('Wrong seek table. Since index %d frame (0-based), '
                        'the cumulated compressed size is greater than '
                        'file size.') % idx
                 raise SeekableFormatError(msg)
 
         # Check format
-        if self._cumulated_c_size and \
-           self._cumulated_c_size[-1] != fsize - skippable_frame_size:
+        if self._full_c_size != fsize - skippable_frame_size:
             raise SeekableFormatError('The cumulated compressed size is wrong')
 
         # Parsed successfully, save for future use.
         self._seek_frame_size = skippable_frame_size
 
-    def append_entry(self, compressed_size, decompressed_size):
-        if compressed_size == 0:
-            if decompressed_size == 0:
-                # (0, 0) frame is no sense
-                return
-            else:
-                # Impossible frame
-                raise ValueError
+    # Find frame index by decompressed position
+    def index_by_dpos(self, pos):
+        # This is necessary when 0 decompressed_size
+        # frames are at the beginning
+        if pos < 0:
+            pos = 0
 
-        # Keep this first, raise OverflowError earlier.
-        self._frames.append(compressed_size)
-        self._frames.append(decompressed_size)
-
-        # Cumulated compressed size
-        if self._cumulated_c_size:
-            self._cumulated_c_size.append(self._cumulated_c_size[-1] + \
-                                          compressed_size)
+        i = bisect_right(self._cumulated_d_size, pos)
+        if i != self._frames_count:
+            return i
         else:
-            self._cumulated_c_size.append(compressed_size)
+            # None means at EOF
+            return None
 
-        # Cumulated decompressed size
-        if self._cumulated_d_size:
-            self._cumulated_d_size.append(self._cumulated_d_size[-1] + \
-                                          decompressed_size)
+    def get_full_c_size(self):
+        return self._full_c_size
+
+    def get_full_d_size(self):
+        return self._full_d_size
+
+    def get_frame_sizes(self, i):
+        if i > 0:
+            return (self._cumulated_c_size[i-1],
+                    self._cumulated_d_size[i-1])
         else:
-            self._cumulated_d_size.append(decompressed_size)
-
-        # Count
-        self._frames_count += 1
+            return 0, 0
 
     def _merge_frames(self, max_frames):
         if self._frames_count <= max_frames:
@@ -261,45 +294,12 @@ class SeekTable:
         # Write
         fp.write(ba)
 
-    def get_full_c_size(self):
-        if self._cumulated_c_size:
-            return self._cumulated_c_size[-1]
-        else:
-            return 0
-
-    def get_full_d_size(self):
-        if self._cumulated_d_size:
-            return self._cumulated_d_size[-1]
-        else:
-            return 0
-
-    # Find frame index by decompressed position
-    def index_by_dpos(self, pos):
-        # This is necessary when 0 decompressed_size
-        # frames are at the beginning
-        if pos < 0:
-            pos = 0
-
-        i = bisect_right(self._cumulated_d_size, pos)
-        if i != self._frames_count:
-            return i
-        else:
-            # None means at EOF
-            return None
-
-    def get_frame_sizes(self, i):
-        if i > 0:
-            return (self._cumulated_c_size[i-1],
-                    self._cumulated_d_size[i-1])
-        else:
-            return 0, 0
-
-    def __len__(self):
-        return self._frames_count
-
     @property
     def seek_frame_size(self):
         return self._seek_frame_size
+
+    def __len__(self):
+        return self._frames_count
 
     def get_info(self):
         return ('Seek table:\n'
@@ -311,7 +311,7 @@ class SeekTable:
 _32_KiB = 32*1024
 class SeekableDecompressReader(ZstdDecompressReader):
     def __init__(self, fp, decomp_factory, trailing_error=(), **decomp_args):
-        self._seek_table = SeekTable()
+        self._seek_table = SeekTable(read_mode=True)
         self._seek_table.load_seek_table(fp, seek_to_0=True)
 
         super().__init__(fp, decomp_factory, trailing_error, **decomp_args)
@@ -439,7 +439,7 @@ class SeekableZstdFile(ZstdFile):
                 raise ValueError(('max_frame_content_size argument '
                                   'is only valid in writing mode.'))
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
-            self._seek_table = SeekTable()
+            self._seek_table = SeekTable(read_mode=False)
 
             # Load seek table in appending mode
             if mode in ("a", "ab"):
@@ -618,7 +618,7 @@ class SeekableZstdFile(ZstdFile):
                  'or a file object that is readable and seekable.'))
 
         # Read/Parse the seek table
-        table = SeekTable()
+        table = SeekTable(read_mode=True)
         try:
             table.load_seek_table(fp, seek_to_0=False)
         except SeekableFormatError:
