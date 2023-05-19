@@ -1,3 +1,4 @@
+import array
 import io
 import os
 import pathlib
@@ -31,9 +32,12 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 10), (9, 10), (9, 10)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [9, 18, 27])
-        self.assertEqual(t._cumulated_d_size, [10, 20, 30])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [9, 10,
+                                           9, 10,
+                                           9, 10])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27])
+        self.assertEqual(list(t._cumulated_d_size), [10, 20, 30])
 
         self.assertEqual(t.get_full_c_size(), 27)
         self.assertEqual(t.get_full_d_size(), 30)
@@ -58,9 +62,11 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 10), (0, 0), (0, 0), (9, 10)]
         t = self.create_table(lst)
 
-        self.assertEqual(t._frames, [(9, 10, None), (9, 10, None)])
-        self.assertEqual(t._cumulated_c_size, [9, 18])
-        self.assertEqual(t._cumulated_d_size, [10, 20])
+        self.assertEqual(t._frames_count, 2)
+        self.assertEqual(list(t._frames), [9, 10,
+                                           9, 10])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18])
+        self.assertEqual(list(t._cumulated_d_size), [10, 20])
 
         self.assertEqual(t.get_full_c_size(), 18)
         self.assertEqual(t.get_full_d_size(), 20)
@@ -80,14 +86,33 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.index_by_dpos(20), None)
         self.assertEqual(t.index_by_dpos(21), None)
 
+        # test array('I')
+        with self.assertRaises(OverflowError):
+            t.append_entry(0xFFFFFFFF+1, 123)
+        with self.assertRaises(OverflowError):
+            t.append_entry(123, 0xFFFFFFFF+1)
+        with self.assertRaises(OverflowError):
+            t.append_entry(-1, 123)
+        with self.assertRaises(OverflowError):
+            t.append_entry(123, -1)
+
+        # test array('Q')
+        arr = array.array('Q')
+        arr.append(1234)
+        with self.assertRaises(OverflowError):
+            arr.append(2**64)
+        with self.assertRaises(OverflowError):
+            arr.append(-1)
+
     def test_case_empty(self):
         # empty
         lst = []
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [])
-        self.assertEqual(t._cumulated_d_size, [])
+        self.assertEqual(t._frames_count, 0)
+        self.assertEqual(len(t._frames), 0)
+        self.assertEqual(list(t._cumulated_c_size), [])
+        self.assertEqual(list(t._cumulated_d_size), [])
 
         self.assertEqual(t.get_full_c_size(), 0)
         self.assertEqual(t.get_full_d_size(), 0)
@@ -103,9 +128,12 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 10), (9, 0), (9, 10)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [9, 18, 27])
-        self.assertEqual(t._cumulated_d_size, [10, 10, 20])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [9, 10,
+                                           9, 0,
+                                           9, 10])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27])
+        self.assertEqual(list(t._cumulated_d_size), [10, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 27)
         self.assertEqual(t.get_full_d_size(), 20)
@@ -126,9 +154,13 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 10), (9, 0), (9, 0), (9, 10)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [9, 18, 27, 36])
-        self.assertEqual(t._cumulated_d_size, [10, 10, 10, 20])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [9, 10,
+                                           9, 0,
+                                           9, 0,
+                                           9, 10])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [10, 10, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
@@ -148,9 +180,13 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 0), (9, 0), (9, 10), (9, 10)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [9, 18, 27, 36])
-        self.assertEqual(t._cumulated_d_size, [0, 0, 10, 20])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [9, 0,
+                                           9, 0,
+                                           9, 10,
+                                           9, 10])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [0, 0, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
@@ -177,9 +213,13 @@ class SeekTableCase(unittest.TestCase):
         lst = [(9, 10), (9, 10), (9, 0), (9, 0)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [9, 18, 27, 36])
-        self.assertEqual(t._cumulated_d_size, [10, 20, 20, 20])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [9, 10,
+                                           9, 10,
+                                           9, 0,
+                                           9, 0])
+        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [10, 20, 20, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
@@ -201,9 +241,12 @@ class SeekTableCase(unittest.TestCase):
         lst = [(1, 0), (1, 0), (1, 0)]
         t = self.create_table(lst)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [1, 2, 3])
-        self.assertEqual(t._cumulated_d_size, [0, 0, 0])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [1, 0,
+                                           1, 0,
+                                           1, 0])
+        self.assertEqual(list(t._cumulated_c_size), [1, 2, 3])
+        self.assertEqual(list(t._cumulated_d_size), [0, 0, 0])
 
         self.assertEqual(t.get_full_c_size(), 3)
         self.assertEqual(t.get_full_d_size(), 0)
@@ -223,28 +266,28 @@ class SeekTableCase(unittest.TestCase):
         t = self.create_table(lst)
         t._merge_frames(1)
         self.assertEqual(len(t), 1)
-        self.assertEqual(t._frames[0], (45, 50, None))
+        self.assertEqual(list(t._frames), [45, 50])
 
         t = self.create_table(lst)
         t._merge_frames(2)
         self.assertEqual(len(t), 2)
-        self.assertEqual(t._frames[0], (27, 30, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
+        self.assertEqual(list(t._frames), [27, 30,
+                                           18, 20])
 
         t = self.create_table(lst)
         t._merge_frames(3)
         self.assertEqual(len(t), 3)
-        self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
-        self.assertEqual(t._frames[2], (9, 10, None))
+        self.assertEqual(list(t._frames), [18, 20,
+                                           18, 20,
+                                           9, 10])
 
         t = self.create_table(lst)
         t._merge_frames(4)
         self.assertEqual(len(t), 4)
-        self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (9, 10, None))
-        self.assertEqual(t._frames[2], (9, 10, None))
-        self.assertEqual(t._frames[3], (9, 10, None))
+        self.assertEqual(list(t._frames), [18, 20,
+                                           9, 10,
+                                           9, 10,
+                                           9, 10])
 
     def test_merge_frames2(self):
         lst = [(9, 10), (9, 10), (9, 10),
@@ -253,37 +296,37 @@ class SeekTableCase(unittest.TestCase):
         t = self.create_table(lst)
         t._merge_frames(1)
         self.assertEqual(len(t), 1)
-        self.assertEqual(t._frames[0], (54, 60, None))
+        self.assertEqual(list(t._frames), [54, 60])
 
         t = self.create_table(lst)
         t._merge_frames(2)
         self.assertEqual(len(t), 2)
-        self.assertEqual(t._frames[0], (27, 30, None))
-        self.assertEqual(t._frames[1], (27, 30, None))
+        self.assertEqual(list(t._frames), [27, 30,
+                                           27, 30])
 
         t = self.create_table(lst)
         t._merge_frames(3)
         self.assertEqual(len(t), 3)
-        self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
-        self.assertEqual(t._frames[2], (18, 20, None))
+        self.assertEqual(list(t._frames), [18, 20,
+                                           18, 20,
+                                           18, 20])
 
         t = self.create_table(lst)
         t._merge_frames(4)
         self.assertEqual(len(t), 4)
-        self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (18, 20, None))
-        self.assertEqual(t._frames[2], (9, 10, None))
-        self.assertEqual(t._frames[3], (9, 10, None))
+        self.assertEqual(list(t._frames), [18, 20,
+                                           18, 20,
+                                           9, 10,
+                                           9, 10])
 
         t = self.create_table(lst)
         t._merge_frames(5)
         self.assertEqual(len(t), 5)
-        self.assertEqual(t._frames[0], (18, 20, None))
-        self.assertEqual(t._frames[1], (9, 10, None))
-        self.assertEqual(t._frames[2], (9, 10, None))
-        self.assertEqual(t._frames[3], (9, 10, None))
-        self.assertEqual(t._frames[4], (9, 10, None))
+        self.assertEqual(list(t._frames), [18, 20,
+                                           9, 10,
+                                           9, 10,
+                                           9, 10,
+                                           9, 10])
 
     def test_load_empty(self):
         # empty
@@ -310,9 +353,12 @@ class SeekTableCase(unittest.TestCase):
         t.load_seek_table(b, seek_to_0=True)
         self.assertEqual(b.tell(), 0)
 
-        self.assertEqual(len(t._frames), len(lst))
-        self.assertEqual(t._cumulated_c_size, [CSIZE, 2*CSIZE, 3*CSIZE])
-        self.assertEqual(t._cumulated_d_size, [DSIZE, 2*DSIZE, 3*DSIZE])
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._frames), [CSIZE, DSIZE,
+                                           CSIZE, DSIZE,
+                                           CSIZE, DSIZE])
+        self.assertEqual(list(t._cumulated_c_size), [CSIZE, 2*CSIZE, 3*CSIZE])
+        self.assertEqual(list(t._cumulated_d_size), [DSIZE, 2*DSIZE, 3*DSIZE])
 
         self.assertEqual(t.get_full_c_size(), 3*CSIZE)
         self.assertEqual(t.get_full_d_size(), 3*DSIZE)

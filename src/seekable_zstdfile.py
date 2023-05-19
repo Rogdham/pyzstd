@@ -1,3 +1,4 @@
+from array import array
 from bisect import bisect_right
 from struct import Struct
 from warnings import warn
@@ -43,15 +44,19 @@ class SeekTable:
         self._clear_seek_table()
 
     def _clear_seek_table(self):
-        self._has_checksum = False
-        # List item: (compressed_size, decompressed_size, checksum)
-        self._frames = []
-        # List item: cumulated_size
-        # The length is same as ._frames
-        self._cumulated_c_size = []
-        self._cumulated_d_size = []
+        self._frames_count = 0
+        # Array item: (c_size1, d_size1,
+        #              c_size2, d_size2,
+        #              c_size3, d_size2,
+        #              ...)
+        # I is uint32_t.
+        self._frames = array('I')
+        # Array item: cumulated_size. Q is uint64_t.
+        self._cumulated_c_size = array('Q')
+        self._cumulated_d_size = array('Q')
 
-        # Size of the seek table frame
+        self._has_checksum = False
+        # Size of the seek table frame, used for append mode.
         self._seek_frame_size = 0
 
     def load_seek_table(self, fp, seek_to_0=True):
@@ -131,7 +136,6 @@ class SeekTable:
 
         # Parse seek table
         offset = 8
-        checksum = None
         for idx in range(frames_number):
             if self._has_checksum:
                 compressed_size, decompressed_size, checksum = \
@@ -150,7 +154,7 @@ class SeekTable:
                 raise SeekableFormatError(msg)
 
             # Append to seek table
-            self.append_entry(compressed_size, decompressed_size, checksum)
+            self.append_entry(compressed_size, decompressed_size)
 
             # Check format
             if self._cumulated_c_size[-1] > fsize - skippable_frame_size:
@@ -167,7 +171,7 @@ class SeekTable:
         # Parsed successfully, save for future use.
         self._seek_frame_size = skippable_frame_size
 
-    def append_entry(self, compressed_size, decompressed_size, checksum=None):
+    def append_entry(self, compressed_size, decompressed_size):
         if compressed_size == 0:
             if decompressed_size == 0:
                 # (0, 0) frame is no sense
@@ -176,49 +180,61 @@ class SeekTable:
                 # Impossible frame
                 raise ValueError
 
-        if self._frames:
-            cumulated_c_size = self._cumulated_c_size[-1] + compressed_size
-            cumulated_d_size = self._cumulated_d_size[-1] + decompressed_size
-        else:
-            cumulated_c_size = compressed_size
-            cumulated_d_size = decompressed_size
-        self._cumulated_c_size.append(cumulated_c_size)
-        self._cumulated_d_size.append(cumulated_d_size)
+        # Keep this first, raise OverflowError earlier.
+        self._frames.append(compressed_size)
+        self._frames.append(decompressed_size)
 
-        self._frames.append((compressed_size, decompressed_size, checksum))
+        # Cumulated compressed size
+        if self._cumulated_c_size:
+            self._cumulated_c_size.append(self._cumulated_c_size[-1] + \
+                                          compressed_size)
+        else:
+            self._cumulated_c_size.append(compressed_size)
+
+        # Cumulated decompressed size
+        if self._cumulated_d_size:
+            self._cumulated_d_size.append(self._cumulated_d_size[-1] + \
+                                          decompressed_size)
+        else:
+            self._cumulated_d_size.append(decompressed_size)
+
+        # Count
+        self._frames_count += 1
 
     def _merge_frames(self, max_frames):
-        if len(self._frames) <= max_frames:
+        if self._frames_count <= max_frames:
             return
 
         # Clear the table
-        lst = self._frames
+        arr = self._frames
+        a, b = divmod(self._frames_count, max_frames)
         self._clear_seek_table()
 
         # Merge frames
         pos = 0
-        a, b = divmod(len(lst), max_frames)
         for i in range(max_frames):
-            # Get slice
-            length = a + (1 if i < b else 0)
-            frames = lst[pos:pos+length]
+            # Slice length
+            length = (a + (1 if i < b else 0)) * 2
 
             # Merge
-            c_size = sum(c for c, _, _ in frames)
-            d_size = sum(d for _, d, _ in frames)
+            c_size = 0
+            d_size = 0
+            for j in range(pos, pos+length, 2):
+                c_size += arr[j]
+                d_size += arr[j+1]
             self.append_entry(c_size, d_size)
 
             pos += length
 
     def write_seek_table(self, fp):
         # Exceeded format limit
-        if len(self._frames) > 0xFFFFFFFF:
+        if self._frames_count > 0xFFFFFFFF:
             # Emit a warning
             warn(('The seek table of "Zstandard Seekable Format" '
                   'has %d entries, which exceeds the maximum value '
                   'allowed by the format (0xFFFFFFFF). The entries '
                   'will be merged into 0xFFFFFFFF entries, this may '
-                  'reduce seeking performance.') % len(self._frames),
+                  'reduce seeking performance.') % self._frames_count,
                  RuntimeWarning, 3)
 
             # Merge frames
@@ -226,19 +242,21 @@ class SeekTable:
 
         # The skippable frame
         offset = 0
-        size = 17 + 8 * len(self._frames)
+        size = 17 + 8 * self._frames_count
         ba = bytearray(size)
 
         # Header
         self._s_2uint32.pack_into(ba, offset, 0x184D2A5E, size-8)
         offset += 8
         # Entries
-        for c_size, d_size, _ in self._frames:
-            self._s_2uint32.pack_into(ba, offset, c_size, d_size)
+        for i in range(0, len(self._frames), 2):
+            self._s_2uint32.pack_into(ba, offset,
+                                      self._frames[i],
+                                      self._frames[i+1])
             offset += 8
         # Footer
         self._s_footer.pack_into(ba, offset,
-                                 len(self._frames), 0, 0x8F92EAB1)
+                                 self._frames_count, 0, 0x8F92EAB1)
 
         # Write
         fp.write(ba)
@@ -263,7 +281,7 @@ class SeekTable:
             pos = 0
 
         i = bisect_right(self._cumulated_d_size, pos)
-        if i != len(self._frames):
+        if i != self._frames_count:
             return i
         else:
             # None means at EOF
@@ -277,7 +295,7 @@ class SeekTable:
             return 0, 0
 
     def __len__(self):
-        return len(self._frames)
+        return self._frames_count
 
     @property
     def seek_frame_size(self):
@@ -287,8 +305,8 @@ class SeekTable:
         return ('Seek table:\n'
                 ' - items: {}\n'
                 ' - has checksum: {}').format(
-                    len(self._frames),
-                    self._has_checksum != 0)
+                    self._frames_count,
+                    bool(self._has_checksum))
 
 _32_KiB = 32*1024
 class SeekableDecompressReader(ZstdDecompressReader):
@@ -372,11 +390,10 @@ class SeekableZstdFile(ZstdFile):
     or read 0-size file.
     It provides relatively fast seeking ability in read mode.
     """
-    # If flush block a lot, the frame may exceed
-    # the 4GiB limit, so set a max size.
+    # The format uses uint32_t for compressed/decompressed sizes. If flush
+    # block a lot, compressed_size may exceed the limit, so set a max size.
     FRAME_MAX_C_SIZE = 2*1024*1024*1024
-    # Zstd seekable format's example code also
-    # use 1GiB as max content size.
+    # Zstd seekable format's example code also use 1GiB as max content size.
     FRAME_MAX_D_SIZE = 1*1024*1024*1024
 
     _READER_CLASS = SeekableDecompressReader
