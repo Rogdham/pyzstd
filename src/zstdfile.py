@@ -307,9 +307,11 @@ class ZstdFile(io.BufferedIOBase):
             # Closed, raise ValueError.
             self._check_mode()
 
-        # Don't generate empty content frame
+        # Don't generate empty content frame.
+        # .last_mode can be ZstdCompressor.CONTINUE.
         if mode == self._compressor.last_mode and \
-           mode != ZstdCompressor.CONTINUE:
+           (mode == self.FLUSH_BLOCK or \
+            mode == self.FLUSH_FRAME):
             return
 
         # Flush zstd block/frame

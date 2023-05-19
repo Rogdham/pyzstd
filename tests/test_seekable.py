@@ -12,7 +12,7 @@ from math import ceil
 from unittest.mock import patch
 
 from pyzstd import *
-from pyzstd import PYZSTD_CONFIG
+from pyzstd import PYZSTD_CONFIG # type: ignore
 from pyzstd.seekable_zstdfile import SeekTable
 
 BIT_BUILD = PYZSTD_CONFIG[0]
@@ -755,8 +755,6 @@ class SeekableZstdFileCase(unittest.TestCase):
             SeekableZstdFile(b, 'r')
 
     def test_read(self):
-        with SeekableZstdFile(BytesIO(b''), 'r') as f:
-            self.assertEqual(f.read(), b'')
         with SeekableZstdFile(BytesIO(self.zero_frame), 'r') as f:
             self.assertEqual(f.read(), b'')
         with SeekableZstdFile(BytesIO(self.one_frame), 'r') as f:
@@ -782,6 +780,19 @@ class SeekableZstdFileCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError,
                                     "I/O operation on closed file"):
             f.read(100)
+
+    def test_read_empty(self):
+        with SeekableZstdFile(BytesIO(b''), 'r') as f:
+            self.assertEqual(f.read(), b'')
+            self.assertEqual(f.tell(), 0)
+
+            self.assertEqual(f.seek(2), 0)
+            self.assertEqual(f.read(), b'')
+            self.assertEqual(f.tell(), 0)
+
+            self.assertEqual(f.seek(-2), 0)
+            self.assertEqual(f.read(), b'')
+            self.assertEqual(f.tell(), 0)
 
     def test_seek(self):
         with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
@@ -871,10 +882,16 @@ class SeekableZstdFileCase(unittest.TestCase):
             with self.assertRaises(TypeError):
                 f.write(dat=b'123')
 
-    def test_write_empty(self):
-        # don't generate empty content frame
+    def test_write_empty_frame(self):
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_FRAME)
+        # 17 is a seek table without entry, 4+4+9
+        self.assertEqual(len(bo.getvalue()), 17)
+
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_FRAME)
             f.flush(f.FLUSH_FRAME)
         # 17 is a seek table without entry, 4+4+9
         self.assertEqual(len(bo.getvalue()), 17)
@@ -885,6 +902,42 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.write(b'')
         # SeekableZstdFile.write() do nothing if length is 0
         self.assertEqual(len(bo.getvalue()), 17)
+
+        # has an empty content frame
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_BLOCK)
+        self.assertGreater(len(bo.getvalue()), 17)
+
+    def test_write_empty_block(self):
+        # If no internal data, .FLUSH_BLOCK return b''.
+        c = ZstdCompressor()
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+        self.assertNotEqual(c.compress(b'123', c.FLUSH_BLOCK),
+                            b'')
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+        self.assertEqual(c.compress(b''), b'')
+        self.assertEqual(c.compress(b''), b'')
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+
+        # mode = .last_mode
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.write(b'123')
+            f.flush(f.FLUSH_BLOCK)
+            fp_pos = f._fp.tell()
+            self.assertNotEqual(fp_pos, 0)
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), fp_pos)
+
+        # mode != .last_mode
+        bo = BytesIO()
+        with SeekableZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), 0)
+            f.write(b'')
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), 0)
 
     def test_flush(self):
         b = BytesIO()

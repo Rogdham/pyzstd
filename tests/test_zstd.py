@@ -2845,10 +2845,11 @@ class FileTestCase(unittest.TestCase):
             expected = comp.compress(THIS_FILE_BYTES) + comp.flush()
             self.assertEqual(dst.getvalue(), expected)
 
-    def test_write_empty(self):
+    def test_write_empty_frame(self):
         # .FLUSH_FRAME generates an empty content frame
         c = ZstdCompressor()
-        self.assertNotEqual(c.flush(), b'')
+        self.assertNotEqual(c.flush(c.FLUSH_FRAME), b'')
+        self.assertNotEqual(c.flush(c.FLUSH_FRAME), b'')
 
         # don't generate empty content frame
         bo = BytesIO()
@@ -2856,11 +2857,52 @@ class FileTestCase(unittest.TestCase):
             pass
         self.assertEqual(bo.getvalue(), b'')
 
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_FRAME)
+        self.assertEqual(bo.getvalue(), b'')
+
         # if .write(b''), generate empty content frame
         bo = BytesIO()
         with ZstdFile(bo, 'w') as f:
             f.write(b'')
         self.assertNotEqual(bo.getvalue(), b'')
+
+        # has an empty content frame
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_BLOCK)
+        self.assertNotEqual(bo.getvalue(), b'')
+
+    def test_write_empty_block(self):
+        # If no internal data, .FLUSH_BLOCK return b''.
+        c = ZstdCompressor()
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+        self.assertNotEqual(c.compress(b'123', c.FLUSH_BLOCK),
+                            b'')
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+        self.assertEqual(c.compress(b''), b'')
+        self.assertEqual(c.compress(b''), b'')
+        self.assertEqual(c.flush(c.FLUSH_BLOCK), b'')
+
+        # mode = .last_mode
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            f.write(b'123')
+            f.flush(f.FLUSH_BLOCK)
+            fp_pos = f._fp.tell()
+            self.assertNotEqual(fp_pos, 0)
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), fp_pos)
+
+        # mode != .last_mode
+        bo = BytesIO()
+        with ZstdFile(bo, 'w') as f:
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), 0)
+            f.write(b'')
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f._fp.tell(), 0)
 
     def test_write_101(self):
         with BytesIO() as dst:
