@@ -29,63 +29,6 @@ class SeekTableCase(unittest.TestCase):
             table.append_entry(*item)
         return table
 
-    def test_case1(self):
-        lst = [(9, 10), (9, 10), (9, 10)]
-        t = self.create_table(lst)
-
-        with self.assertRaises(AttributeError):
-            t._frames
-        self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27])
-        self.assertEqual(list(t._cumulated_d_size), [10, 20, 30])
-
-        self.assertEqual(t.get_full_c_size(), 27)
-        self.assertEqual(t.get_full_d_size(), 30)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
-        self.assertEqual(t.get_frame_sizes(2), (18, 20))
-
-        # find frame index
-        self.assertEqual(t.index_by_dpos(-1), 0)
-        self.assertEqual(t.index_by_dpos(0), 0)
-        self.assertEqual(t.index_by_dpos(1), 0)
-
-        self.assertEqual(t.index_by_dpos(9), 0)
-        self.assertEqual(t.index_by_dpos(10), 1)
-        self.assertEqual(t.index_by_dpos(11), 1)
-
-        self.assertEqual(t.index_by_dpos(29), 2)
-        self.assertEqual(t.index_by_dpos(30), None)
-        self.assertEqual(t.index_by_dpos(31), None)
-
-    def test_add_00_entry(self):
-        # don't add (0, 0) entry to internal table
-        lst = [(9, 10), (0, 0), (0, 0), (9, 10)]
-        t = self.create_table(lst)
-
-        with self.assertRaises(AttributeError):
-            t._frames
-        self.assertEqual(t._frames_count, 2)
-        self.assertEqual(list(t._cumulated_c_size), [9, 18])
-        self.assertEqual(list(t._cumulated_d_size), [10, 20])
-
-        self.assertEqual(t.get_full_c_size(), 18)
-        self.assertEqual(t.get_full_d_size(), 20)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
-        self.assertEqual(t.get_frame_sizes(1), (9, 10))
-
-        # find frame index
-        self.assertEqual(t.index_by_dpos(-1), 0)
-        self.assertEqual(t.index_by_dpos(0), 0)
-        self.assertEqual(t.index_by_dpos(1), 0)
-
-        self.assertEqual(t.index_by_dpos(9), 0)
-        self.assertEqual(t.index_by_dpos(10), 1)
-        self.assertEqual(t.index_by_dpos(11), 1)
-
-        self.assertEqual(t.index_by_dpos(19), 1)
-        self.assertEqual(t.index_by_dpos(20), None)
-        self.assertEqual(t.index_by_dpos(21), None)
-
     def test_array_append(self):
         # test array('I')
         t = SeekTable(read_mode=False)
@@ -108,10 +51,74 @@ class SeekTableCase(unittest.TestCase):
         arr = array.array('Q')
         arr.append(0)
         arr.append(2**64-1)
-        with self.assertRaises(OverflowError):
-            arr.append(2**64)
+        self.assertEqual(arr[0], 0)
+        self.assertEqual(arr[1], 2**64-1)
         with self.assertRaises(OverflowError):
             arr.append(-1)
+        with self.assertRaises(OverflowError):
+            arr.append(2**64)
+
+    def test_case1(self):
+        lst = [(9, 10), (9, 10), (9, 10)]
+        t = self.create_table(lst)
+
+        with self.assertRaises(AttributeError):
+            t._frames
+        self.assertEqual(t._frames_count, len(lst))
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18, 27])
+        self.assertEqual(list(t._cumulated_d_size), [0, 10, 20, 30])
+
+        self.assertEqual(t.get_full_c_size(), 27)
+        self.assertEqual(t.get_full_d_size(), 30)
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 10))
+        self.assertEqual(t.get_frame_sizes(3), (18, 20))
+
+        # find frame index
+        self.assertEqual(t.index_by_dpos(-1), 1)
+        self.assertEqual(t.index_by_dpos(0), 1)
+        self.assertEqual(t.index_by_dpos(1), 1)
+
+        self.assertEqual(t.index_by_dpos(9), 1)
+        self.assertEqual(t.index_by_dpos(10), 2)
+        self.assertEqual(t.index_by_dpos(11), 2)
+
+        self.assertEqual(t.index_by_dpos(19), 2)
+        self.assertEqual(t.index_by_dpos(20), 3)
+        self.assertEqual(t.index_by_dpos(21), 3)
+
+        self.assertEqual(t.index_by_dpos(29), 3)
+        self.assertEqual(t.index_by_dpos(30), None)
+        self.assertEqual(t.index_by_dpos(31), None)
+
+    def test_add_00_entry(self):
+        # don't add (0, 0) entry to internal table
+        lst = [(9, 10), (0, 0), (0, 0), (9, 10)]
+        t = self.create_table(lst)
+
+        with self.assertRaises(AttributeError):
+            t._frames
+        self.assertEqual(t._frames_count, 2)
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18])
+        self.assertEqual(list(t._cumulated_d_size), [0, 10, 20])
+
+        self.assertEqual(t.get_full_c_size(), 18)
+        self.assertEqual(t.get_full_d_size(), 20)
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 10))
+
+        # find frame index
+        self.assertEqual(t.index_by_dpos(-1), 1)
+        self.assertEqual(t.index_by_dpos(0), 1)
+        self.assertEqual(t.index_by_dpos(1), 1)
+
+        self.assertEqual(t.index_by_dpos(9), 1)
+        self.assertEqual(t.index_by_dpos(10), 2)
+        self.assertEqual(t.index_by_dpos(11), 2)
+
+        self.assertEqual(t.index_by_dpos(19), 2)
+        self.assertEqual(t.index_by_dpos(20), None)
+        self.assertEqual(t.index_by_dpos(21), None)
 
     def test_case_empty(self):
         # empty
@@ -121,12 +128,12 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, 0)
-        self.assertEqual(list(t._cumulated_c_size), [])
-        self.assertEqual(list(t._cumulated_d_size), [])
+        self.assertEqual(list(t._cumulated_c_size), [0])
+        self.assertEqual(list(t._cumulated_d_size), [0])
 
         self.assertEqual(t.get_full_c_size(), 0)
         self.assertEqual(t.get_full_d_size(), 0)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
 
         # find frame index
         self.assertEqual(t.index_by_dpos(-1), None)
@@ -141,20 +148,21 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27])
-        self.assertEqual(list(t._cumulated_d_size), [10, 10, 20])
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18, 27])
+        self.assertEqual(list(t._cumulated_d_size), [0, 10, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 27)
         self.assertEqual(t.get_full_d_size(), 20)
-        self.assertEqual(t.get_frame_sizes(1), (9, 10))
-        self.assertEqual(t.get_frame_sizes(2), (18, 10))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 10))
+        self.assertEqual(t.get_frame_sizes(3), (18, 10))
 
         # find frame index
-        self.assertEqual(t.index_by_dpos(9), 0)
-        self.assertEqual(t.index_by_dpos(10), 2)
-        self.assertEqual(t.index_by_dpos(11), 2)
+        self.assertEqual(t.index_by_dpos(9), 1)
+        self.assertEqual(t.index_by_dpos(10), 3)
+        self.assertEqual(t.index_by_dpos(11), 3)
 
-        self.assertEqual(t.index_by_dpos(19), 2)
+        self.assertEqual(t.index_by_dpos(19), 3)
         self.assertEqual(t.index_by_dpos(20), None)
         self.assertEqual(t.index_by_dpos(21), None)
 
@@ -166,19 +174,21 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
-        self.assertEqual(list(t._cumulated_d_size), [10, 10, 10, 20])
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [0, 10, 10, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
-        self.assertEqual(t.get_frame_sizes(2), (18, 10))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 10))
+        self.assertEqual(t.get_frame_sizes(4), (27, 10))
 
         # find frame index
-        self.assertEqual(t.index_by_dpos(9), 0)
-        self.assertEqual(t.index_by_dpos(10), 3)
-        self.assertEqual(t.index_by_dpos(11), 3)
+        self.assertEqual(t.index_by_dpos(9), 1)
+        self.assertEqual(t.index_by_dpos(10), 4)
+        self.assertEqual(t.index_by_dpos(11), 4)
 
-        self.assertEqual(t.index_by_dpos(19), 3)
+        self.assertEqual(t.index_by_dpos(19), 4)
         self.assertEqual(t.index_by_dpos(20), None)
         self.assertEqual(t.index_by_dpos(21), None)
 
@@ -190,26 +200,26 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
-        self.assertEqual(list(t._cumulated_d_size), [0, 0, 10, 20])
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [0, 0, 0, 10, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
-        self.assertEqual(t.get_frame_sizes(1), (9, 0))
-        self.assertEqual(t.get_frame_sizes(2), (18, 0))
-        self.assertEqual(t.get_frame_sizes(3), (27, 10))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 0))
+        self.assertEqual(t.get_frame_sizes(3), (18, 0))
+        self.assertEqual(t.get_frame_sizes(4), (27, 10))
 
         # find frame index
-        self.assertEqual(t.index_by_dpos(-1), 2)
-        self.assertEqual(t.index_by_dpos(0), 2)
-        self.assertEqual(t.index_by_dpos(1), 2)
+        self.assertEqual(t.index_by_dpos(-1), 3)
+        self.assertEqual(t.index_by_dpos(0), 3)
+        self.assertEqual(t.index_by_dpos(1), 3)
 
-        self.assertEqual(t.index_by_dpos(9), 2)
-        self.assertEqual(t.index_by_dpos(10), 3)
-        self.assertEqual(t.index_by_dpos(11), 3)
+        self.assertEqual(t.index_by_dpos(9), 3)
+        self.assertEqual(t.index_by_dpos(10), 4)
+        self.assertEqual(t.index_by_dpos(11), 4)
 
-        self.assertEqual(t.index_by_dpos(19), 3)
+        self.assertEqual(t.index_by_dpos(19), 4)
         self.assertEqual(t.index_by_dpos(20), None)
         self.assertEqual(t.index_by_dpos(21), None)
 
@@ -221,21 +231,22 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [9, 18, 27, 36])
-        self.assertEqual(list(t._cumulated_d_size), [10, 20, 20, 20])
+        self.assertEqual(list(t._cumulated_c_size), [0, 9, 18, 27, 36])
+        self.assertEqual(list(t._cumulated_d_size), [0, 10, 20, 20, 20])
 
         self.assertEqual(t.get_full_c_size(), 36)
         self.assertEqual(t.get_full_d_size(), 20)
-        self.assertEqual(t.get_frame_sizes(1), (9, 10))
-        self.assertEqual(t.get_frame_sizes(2), (18, 20))
-        self.assertEqual(t.get_frame_sizes(3), (27, 20))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (9, 10))
+        self.assertEqual(t.get_frame_sizes(3), (18, 20))
+        self.assertEqual(t.get_frame_sizes(4), (27, 20))
 
         # find frame index
-        self.assertEqual(t.index_by_dpos(9), 0)
-        self.assertEqual(t.index_by_dpos(10), 1)
-        self.assertEqual(t.index_by_dpos(11), 1)
+        self.assertEqual(t.index_by_dpos(9), 1)
+        self.assertEqual(t.index_by_dpos(10), 2)
+        self.assertEqual(t.index_by_dpos(11), 2)
 
-        self.assertEqual(t.index_by_dpos(19), 1)
+        self.assertEqual(t.index_by_dpos(19), 2)
         self.assertEqual(t.index_by_dpos(20), None)
         self.assertEqual(t.index_by_dpos(21), None)
 
@@ -247,14 +258,14 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [1, 2, 3])
-        self.assertEqual(list(t._cumulated_d_size), [0, 0, 0])
+        self.assertEqual(list(t._cumulated_c_size), [0, 1, 2, 3])
+        self.assertEqual(list(t._cumulated_d_size), [0, 0, 0, 0])
 
         self.assertEqual(t.get_full_c_size(), 3)
         self.assertEqual(t.get_full_d_size(), 0)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
-        self.assertEqual(t.get_frame_sizes(1), (1, 0))
-        self.assertEqual(t.get_frame_sizes(2), (2, 0))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(2), (1, 0))
+        self.assertEqual(t.get_frame_sizes(3), (2, 0))
 
         # find frame index
         self.assertEqual(t.index_by_dpos(-1), None)
@@ -333,7 +344,7 @@ class SeekTableCase(unittest.TestCase):
     def test_load_empty(self):
         # empty
         b = BytesIO()
-        t = SeekTable()
+        t = SeekTable(read_mode=True)
         t.load_seek_table(b)
         self.assertEqual(len(t), 0)
         self.assertEqual(b.tell(), 0)
@@ -358,18 +369,32 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(AttributeError):
             t._frames
         self.assertEqual(t._frames_count, len(lst))
-        self.assertEqual(list(t._cumulated_c_size), [CSIZE, 2*CSIZE, 3*CSIZE])
-        self.assertEqual(list(t._cumulated_d_size), [DSIZE, 2*DSIZE, 3*DSIZE])
+        self.assertEqual(list(t._cumulated_c_size), [0, CSIZE, 2*CSIZE, 3*CSIZE])
+        self.assertEqual(list(t._cumulated_d_size), [0, DSIZE, 2*DSIZE, 3*DSIZE])
 
         self.assertEqual(t.get_full_c_size(), 3*CSIZE)
         self.assertEqual(t.get_full_d_size(), 3*DSIZE)
-        self.assertEqual(t.get_frame_sizes(0), (0, 0))
-        self.assertEqual(t.get_frame_sizes(2), (2*CSIZE, 2*DSIZE))
+        self.assertEqual(t.get_frame_sizes(1), (0, 0))
+        self.assertEqual(t.get_frame_sizes(3), (2*CSIZE, 2*DSIZE))
 
         # load, seek_to_0=False
         t = SeekTable()
         t.load_seek_table(b, seek_to_0=False)
         self.assertEqual(b.tell(), len(b.getvalue()))
+
+    def test_load_has_checksum(self):
+        b = BytesIO()
+        b.write(COMPRESSED)
+        b.write(COMPRESSED)
+        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*(4+4+4)))
+        b.write(SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 123))
+        b.write(SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 456))
+        b.write(SeekTable._s_footer.pack(2, 0b10000000, 0x8F92EAB1))
+
+        t = SeekTable()
+        t.load_seek_table(b)
+        self.assertTrue(t._has_checksum)
+        self.assertEqual(len(t), 2)
 
     def test_load_bad1(self):
         # 0 < length < 17
@@ -1282,7 +1307,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             # to P1
             self.assertEqual(f.read(DSIZE), DECOMPRESSED)
             self.assertEqual(f.tell(), DSIZE)
-            self.assertEqual(t.index_by_dpos(DSIZE), 2)
+            self.assertEqual(t.index_by_dpos(DSIZE), 3)
             self.assertLess(f._fp.tell(), 5*1024*1024)
 
             # new position
@@ -1292,9 +1317,11 @@ class SeekableZstdFileCase(unittest.TestCase):
             # else:
             #     do_jump
             NEW_POS = DSIZE + 3
-            self.assertEqual(t.index_by_dpos(NEW_POS), 2)
+            self.assertEqual(t.index_by_dpos(NEW_POS), 3)
             self.assertGreaterEqual(NEW_POS, f.tell())
-            c_pos, d_pos = t.get_frame_sizes(2)
+            c_pos, d_pos = t.get_frame_sizes(3)
+            self.assertGreaterEqual(c_pos, _10MiB)
+            self.assertEqual(d_pos, DSIZE)
             self.assertGreaterEqual(c_pos - f._fp.tell(),
                                     1024*1024)
 

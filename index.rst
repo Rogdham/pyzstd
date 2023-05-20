@@ -933,7 +933,7 @@ SeekableZstdFile class
 
             Avoid really tiny frame sizes (<1 KiB), that would hurt compression ratio considerably.
 
-            You can also manually generate a frame using ``f.flush(f.FLUSH_FRAME)``.
+            You can also manually generate a frame using ``f.flush(mode=f.FLUSH_FRAME)``.
 
     .. py:staticmethod:: is_seekable_format_file(filename)
 

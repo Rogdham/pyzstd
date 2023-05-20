@@ -54,14 +54,17 @@ class SeekTable:
         self._full_d_size = 0
 
         if self._read_mode:
-            # Array item: cumulated_size. Q is uint64_t.
-            self._cumulated_c_size = array('Q')
-            self._cumulated_d_size = array('Q')
+            # Item: cumulated_size
+            # Length: frames_count + 1
+            # Q is uint64_t.
+            self._cumulated_c_size = array('Q', [0])
+            self._cumulated_d_size = array('Q', [0])
         else:
-            # Array item: (c_size1, d_size1,
-            #              c_size2, d_size2,
-            #              c_size3, d_size2,
-            #              ...)
+            # Item: (c_size1, d_size1,
+            #        c_size2, d_size2,
+            #        c_size3, d_size3,
+            #        ...)
+            # Length: frames_count * 2
             # I is uint32_t.
             self._frames = array('I')
 
@@ -74,27 +77,16 @@ class SeekTable:
                 # Impossible frame
                 raise ValueError
 
-        if self._read_mode:
-            # Cumulated compressed size
-            if self._cumulated_c_size:
-                self._cumulated_c_size.append(self._cumulated_c_size[-1] + \
-                                              compressed_size)
-            else:
-                self._cumulated_c_size.append(compressed_size)
-
-            # Cumulated decompressed size
-            if self._cumulated_d_size:
-                self._cumulated_d_size.append(self._cumulated_d_size[-1] + \
-                                              decompressed_size)
-            else:
-                self._cumulated_d_size.append(decompressed_size)
-        else:
-            self._frames.append(compressed_size)
-            self._frames.append(decompressed_size)
-
         self._frames_count += 1
         self._full_c_size += compressed_size
         self._full_d_size += decompressed_size
+
+        if self._read_mode:
+            self._cumulated_c_size.append(self._full_c_size)
+            self._cumulated_d_size.append(self._full_d_size)
+        else:
+            self._frames.append(compressed_size)
+            self._frames.append(decompressed_size)
 
     def load_seek_table(self, fp, seek_to_0=True):
         # Check fp readable/seekable
@@ -209,30 +201,26 @@ class SeekTable:
 
     # Find frame index by decompressed position
     def index_by_dpos(self, pos):
-        # This is necessary when 0 decompressed_size
-        # frames are at the beginning
+        # Array's first item is 0, so this is necessary.
         if pos < 0:
             pos = 0
 
         i = bisect_right(self._cumulated_d_size, pos)
-        if i != self._frames_count:
+        if i != self._frames_count + 1:
             return i
         else:
             # None means at EOF
             return None
+
+    def get_frame_sizes(self, i):
+        return (self._cumulated_c_size[i-1],
+                self._cumulated_d_size[i-1])
 
     def get_full_c_size(self):
         return self._full_c_size
 
     def get_full_d_size(self):
         return self._full_d_size
-
-    def get_frame_sizes(self, i):
-        if i > 0:
-            return (self._cumulated_c_size[i-1],
-                    self._cumulated_d_size[i-1])
-        else:
-            return 0, 0
 
     def _merge_frames(self, max_frames):
         if self._frames_count <= max_frames:
