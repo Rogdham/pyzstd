@@ -760,12 +760,12 @@ class SeekableZstdFileCase(unittest.TestCase):
         # append mode
         b = BytesIO(self.two_frames)
         with self.assertRaisesRegex(TypeError,
-                                    "Can't accept file object"):
+                                    "can't accept file object"):
             SeekableZstdFile(b, 'ab')
 
         # specify max_frame_content_size in reading mode
         with self.assertRaisesRegex(ValueError,
-                                    'only valid in writing mode'):
+                                    'only valid in write modes'):
             SeekableZstdFile(b, 'r', max_frame_content_size=100)
 
     def test_load(self):
@@ -1169,7 +1169,7 @@ class SeekableZstdFileCase(unittest.TestCase):
     def test_bad_append(self):
         # can't accept file object
         with self.assertRaisesRegex(TypeError,
-                                    "Can't accept file object"):
+                                    "can't accept file object"):
             SeekableZstdFile(BytesIO(self.two_frames), 'ab')
 
         # two frames NOT seekable format file

@@ -913,7 +913,7 @@ SeekableZstdFile class
 
     Note that it doesn't verify/write the XXH64 checksum fields, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
 
-    :py:class:`ZstdFile` can also read "Zstandard Seekable Format" file, but no fast seeking ability.
+    :py:class:`ZstdFile` class can also read "Zstandard Seekable Format" file, but no fast seeking ability.
 
     .. versionadded:: 0.15.8
 
@@ -937,7 +937,7 @@ SeekableZstdFile class
 
     .. py:staticmethod:: is_seekable_format_file(filename)
 
-        This static method checks if a file is a valid "Zstandard Seekable Format" file or 0-size file.
+        This static method checks if a file is "Zstandard Seekable Format" file or 0-size file.
 
         It parses the seek table at the end of the file, returns ``True`` if no format error.
 

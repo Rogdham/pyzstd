@@ -202,7 +202,7 @@ class SeekTable:
 
     # Find frame index by decompressed position
     def index_by_dpos(self, pos):
-        # Array's first item is 0, so this is necessary.
+        # Array's first item is 0, so need this.
         if pos < 0:
             pos = 0
 
@@ -210,7 +210,7 @@ class SeekTable:
         if i != self._frames_count + 1:
             return i
         else:
-            # None means at EOF
+            # None means >= EOF
             return None
 
     def get_frame_sizes(self, i):
@@ -252,11 +252,11 @@ class SeekTable:
         # Exceeded format limit
         if self._frames_count > 0xFFFFFFFF:
             # Emit a warning
-            warn(('The seek table of "Zstandard Seekable Format" '
-                  'has %d entries, which exceeds the maximum value '
-                  'allowed by the format (0xFFFFFFFF). The entries '
-                  'will be merged into 0xFFFFFFFF entries, this may '
-                  'reduce seeking performance.') % self._frames_count,
+            warn(('SeekableZstdFile\'s seek table has %d entries, '
+                  'which exceeds the maximum value allowed by '
+                  '"Zstandard Seekable Format" (0xFFFFFFFF). The '
+                  'entries will be merged into 0xFFFFFFFF entries, '
+                  'this may reduce seeking performance.') % self._frames_count,
                  RuntimeWarning, 3)
 
             # Merge frames
@@ -396,12 +396,12 @@ class SeekableZstdFile(ZstdFile):
         PathLike object), in which case the named file is opened, or it can be
         an existing file object to read from or write to.
 
-        In appending mode ("a" or "ab"), filename can't be a file object, use
-        file path in this mode.
-
         mode can be "r" for reading (default), "w" for (over)writing, "x" for
         creating exclusively, or "a" for appending. These can equivalently be
         given as "rb", "wb", "xb" and "ab" respectively.
+
+        In append mode ("a" or "ab"), filename argument can't be a file object,
+        use file path in this mode.
 
         Parameters
         level_or_option: When it's an int object, it represents compression
@@ -411,12 +411,12 @@ class SeekableZstdFile(ZstdFile):
             support int type compression level in this case.
         zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
             decompression.
-        max_frame_content_size: In writing/appending modes (compression), when
+        max_frame_content_size: In write/append modes (compression), when
             the uncompressed data size reaches max_frame_content_size, a frame
-            is generated. If the size is small, it will increase seeking speed
-            but reduce compression ratio. If the size is large, it will reduce
-            seeking speed but increase compression ratio. You can also manually
-            generate a frame using f.flush(f.FLUSH_FRAME).
+            is generated automatically. If the size is small, it will increase
+            seeking speed, but reduce compression ratio. If the size is large,
+            it will reduce seeking speed, but increase compression ratio. You
+            can also manually generate a frame using f.flush(f.FLUSH_FRAME).
         """
         self._fp = None
         self._closefp = False
@@ -425,37 +425,37 @@ class SeekableZstdFile(ZstdFile):
         if mode in ("r", "rb"):
             # Specified max_frame_content_size argument
             if max_frame_content_size != 1024*1024*1024:
-                raise ValueError(('max_frame_content_size argument '
-                                  'is only valid in writing mode.'))
+                raise ValueError(('max_frame_content_size argument is only '
+                                  'valid in write modes (compression).'))
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
+            if not (0 < max_frame_content_size <= self.FRAME_MAX_D_SIZE):
+                raise ValueError(
+                    ('max_frame_content_size argument should be '
+                     '0 < value <= %d, provided value is %d.') % \
+                    (self.FRAME_MAX_D_SIZE, max_frame_content_size))
+
+            # For seekable format
+            self._max_frame_content_size = max_frame_content_size
+            self._reset_frame_sizes()
             self._seek_table = SeekTable(read_mode=False)
 
-            # Load seek table in appending mode
+            # Load seek table in append mode
             if mode in ("a", "ab"):
                 if isinstance(filename, (str, bytes, PathLike)):
                     with io.open(filename, "rb") as f:
                         self._seek_table.load_seek_table(f, seek_to_0=False)
                 else:
                     raise TypeError(
-                            ("SeekableZstdFile's appending mode "
-                             "('a'/'ab') only accepts file path "
-                             "(str/bytes/PathLike) as filename "
-                             "argument. Can't accept file object."))
-
-            # For seekable format
-            if not (0 < max_frame_content_size <= self.FRAME_MAX_D_SIZE):
-                raise ValueError(
-                    ('max_frame_content_size argument should be '
-                     '0 < value <= %d, provided value is %d.') % \
-                    (self.FRAME_MAX_D_SIZE, max_frame_content_size))
-            self._max_frame_content_size = max_frame_content_size
-            self._reset_frame_sizes()
+                            ("In append mode ('a', 'ab'), "
+                             "SeekableZstdFile.__init__() method can't "
+                             "accept file object as filename argument. "
+                             "Please use file path (str/bytes/PathLike)."))
 
         super().__init__(filename, mode,
                          level_or_option=level_or_option,
                          zstd_dict=zstd_dict)
 
-        # Overwrite seek table in appending mode
+        # Overwrite seek table in append mode
         if mode in ("a", "ab"):
             if self._fp.seekable():
                 self._fp.seek(self._seek_table.get_full_c_size())
@@ -466,12 +466,12 @@ class SeekableZstdFile(ZstdFile):
                 self._seek_table.append_entry(
                         self._seek_table.seek_frame_size, 0)
                 # Emit a warning
-                warn(("SeekableZstdFile is opened in appending mode "
-                      "('a'/'ab'), but the underlying file object is "
-                      "not seekable. Therefore the seek table (a zstd "
-                      "skippable frame) at the end of the file can't "
-                      "be overwritten. Each time open such file in "
-                      "appending mode, it will waste some storage "
+                warn(("SeekableZstdFile is opened in append mode "
+                      "('a', 'ab'), but the underlying file object "
+                      "is not seekable. Therefore the seek table (a "
+                      "zstd skippable frame) at the end of the file "
+                      "can't be overwritten. Each time open such file "
+                      "in append mode, it will waste some storage "
                       "space, %d bytes were wasted this time.") % \
                         self._seek_table.seek_frame_size,
                      RuntimeWarning, 2)
@@ -583,8 +583,7 @@ class SeekableZstdFile(ZstdFile):
 
     @staticmethod
     def is_seekable_format_file(filename):
-        """Check if a file is a valid Zstandard Seekable Format file or 0-size
-        file.
+        """Check if a file is Zstandard Seekable Format file or 0-size file.
 
         It parses the seek table at the end of the file, returns True if no
         format error.
@@ -614,11 +613,10 @@ class SeekableZstdFile(ZstdFile):
             ret = False
         else:
             ret = True
-
-        # Post process
-        if is_file_path:
-            fp.close()
-        else:
-            fp.seek(orig_pos)
+        finally:
+            if is_file_path:
+                fp.close()
+            else:
+                fp.seek(orig_pos)
 
         return ret
