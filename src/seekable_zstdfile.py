@@ -40,7 +40,8 @@ class SeekTable:
     _s_2uint32 = Struct('<II')
     _s_3uint32 = Struct('<III')
 
-    def __init__(self, read_mode=True):
+    # read_mode is True or False
+    def __init__(self, read_mode):
         self._read_mode = read_mode
         self._clear_seek_table()
 
