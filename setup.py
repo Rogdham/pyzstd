@@ -162,15 +162,15 @@ def do_setup():
         kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
         sys.path.append('src/bin_ext')
-        import build_cffi
-        binary_extension = build_cffi.get_extension(**kwargs)
+        import build_pyzstd_cffi
+        binary_extension = build_pyzstd_cffi.get_extension(**kwargs)
     else:  # C implementation
         # packages
         packages = ['pyzstd', 'pyzstd.c']
 
         # binary extension
         kwargs['name'] = 'pyzstd.c._zstd'
-        kwargs['sources'].append('src/bin_ext/_zstdmodule.c')
+        kwargs['sources'].append('src/bin_ext/pyzstd.c')
         if MULTI_PHASE_INIT:
             # use multi-phase initialization (PEP-489) on CPython 3.11+
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
