@@ -345,7 +345,7 @@ class SeekTableCase(unittest.TestCase):
         # empty
         b = BytesIO()
         t = SeekTable(read_mode=True)
-        t.load_seek_table(b)
+        t.load_seek_table(b, seek_to_0=True)
         self.assertEqual(len(t), 0)
         self.assertEqual(b.tell(), 0)
 
@@ -392,7 +392,7 @@ class SeekTableCase(unittest.TestCase):
         b.write(SeekTable._s_footer.pack(2, 0b10000000, 0x8F92EAB1))
 
         t = SeekTable(read_mode=True)
-        t.load_seek_table(b)
+        t.load_seek_table(b, seek_to_0=False)
         self.assertTrue(t._has_checksum)
         self.assertEqual(len(t), 2)
 
@@ -402,7 +402,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'size is less than'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # wrong Seekable_Magic_Number
         b = BytesIO()
@@ -412,7 +412,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Format Magic Number'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # wrong Seek_Table_Descriptor
         b = BytesIO()
@@ -422,7 +422,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Reserved_Bits'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # wrong expected size
         b = BytesIO()
@@ -432,7 +432,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'less than expected seek table size'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # wrong Magic_Number
         b = BytesIO()
@@ -443,7 +443,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Magic_Number'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # wrong Frame_Size
         b = BytesIO()
@@ -454,7 +454,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Frame_Size'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
     def test_load_bad2(self):
         # wrong Frame_Size
@@ -467,7 +467,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'impossible'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # cumulated compressed size 1
         b = BytesIO()
@@ -479,7 +479,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # cumulated compressed size 2
         b = BytesIO()
@@ -493,7 +493,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
         # cumulated compressed size 3
         b = BytesIO()
@@ -507,7 +507,7 @@ class SeekTableCase(unittest.TestCase):
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
-            t.load_seek_table(b)
+            t.load_seek_table(b, seek_to_0=True)
 
     @unittest.skipIf(BIT_BUILD == 32, 'skip in 32-bit build')
     def test_write_table(self):

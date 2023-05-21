@@ -89,7 +89,9 @@ class SeekTable:
             self._frames.append(compressed_size)
             self._frames.append(decompressed_size)
 
-    def load_seek_table(self, fp, seek_to_0=True):
+    # seek_to_0 is True or False.
+    # In read mode, seeking to 0 is necessary.
+    def load_seek_table(self, fp, seek_to_0):
         # Check fp readable/seekable
         if not (hasattr(fp, 'readable') and hasattr(fp, "seekable")):
             raise TypeError(
@@ -159,7 +161,6 @@ class SeekTable:
             msg = "Seek table frame's Frame_Size is wrong."
             raise SeekableFormatError(msg)
 
-        # For reading mode, seeking to 0 is necessary.
         # No more fp operations.
         if seek_to_0:
             fp.seek(0)
@@ -605,8 +606,8 @@ class SeekableZstdFile(ZstdFile):
                 ('filename argument must be a str/bytes/PathLike object, '
                  'or a file object that is readable and seekable.'))
 
-        # Read/Parse the seek table
-        table = SeekTable(read_mode=True)
+        # Read/Parse the seek table. Write mode uses less RAM.
+        table = SeekTable(read_mode=False)
         try:
             table.load_seek_table(fp, seek_to_0=False)
         except SeekableFormatError:
