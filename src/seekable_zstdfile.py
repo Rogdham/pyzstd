@@ -292,11 +292,9 @@ class SeekTable:
         return self._frames_count
 
     def get_info(self):
-        return ('Seek table:\n'
-                ' - items: {}\n'
-                ' - has checksum: {}').format(
-                    self._frames_count,
-                    bool(self._has_checksum))
+        return (self._frames_count,
+                self._full_c_size,
+                self._full_d_size)
 
 _32_KiB = 32*1024
 class SeekableDecompressReader(ZstdDecompressReader):
@@ -492,6 +490,7 @@ class SeekableZstdFile(ZstdFile):
             if self._mode == _MODE_WRITE:
                 self.flush(self.FLUSH_FRAME)
                 self._seek_table.write_seek_table(self._fp)
+                self._seek_table = None
         finally:
             super().close()
 
@@ -575,12 +574,19 @@ class SeekableZstdFile(ZstdFile):
 
     @property
     def seek_table_info(self):
+        '''A tuple: (frames_number, compressed_size, decompressed_size)
+        1, Frames_number and compressed_size don't count the seek table
+           frame (a zstd skippable frame at the end of the file).
+        2, In write modes, the part of data that has not been flushed to
+           frames is not counted.
+        '''
         if self._mode == _MODE_WRITE:
             return self._seek_table.get_info()
         elif self._mode == _MODE_READ:
             return self._buffer.raw.get_seek_table_info()
         else:
-            return 'SeekableZstdFile object has been closed'
+            # Closed
+            return None
 
     @staticmethod
     def is_seekable_format_file(filename):

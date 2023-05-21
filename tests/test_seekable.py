@@ -574,14 +574,17 @@ class SeekableZstdFileCase(unittest.TestCase):
                          1*1024*1024*1024)
 
         with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
-            self.assertEqual(type(f.seek_table_info), str)
-            self.assertIn('items: 2', f.seek_table_info)
+            self.assertEqual(f.seek_table_info,
+                             (2,
+                              len(self.two_frames)-(17+2*8),
+                              len(DECOMPRESSED)*2))
         with SeekableZstdFile(BytesIO(self.two_frames), 'w') as f:
             self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
             self.assertEqual(f.flush(f.FLUSH_FRAME), None)
             self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
             self.assertEqual(f.flush(f.FLUSH_FRAME), None)
-            self.assertIn('items: 2', f.seek_table_info)
+            self.assertEqual(f.seek_table_info,
+                             (2, f._fp.tell(), len(DECOMPRESSED)*2))
 
     def test_init(self):
         with SeekableZstdFile(BytesIO(self.two_frames)) as f:
@@ -860,14 +863,29 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.read(), DECOMPRESSED*2)
 
     def test_write(self):
+        DSIZE = len(DECOMPRESSED)
         # write
         b = BytesIO()
         with SeekableZstdFile(b, 'w') as f:
-            self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
+            self.assertEqual(f.write(DECOMPRESSED), DSIZE)
+            self.assertEqual(f.tell(), DSIZE)
+
             self.assertIsNone(f.flush(f.FLUSH_BLOCK))
+            self.assertEqual(f.tell(), DSIZE)
+            self.assertEqual(f.seek_table_info, (0, 0, 0))
+
             self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.tell(), DSIZE)
+            fp_pos = f._fp.tell()
+            self.assertEqual(f.seek_table_info, (1, fp_pos, DSIZE))
+
             self.assertEqual(f.write(b'xyz'), 3)
+            self.assertEqual(f.tell(), DSIZE+3)
+            self.assertEqual(f.seek_table_info, (1, fp_pos, DSIZE))
+
             f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.tell(), DSIZE+3)
+            self.assertEqual(f.seek_table_info, (2, f._fp.tell(), DSIZE+3))
         dat = b.getvalue()
         lst = self.get_decompressed_sizes_list(dat)
         self.assertEqual(lst, [10, 3, 0])
@@ -912,13 +930,16 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.tell(), 0)
         # 17 is a seek table without entry, 4+4+9
         self.assertEqual(len(bo.getvalue()), 17)
 
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.tell(), 0)
             f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.tell(), 0)
         # 17 is a seek table without entry, 4+4+9
         self.assertEqual(len(bo.getvalue()), 17)
 
@@ -926,6 +947,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.write(b'')
+            self.assertEqual(f.tell(), 0)
         # SeekableZstdFile.write() do nothing if length is 0
         self.assertEqual(len(bo.getvalue()), 17)
 
@@ -933,6 +955,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f.tell(), 0)
         self.assertGreater(len(bo.getvalue()), 17)
 
     def test_write_empty_block(self):
@@ -950,33 +973,76 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.write(b'123')
+            self.assertEqual(f.tell(), 3)
+
             f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f.tell(), 3)
             fp_pos = f._fp.tell()
             self.assertNotEqual(fp_pos, 0)
+
             f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f.tell(), 3)
             self.assertEqual(f._fp.tell(), fp_pos)
 
         # mode != .last_mode
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w') as f:
             f.flush(f.FLUSH_BLOCK)
-            self.assertEqual(f._fp.tell(), 0)
-            f.write(b'')
-            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f.tell(), 0)
             self.assertEqual(f._fp.tell(), 0)
 
+            f.write(b'')
+            self.assertEqual(f.tell(), 0)
+
+            f.flush(f.FLUSH_BLOCK)
+            self.assertEqual(f.tell(), 0)
+            self.assertEqual(f._fp.tell(), 0)
+
+    def test_buffer_protocol(self):
+        # don't use len() for buffer protocol objects
+        arr = array.array("I", range(1000))
+        LENGTH = len(arr) * arr.itemsize
+
+        # write
+        b = BytesIO()
+        with SeekableZstdFile(b, "wb",
+                              max_frame_content_size=33) as f:
+            self.assertEqual(f.write(arr), LENGTH)
+            self.assertEqual(f.tell(), LENGTH)
+            f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.seek_table_info,
+                             (ceil(LENGTH/33),
+                              f._fp.tell(),
+                              ceil(LENGTH)))
+
+        # verify
+        with SeekableZstdFile(b, "rb") as f:
+            dat = f.read()
+            self.assertEqual(dat, arr.tobytes())
+
     def test_flush(self):
+        DSIZE = len(DECOMPRESSED)
         b = BytesIO()
         with SeekableZstdFile(b, 'w') as f:
-            f.write(DECOMPRESSED)
+            self.assertEqual(f.write(DECOMPRESSED), DSIZE)
+            self.assertEqual(f.tell(), DSIZE)
+
             self.assertEqual(f.flush(f.FLUSH_BLOCK), None)
-            self.assertIn('items: 0\n', f.seek_table_info)
+            self.assertEqual(f.tell(), DSIZE)
+            self.assertEqual(f.seek_table_info, (0, 0, 0))
+
             self.assertEqual(f.flush(mode=f.FLUSH_FRAME), None)
-            self.assertIn('items: 1\n', f.seek_table_info)
+            self.assertEqual(f.tell(), DSIZE)
+            fp_pos = f._fp.tell()
+            self.assertEqual(f.seek_table_info, (1, fp_pos, DSIZE))
+
             f.write(DECOMPRESSED)
-            self.assertIn('items: 1\n', f.seek_table_info)
+            self.assertEqual(f.tell(), DSIZE*2)
+            self.assertEqual(f.seek_table_info, (1, fp_pos, DSIZE))
+
             f.flush(f.FLUSH_FRAME)
-            self.assertIn('items: 2\n', f.seek_table_info)
+            self.assertEqual(f.tell(), DSIZE*2)
+            self.assertEqual(f.seek_table_info, (2, f._fp.tell(), DSIZE*2))
 
         # closed file
         with self.assertRaisesRegex(ValueError, 'I/O operation'):
@@ -1048,18 +1114,51 @@ class SeekableZstdFileCase(unittest.TestCase):
                              max_frame_content_size=1*1024*1024*1024+1)
 
     def test_write_max_content_size(self):
+        DSIZE = len(DECOMPRESSED)
         TAIL = b'12345'
+        TAILSIZE = len(TAIL)
 
         b = BytesIO()
         with SeekableZstdFile(b, 'w',
                               max_frame_content_size=4) as f:
-            self.assertEqual(f.write(DECOMPRESSED), len(DECOMPRESSED))
+            # 4, 4, (2)
+            self.assertEqual(f.write(DECOMPRESSED), DSIZE)
+            self.assertEqual(f.tell(), DSIZE)
+            fp_pos = f._fp.tell()
+            self.assertEqual(f.seek_table_info,
+                             (2, fp_pos, 8))
+
+            # 4, 4, (2)
             self.assertIsNone(f.flush(f.FLUSH_BLOCK))
+            self.assertEqual(f.tell(), DSIZE)
+            self.assertEqual(f.seek_table_info,
+                             (2, fp_pos, 8))
+
+            # 4, 4, 2
             self.assertIsNone(f.flush(f.FLUSH_FRAME))
-            self.assertEqual(f.write(TAIL), len(TAIL))
+            self.assertEqual(f.tell(), DSIZE)
+            self.assertEqual(f.seek_table_info,
+                             (3, f._fp.tell(), DSIZE))
+
+            # 4, 4, 2, 4, (1)
+            self.assertEqual(f.write(TAIL), TAILSIZE)
+            self.assertEqual(f.tell(), DSIZE+TAILSIZE)
+            self.assertEqual(f.seek_table_info,
+                             (4, f._fp.tell(), DSIZE+4))
+
+            # 4, 4, 2, 4, 1
             self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.tell(), DSIZE+TAILSIZE)
+            self.assertEqual(f.seek_table_info,
+                             (5, f._fp.tell(), DSIZE+TAILSIZE))
+
+            # 4, 4, 2, 4, 1,
+            # 4, 4, 4, (3)
             self.assertEqual(f.write(DECOMPRESSED+TAIL),
-                             len(DECOMPRESSED+TAIL))
+                             DSIZE+TAILSIZE)
+            self.assertEqual(f.tell(), (DSIZE+TAILSIZE)*2)
+            self.assertEqual(f.seek_table_info,
+                             (8, f._fp.tell(), 27))
         frames = [4, 4, 2,
                   4, 1,
                   4, 4, 4, 3,
@@ -1073,21 +1172,35 @@ class SeekableZstdFileCase(unittest.TestCase):
                              DECOMPRESSED + TAIL + DECOMPRESSED + TAIL)
             # 1 is the skip table
             self.assertEqual(len(f._buffer.raw._seek_table), len(frames)-1)
+            self.assertEqual(f.seek_table_info,
+                             (9,
+                              len(b.getvalue()) - (17+9*8),
+                              (DSIZE+TAILSIZE)*2))
 
     def test_append_mode(self):
+        DSIZE = len(DECOMPRESSED)
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
             filename = tmp_f.name
-
         # two frames seekable format file
         with io.open(filename, 'wb') as f:
             f.write(self.two_frames)
 
         # append
         with SeekableZstdFile(filename, 'a') as f:
-            f.write(DECOMPRESSED)
-            f.flush()
-            f.write(DECOMPRESSED)
-            f.flush(f.FLUSH_FRAME)
+            # same as ZstdFile, in append mode init position is 0.
+            self.assertEqual(f.tell(), 0)
+
+            self.assertEqual(f.write(DECOMPRESSED), DSIZE)
+            self.assertEqual(f.tell(), DSIZE)
+
+            self.assertIsNone(f.flush())
+            self.assertEqual(f.tell(), DSIZE)
+
+            self.assertEqual(f.write(DECOMPRESSED), DSIZE)
+            self.assertEqual(f.tell(), DSIZE*2)
+
+            self.assertIsNone(f.flush(f.FLUSH_FRAME))
+            self.assertEqual(f.tell(), DSIZE*2)
 
         # verify
         with SeekableZstdFile(filename, 'r') as f:
@@ -1345,6 +1458,7 @@ class SeekableZstdFileCase(unittest.TestCase):
                                      CParameter.checksumFlag:1},
                               max_frame_content_size=_100KiB) as f:
             self.assertEqual(f.write(b), len(b))
+            self.assertEqual(f.tell(), len(b))
 
         # frames
         self.assertEqual(self.get_decompressed_sizes_list(bo.getvalue()),
@@ -1389,6 +1503,46 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(0), 0)
             self.assertEqual(f.tell(), 0)
             self.assertEqual(f.read(), b)
+
+    def test_table_info(self):
+        # read mode
+        with SeekableZstdFile(BytesIO(self.two_frames), 'r') as f:
+            self.assertEqual(f.read(), DECOMPRESSED*2)
+            self.assertEqual(f.seek_table_info,
+                             (2,
+                              len(self.two_frames) - (17+2*8),
+                              len(DECOMPRESSED)*2)
+                            )
+
+        # write mode
+        with SeekableZstdFile(BytesIO(), 'w') as f:
+            f.write(DECOMPRESSED)
+            f.flush(f.FLUSH_FRAME)
+            f.write(DECOMPRESSED)
+            f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.seek_table_info,
+                             (2,
+                              f._fp.tell(),
+                              len(DECOMPRESSED)*2)
+                            )
+
+        # append mode
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = tmp_f.name
+        with io.open(filename, 'wb') as f:
+            f.write(self.two_frames)
+        with SeekableZstdFile(filename, 'a') as f:
+            f.write(DECOMPRESSED)
+            f.flush(f.FLUSH_FRAME)
+            self.assertEqual(f.seek_table_info,
+                             (3,
+                              f._fp.tell(),
+                              len(DECOMPRESSED)*3)
+                            )
+        os.remove(filename)
+
+        # closed
+        self.assertIsNone(f.seek_table_info)
 
 if __name__ == "__main__":
     unittest.main()

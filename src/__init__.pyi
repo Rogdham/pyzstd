@@ -210,6 +210,9 @@ class SeekableZstdFile(ZstdFile):
                  zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                  max_frame_content_size: int = 1024*1024*1024) -> None: ...
 
+    @property
+    def seek_table_info(self) -> Tuple[int, int, int]: ...
+
     @staticmethod
     def is_seekable_format_file(filename: Union[str, bytes, PathLike, BinaryIO]) -> bool: ...
 
