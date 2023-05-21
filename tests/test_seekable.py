@@ -1100,6 +1100,18 @@ class SeekableZstdFileCase(unittest.TestCase):
 
         os.remove(filename)
 
+    def test_close_exception(self):
+        class B(BytesIO):
+            def write(self, data):
+                if data:
+                    raise OSError
+
+        f = SeekableZstdFile(B(), 'w')
+        with self.assertRaises(OSError):
+            f.close()
+        self.assertTrue(f.closed)
+        self.assertIsNone(f._seek_table)
+
     def test_wrong_max_frame_content_size(self):
         with self.assertRaises(TypeError):
             SeekableZstdFile(BytesIO(), 'w',

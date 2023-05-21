@@ -488,9 +488,11 @@ class SeekableZstdFile(ZstdFile):
         """
         try:
             if self._mode == _MODE_WRITE:
-                self.flush(self.FLUSH_FRAME)
-                self._seek_table.write_seek_table(self._fp)
-                self._seek_table = None
+                try:
+                    self.flush(self.FLUSH_FRAME)
+                    self._seek_table.write_seek_table(self._fp)
+                finally:
+                    self._seek_table = None
         finally:
             super().close()
 
