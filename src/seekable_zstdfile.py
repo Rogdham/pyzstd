@@ -354,7 +354,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
             self._eof = False
             self._pos = d_pos
             self._fp.seek(c_pos)
-            self._decompressor = self._decomp_factory(**self._decomp_args)
+            self._decompressor._reset_session()
 
         # Read and discard data until we reach the desired position.
         # If offset < 0, do nothing.

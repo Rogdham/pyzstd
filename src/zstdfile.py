@@ -91,7 +91,11 @@ class ZstdDecompressReader(_compression.DecompressReader):
 
         # Make it so that offset is the number of bytes to skip forward.
         if offset < self._pos:
-            self._rewind()
+            # Rewind
+            self._fp.seek(0)
+            self._eof = False
+            self._pos = 0
+            self._decompressor._reset_session()
         else:
             offset -= self._pos
 

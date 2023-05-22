@@ -1765,6 +1765,34 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         with self.assertRaises(ZstdError):
             d.decompress(b'123456789')
 
+    def test_reset_session(self):
+        D_DAT = SAMPLES[0]
+        C_DAT = compress(D_DAT, zstd_dict=TRAINED_DICT)
+
+        # ZstdDecompressor
+        d = ZstdDecompressor(zstd_dict=TRAINED_DICT)
+        dat = d.decompress(C_DAT, 10)
+        self.assertEqual(dat, D_DAT[:10])
+        self.assertFalse(d.eof)
+        self.assertFalse(d.needs_input)
+
+        self.assertIsNone(d._reset_session()) # reset
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+        self.assertEqual(d.decompress(C_DAT), D_DAT)
+
+        # EndlessZstdDecompressor
+        d = EndlessZstdDecompressor(zstd_dict=TRAINED_DICT)
+        dat = d.decompress(C_DAT, 10)
+        self.assertEqual(dat, D_DAT[:10])
+        self.assertFalse(d.at_frame_edge)
+        self.assertFalse(d.needs_input)
+
+        self.assertIsNone(d._reset_session()) # reset
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+        self.assertEqual(d.decompress(C_DAT), D_DAT)
+
 class ZstdDictTestCase(unittest.TestCase):
 
     def test_is_raw(self):

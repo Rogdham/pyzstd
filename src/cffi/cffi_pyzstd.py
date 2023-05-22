@@ -1193,21 +1193,32 @@ class _Decompressor:
 
             return ret
         except:
-            # Reset variables
-            self._in_begin = 0
-            self._in_end = 0
-
-            self._needs_input = True
-            if self._type == _TYPE_DEC:
-                self._eof = False
-            else:
-                self._at_frame_edge = True
-
-            # Resetting session never fail
-            m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
+            # Reset decompressor's states/session
+            self.__reset_session()
             raise
         finally:
             self._lock.release()
+
+    def __reset_session(self):
+        # Reset variables
+        self._in_begin = 0
+        self._in_end = 0
+
+        self._needs_input = True
+        if self._type == _TYPE_DEC:
+            self._eof = False
+        else:
+            self._at_frame_edge = True
+
+        # Resetting session never fail
+        m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
+
+    def _reset_session(self):
+        """This is an undocumented method, used for ZstdFile/SeekableZstdFile classes.
+        Reset decompressor's states/session, don't reset parameters and dictionary.
+        """
+        with self._lock:
+            self.__reset_session()
 
     def __reduce__(self):
         msg = "Cannot pickle %s object." % type(self)
