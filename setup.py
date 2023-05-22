@@ -66,13 +66,18 @@ class pyzstd_build_ext(build_ext):
                 #   Level 0 produces no debug information at all. This reduces
                 #   the size of GCC wheels. By default CPython won't print any
                 #   C stack trace, so -g0 and -g2 are same for most users.
-                more_options = ['-g0']
+                # -flto:
+                #   This option runs the standard link-time optimizer. To use the
+                #   link-time optimizer, -flto and optimization options should be
+                #   specified at compile time and during the final link.
+                more_options = ['-g0', '-flto']
                 if self.PYZSTD_AVX2:
                     instrs = ['-mavx2', '-mlzcnt', '-mbmi', '-mbmi2']
                     more_options.extend(instrs)
                 if self.PYZSTD_WARNING_AS_ERROR:
                     more_options.append('-Werror')
                 extension.extra_compile_args.extend(more_options)
+                extension.extra_link_args.extend(['-g0', '-flto'])
             elif self.compiler.compiler_type == 'msvc':
                 # Remove .S source files, they use gcc/clang syntax.
                 extension.sources = [i for i in extension.sources
@@ -162,8 +167,8 @@ def do_setup():
         kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
         sys.path.append('src/bin_ext')
-        import build_pyzstd_cffi
-        binary_extension = build_pyzstd_cffi.get_extension(**kwargs)
+        import pyzstd_build_cffi
+        binary_extension = pyzstd_build_cffi.get_extension(**kwargs)
     else:  # C implementation
         # packages
         packages = ['pyzstd', 'pyzstd.c']
