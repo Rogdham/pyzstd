@@ -23,7 +23,9 @@ Release note
 ------------
 **0.15.8  (xxx xx, 2023)**
 
-Add `SeekableZstdFile <https://pyzstd.readthedocs.io/en/latest/#SeekableZstdFile>`_ class that supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
+#. Add `SeekableZstdFile <https://pyzstd.readthedocs.io/en/latest/#SeekableZstdFile>`_ class that supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
+
+#. Add *mode* argument to ``ZstdFile.flush()`` method, now it can flush a zstd frame.
 
 **0.15.7  (Apr 21, 2023)**
 

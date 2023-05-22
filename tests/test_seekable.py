@@ -432,7 +432,7 @@ class SeekTableCase(unittest.TestCase):
         b.seek(0)
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
-                                    'less than expected seek table size'):
+                                    'less than expected size'):
             t.load_seek_table(b, seek_to_0=True)
 
         # wrong Magic_Number
@@ -1200,7 +1200,8 @@ class SeekableZstdFileCase(unittest.TestCase):
 
         # append
         with SeekableZstdFile(filename, 'a') as f:
-            # same as ZstdFile, in append mode init position is 0.
+            # consistent with ZstdFile, in append mode the initial position
+            # is 0. user can get the correct position via f.seek_table_info.
             self.assertEqual(f.tell(), 0)
 
             self.assertEqual(f.write(DECOMPRESSED), DSIZE)

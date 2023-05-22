@@ -16,6 +16,7 @@ class SeekableFormatError(Exception):
 
 __doc__ = '''\
 Zstandard Seekable Format (Ver 0.1.0, 2017 Apr)
+Square brackets are used to indicate optional fields.
 All numeric fields are little-endian unless specified otherwise.
 A. Seek table is a skippable frame at the end of file:
      Magic_Number  Frame_Size  [Seek_Table_Entries]  Seek_Table_Footer
@@ -37,9 +38,9 @@ D. Seek_Table_Descriptor:
 __format_version__ = '0.1.0'
 
 class SeekTable:
-    _s_footer  = Struct('<IBI')
     _s_2uint32 = Struct('<II')
     _s_3uint32 = Struct('<III')
+    _s_footer  = Struct('<IBI')
 
     # read_mode is True or False
     def __init__(self, read_mode):
@@ -99,11 +100,11 @@ class SeekTable:
                 'The file object should have .readable()/.seekable() methods.')
         if not fp.readable():
             raise TypeError(
-                ('To load the seek table of "Zstandard Seekable Format", '
+                ('To load the seek table of Zstandard Seekable Format, '
                  'the file object should be readable.'))
         if not fp.seekable():
             raise TypeError(
-                ("To load the seek table of \"Zstandard Seekable Format\", "
+                ("To load the seek table of Zstandard Seekable Format, "
                  "the file object should be seekable. In SeekableZstdFile's "
                  "reading mode, the file object must be seekable. If the "
                  "file object is not seekable, it can be read sequentially "
@@ -124,12 +125,11 @@ class SeekTable:
         frames_number, descriptor, magic_number = self._s_footer.unpack(footer)
         # Check format
         if magic_number != 0x8F92EAB1:
-            msg = (r'The last 4 bytes of the file is not Zstandard '
-                   r'Seekable Format Magic Number (b"\xb1\xea\x92\x8f)". '
-                   r'SeekableZstdFile class only supports Zstandard '
-                   r'Seekable Format file or 0-size file. To read a '
-                   r'zstd file that is not in Zstandard Seekable '
-                   r'Format, use ZstdFile class.')
+            msg = ('The last 4 bytes of the file is not Zstandard Seekable '
+                   'Format Magic Number (b"\\xb1\\xea\\x92\\x8f)". '
+                   'SeekableZstdFile class only supports Zstandard Seekable '
+                   'Format file or 0-size file. To read a zstd file that is '
+                   'not in Zstandard Seekable Format, use ZstdFile class.')
             raise SeekableFormatError(msg)
 
         # Seek_Table_Descriptor
@@ -144,9 +144,9 @@ class SeekTable:
         # Frame size
         entry_size = 12 if self._has_checksum else 8
         skippable_frame_size = 17 + frames_number * entry_size
-        if skippable_frame_size > fsize:
-            msg = 'File size is less than expected seek table size.'
-            raise SeekableFormatError(msg)
+        if fsize < skippable_frame_size:
+            raise SeekableFormatError(('File size is less than expected '
+                                       'size of the seek table frame.'))
 
         # Read seek table
         fp.seek(-skippable_frame_size, 2) # 2 is SEEK_END
@@ -162,7 +162,7 @@ class SeekTable:
             msg = "Seek table frame's Frame_Size is wrong."
             raise SeekableFormatError(msg)
 
-        # No more fp operations.
+        # No more fp operations
         if seek_to_0:
             fp.seek(0)
 
@@ -255,8 +255,8 @@ class SeekTable:
         if self._frames_count > 0xFFFFFFFF:
             # Emit a warning
             warn(('SeekableZstdFile\'s seek table has %d entries, '
-                  'which exceeds the maximum value allowed by '
-                  '"Zstandard Seekable Format" (0xFFFFFFFF). The '
+                  'which exceeds the maximal value allowed by '
+                  'Zstandard Seekable Format (0xFFFFFFFF). The '
                   'entries will be merged into 0xFFFFFFFF entries, '
                   'this may reduce seeking performance.') % self._frames_count,
                  RuntimeWarning, 3)
@@ -401,7 +401,7 @@ class SeekableZstdFile(ZstdFile):
         given as "rb", "wb", "xb" and "ab" respectively.
 
         In append mode ("a" or "ab"), filename argument can't be a file object,
-        use file path in this mode.
+        please use file path.
 
         Parameters
         level_or_option: When it's an int object, it represents compression
