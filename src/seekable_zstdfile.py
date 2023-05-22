@@ -10,8 +10,9 @@ from pyzstd.zstdfile import ZstdDecompressReader, ZstdFile, \
 __all__ = ('SeekableFormatError', 'SeekableZstdFile')
 
 class SeekableFormatError(Exception):
-    '''An error related to Zstandard Seekable Format.'''
-    pass
+    'An error related to Zstandard Seekable Format.'
+    def __init__(self, msg):
+        super().__init__('[Zstandard Seekable Format error] ' + msg)
 
 __doc__ = '''\
 Zstandard Seekable Format (Ver 0.1.0, 2017 Apr)
@@ -114,7 +115,7 @@ class SeekTable:
             return
         elif fsize < 17: # 17=4+4+9
             msg = ('File size is less than the minimal size '
-                   '(17 bytes) of "Zstandard Seekable Format".')
+                   '(17 bytes) of Zstandard Seekable Format.')
             raise SeekableFormatError(msg)
 
         # Read footer
@@ -125,17 +126,17 @@ class SeekTable:
         if magic_number != 0x8F92EAB1:
             msg = (r'The last 4 bytes of the file is not Zstandard '
                    r'Seekable Format Magic Number (b"\xb1\xea\x92\x8f)". '
-                   r'SeekableZstdFile class only supports "Zstandard '
-                   r'Seekable Format" file or 0-size file. To read a '
-                   r'zstd file that is not in "Zstandard Seekable '
-                   r'Format", use ZstdFile class.')
+                   r'SeekableZstdFile class only supports Zstandard '
+                   r'Seekable Format file or 0-size file. To read a '
+                   r'zstd file that is not in Zstandard Seekable '
+                   r'Format, use ZstdFile class.')
             raise SeekableFormatError(msg)
 
         # Seek_Table_Descriptor
         self._has_checksum = \
            descriptor & 0b10000000
         if descriptor & 0b01111100:
-            msg = ('In "Zstandard Seekable Format" version %s, the '
+            msg = ('In Zstandard Seekable Format version %s, the '
                    'Reserved_Bits in Seek_Table_Descriptor must be 0.') \
                     % __format_version__
             raise SeekableFormatError(msg)
@@ -576,12 +577,12 @@ class SeekableZstdFile(ZstdFile):
 
     @property
     def seek_table_info(self):
-        '''A tuple: (frames_number, compressed_size, decompressed_size)
+        """A tuple: (frames_number, compressed_size, decompressed_size)
         1, Frames_number and compressed_size don't count the seek table
            frame (a zstd skippable frame at the end of the file).
         2, In write modes, the part of data that has not been flushed to
            frames is not counted.
-        '''
+        """
         if self._mode == _MODE_WRITE:
             return self._seek_table.get_info()
         elif self._mode == _MODE_READ:

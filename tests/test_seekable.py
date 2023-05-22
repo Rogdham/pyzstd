@@ -401,7 +401,8 @@ class SeekTableCase(unittest.TestCase):
         b = BytesIO(b'len<17')
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
-                                    'size is less than'):
+                                    (r'^\[Zstandard Seekable Format error\] '
+                                     r'File size is less than')):
             t.load_seek_table(b, seek_to_0=True)
 
         # wrong Seekable_Magic_Number
