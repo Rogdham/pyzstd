@@ -3,7 +3,6 @@ import io
 import os
 import pathlib
 import random
-import re
 import sys
 import tempfile
 import unittest
@@ -401,7 +400,7 @@ class SeekTableCase(unittest.TestCase):
         b = BytesIO(b'len<17')
         t = SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
-                                    (r'^\[Zstandard Seekable Format error\] '
+                                    (r'^Zstandard Seekable Format error: '
                                      r'File size is less than')):
             t.load_seek_table(b, seek_to_0=True)
 
@@ -831,16 +830,27 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.tell(), len(DECOMPRESSED)*2)
 
             self.assertEqual(f.seek(1), 1)
+            self.assertEqual(f.tell(), 1)
             self.assertEqual(f.read(), DECOMPRESSED[1:]+DECOMPRESSED)
+
             self.assertEqual(f.seek(-1), 0)
+            self.assertEqual(f.tell(), 0)
             self.assertEqual(f.read(), DECOMPRESSED*2)
+
             self.assertEqual(f.seek(9), 9)
+            self.assertEqual(f.tell(), 9)
             self.assertEqual(f.read(), DECOMPRESSED[9:]+DECOMPRESSED)
+
             self.assertEqual(f.seek(21), 20)
+            self.assertEqual(f.tell(), 20)
             self.assertEqual(f.read(), b'')
+
             self.assertEqual(f.seek(0), 0)
+            self.assertEqual(f.tell(), 0)
             self.assertEqual(f.read(), DECOMPRESSED*2)
+
             self.assertEqual(f.seek(20), 20)
+            self.assertEqual(f.tell(), 20)
             self.assertEqual(f.read(), b'')
 
     def test_read_not_seekable(self):

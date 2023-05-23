@@ -12,7 +12,7 @@ __all__ = ('SeekableFormatError', 'SeekableZstdFile')
 class SeekableFormatError(Exception):
     'An error related to Zstandard Seekable Format.'
     def __init__(self, msg):
-        super().__init__('[Zstandard Seekable Format error] ' + msg)
+        super().__init__('Zstandard Seekable Format error: ' + msg)
 
 __doc__ = '''\
 Zstandard Seekable Format (Ver 0.1.0, 2017 Apr)
@@ -42,7 +42,7 @@ class SeekTable:
     _s_3uint32 = Struct('<III')
     _s_footer  = Struct('<IBI')
 
-    # read_mode is True or False
+    # read_mode is True for read mode, False for write/append modes.
     def __init__(self, read_mode):
         self._read_mode = read_mode
         self._clear_seek_table()
@@ -582,6 +582,7 @@ class SeekableZstdFile(ZstdFile):
            frame (a zstd skippable frame at the end of the file).
         2, In write modes, the part of data that has not been flushed to
            frames is not counted.
+        3, If the SeekableZstdFile object is closed, it's None.
         """
         if self._mode == _MODE_WRITE:
             return self._seek_table.get_info()
@@ -615,9 +616,10 @@ class SeekableZstdFile(ZstdFile):
                 ('filename argument must be a str/bytes/PathLike object, '
                  'or a file object that is readable and seekable.'))
 
-        # Read/Parse the seek table. Write mode uses less RAM.
+        # Write mode uses less RAM
         table = SeekTable(read_mode=False)
         try:
+            # Read/Parse the seek table
             table.load_seek_table(fp, seek_to_0=False)
         except SeekableFormatError:
             ret = False
