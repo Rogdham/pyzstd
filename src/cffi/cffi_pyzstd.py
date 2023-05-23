@@ -1207,6 +1207,7 @@ class _Decompressor:
         self._needs_input = True
         if self._type == _TYPE_DEC:
             self._eof = False
+            self._unused_data = ffi.NULL
         else:
             self._at_frame_edge = True
 

@@ -1768,22 +1768,45 @@ class DecompressorFlagsTestCase(unittest.TestCase):
     def test_reset_session(self):
         D_DAT = SAMPLES[0]
         C_DAT = compress(D_DAT, zstd_dict=TRAINED_DICT)
+        C_2DAT = C_DAT * 2
+        TAIL = b'1234'
 
         # ZstdDecompressor
         d = ZstdDecompressor(zstd_dict=TRAINED_DICT)
-        dat = d.decompress(C_DAT, 10)
+        # part data
+        dat = d.decompress(C_DAT+TAIL, 10)
         self.assertEqual(dat, D_DAT[:10])
         self.assertFalse(d.eof)
         self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
 
-        self.assertIsNone(d._reset_session()) # reset
+        # reset
+        self.assertIsNone(d._reset_session())
         self.assertFalse(d.eof)
         self.assertTrue(d.needs_input)
-        self.assertEqual(d.decompress(C_DAT), D_DAT)
+        self.assertEqual(d.unused_data, b'')
+
+        # full
+        self.assertEqual(d.decompress(C_DAT+TAIL), D_DAT)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, TAIL)
+
+        # reset
+        self.assertIsNone(d._reset_session())
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
+
+        # full
+        self.assertEqual(d.decompress(C_2DAT), D_DAT)
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, C_DAT)
 
         # EndlessZstdDecompressor
         d = EndlessZstdDecompressor(zstd_dict=TRAINED_DICT)
-        dat = d.decompress(C_DAT, 10)
+        dat = d.decompress(C_2DAT, 10)
         self.assertEqual(dat, D_DAT[:10])
         self.assertFalse(d.at_frame_edge)
         self.assertFalse(d.needs_input)
@@ -1791,7 +1814,7 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertIsNone(d._reset_session()) # reset
         self.assertTrue(d.at_frame_edge)
         self.assertTrue(d.needs_input)
-        self.assertEqual(d.decompress(C_DAT), D_DAT)
+        self.assertEqual(d.decompress(C_2DAT), D_DAT*2)
 
 class ZstdDictTestCase(unittest.TestCase):
 

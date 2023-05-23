@@ -8,22 +8,6 @@ typedef enum {
     TYPE_ENDLESS_DECOMPRESSOR,  /* <E>, EndlessZstdDecompressor class */
 } decompress_type;
 
-FORCE_INLINE void
-decompressor_reset_session(ZstdDecompressor *self)
-{
-    /* Reset variables */
-    self->in_begin = 0;
-    self->in_end = 0;
-
-    self->needs_input = 1;
-    self->at_frame_edge = 1;
-    self->eof = 0;
-    self->_unused_char_for_align = 0;
-
-    /* Resetting session never fail */
-    ZSTD_DCtx_reset(self->dctx, ZSTD_reset_session_only);
-}
-
 /* Decompress implementation for <D>, <E>, pseudo code:
 
         initialize_output_buffer
@@ -169,6 +153,28 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 error:
     OutputBuffer_OnError(&buffer);
     return NULL;
+}
+
+FORCE_INLINE void
+decompressor_reset_session(ZstdDecompressor *self,
+                           const decompress_type type)
+{
+    /* Reset variables */
+    self->in_begin = 0;
+    self->in_end = 0;
+
+    if (type == TYPE_DECOMPRESSOR) {
+        Py_CLEAR(self->unused_data);
+    }
+
+    /* Reset variables in one operation */
+    self->needs_input = 1;
+    self->at_frame_edge = 1;
+    self->eof = 0;
+    self->_unused_char_for_align = 0;
+
+    /* Resetting session never fail */
+    ZSTD_DCtx_reset(self->dctx, ZSTD_reset_session_only);
 }
 
 /* For ZstdDecompressor, EndlessZstdDecompressor. */
@@ -387,7 +393,7 @@ stream_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kwargs,
 
 error:
     /* Reset decompressor's states/session */
-    decompressor_reset_session(self);
+    decompressor_reset_session(self, type);
 
     Py_CLEAR(ret);
 success:
@@ -584,7 +590,7 @@ ZstdDecompressor_reset_session(ZstdDecompressor *self)
 {
     /* Thread-safe code */
     ACQUIRE_LOCK(self);
-    decompressor_reset_session(self);
+    decompressor_reset_session(self, TYPE_DECOMPRESSOR);
     RELEASE_LOCK(self);
 
     Py_RETURN_NONE;
@@ -681,11 +687,22 @@ EndlessZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObj
     return stream_decompress(self, args, kwargs, TYPE_ENDLESS_DECOMPRESSOR);
 }
 
+static PyObject *
+EndlessZstdDecompressor_reset_session(ZstdDecompressor *self)
+{
+    /* Thread-safe code */
+    ACQUIRE_LOCK(self);
+    decompressor_reset_session(self, TYPE_ENDLESS_DECOMPRESSOR);
+    RELEASE_LOCK(self);
+
+    Py_RETURN_NONE;
+}
+
 static PyMethodDef EndlessZstdDecompressor_methods[] = {
     {"decompress", (PyCFunction)EndlessZstdDecompressor_decompress,
      METH_VARARGS|METH_KEYWORDS, EndlessZstdDecompressor_decompress_doc},
 
-    {"_reset_session", (PyCFunction)ZstdDecompressor_reset_session,
+    {"_reset_session", (PyCFunction)EndlessZstdDecompressor_reset_session,
      METH_NOARGS, ZstdDecompressor_reset_session_doc},
 
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
