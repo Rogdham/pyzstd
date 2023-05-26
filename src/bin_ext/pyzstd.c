@@ -2,6 +2,7 @@
 #include "dict.c"
 #include "compressor.c"
 #include "decompressor.c"
+#include "filereader.c"
 #include "stream.c"
 
 /* --------------------------
@@ -269,9 +270,9 @@ add_constants(PyObject *module)
         return -1;
     }
 
-    /* _ZSTD_DStreamInSize */
-    obj = PyLong_FromSize_t(ZSTD_DStreamInSize());
-    if (PyModule_AddObject(module, "_ZSTD_DStreamInSize", obj) < 0) {
+    /* _ZSTD_DStreamOutSize */
+    obj = PyLong_FromSize_t(ZSTD_DStreamOutSize());
+    if (PyModule_AddObject(module, "_ZSTD_DStreamOutSize", obj) < 0) {
         Py_XDECREF(obj);
         return -1;
     }
@@ -381,6 +382,16 @@ static int _zstd_exec(PyObject *module) {
         return -1;
     }
 
+    MS_MEMBER(str_read) = PyUnicode_FromString("read");
+    if (MS_MEMBER(str_read) == NULL) {
+        return -1;
+    }
+
+    MS_MEMBER(int_ZSTD_DStreamInSize) = PyLong_FromSize_t(ZSTD_DStreamInSize());
+    if (MS_MEMBER(int_ZSTD_DStreamInSize) == NULL) {
+        return -1;
+    }
+
     MS_MEMBER(CParameter_type) = NULL;
     MS_MEMBER(DParameter_type) = NULL;
 
@@ -463,6 +474,14 @@ static int _zstd_exec(PyObject *module) {
         return -1;
     }
 
+    /* ZstdFileReader */
+    if (add_type_to_module(module,
+                           "ZstdFileReader",
+                           &ZstdFileReader_type_spec,
+                           &MS_MEMBER(ZstdFileReader_type)) < 0) {
+        return -1;
+    }
+
     /* zstd_version, a str. */
     if (PyModule_AddStringConstant(module, "zstd_version",
                                    ZSTD_versionString()) < 0) {
@@ -488,12 +507,15 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
     Py_VISIT(MS_MEMBER(empty_readonly_memoryview));
     Py_VISIT(MS_MEMBER(str_readinto));
     Py_VISIT(MS_MEMBER(str_write));
+    Py_VISIT(MS_MEMBER(str_read));
+    Py_VISIT(MS_MEMBER(int_ZSTD_DStreamInSize));
 
     Py_VISIT(MS_MEMBER(ZstdDict_type));
     Py_VISIT(MS_MEMBER(ZstdCompressor_type));
     Py_VISIT(MS_MEMBER(RichMemZstdCompressor_type));
     Py_VISIT(MS_MEMBER(ZstdDecompressor_type));
     Py_VISIT(MS_MEMBER(EndlessZstdDecompressor_type));
+    Py_VISIT(MS_MEMBER(ZstdFileReader_type));
     Py_VISIT(MS_MEMBER(ZstdError));
 
     Py_VISIT(MS_MEMBER(CParameter_type));
@@ -510,12 +532,15 @@ _zstd_clear(PyObject *module)
     Py_CLEAR(MS_MEMBER(empty_readonly_memoryview));
     Py_CLEAR(MS_MEMBER(str_readinto));
     Py_CLEAR(MS_MEMBER(str_write));
+    Py_CLEAR(MS_MEMBER(str_read));
+    Py_CLEAR(MS_MEMBER(int_ZSTD_DStreamInSize));
 
     Py_CLEAR(MS_MEMBER(ZstdDict_type));
     Py_CLEAR(MS_MEMBER(ZstdCompressor_type));
     Py_CLEAR(MS_MEMBER(RichMemZstdCompressor_type));
     Py_CLEAR(MS_MEMBER(ZstdDecompressor_type));
     Py_CLEAR(MS_MEMBER(EndlessZstdDecompressor_type));
+    Py_CLEAR(MS_MEMBER(ZstdFileReader_type));
     Py_CLEAR(MS_MEMBER(ZstdError));
 
     Py_CLEAR(MS_MEMBER(CParameter_type));

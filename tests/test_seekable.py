@@ -1467,7 +1467,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertGreater(f._fp.tell(), _10MiB)
             self.assertEqual(f.read(), DECOMPRESSED[3:])
 
-    def test_real_data(self):
+    def run_with_real_data(self, CLS):
         _100KiB = 100*1024
         _1MiB = 1*1024*1024
         b = bytes([random.randint(0, 255) for _ in range(128*1024)])
@@ -1489,15 +1489,18 @@ class SeekableZstdFileCase(unittest.TestCase):
                          [102400, 102400, 102400, 102400, 102400, 102400,
                           102400, 102400, 102400, 102400, 24576, 0])
 
-        # ZstdFile
+        # test 1
         bo.seek(0)
-        with ZstdFile(bo, 'r') as f:
+        with CLS(bo, 'r') as f:
             self.assertEqual(f.read(), b)
 
-        # read, automatically seek to 0.
-        with SeekableZstdFile(bo, 'r') as f:
+        # test 2
+        bo.seek(0)
+        with CLS(bo, 'r') as f:
             # frames number
-            self.assertEqual(len(f._buffer.raw._seek_table), ceil(_1MiB/_100KiB))
+            if CLS is SeekableZstdFile:
+                self.assertEqual(len(f._buffer.raw._seek_table),
+                                 ceil(_1MiB/_100KiB))
             # read 1
             OFFSET1 = 23
             OFFSET2 = 3 * _100KiB + 1234
@@ -1527,6 +1530,10 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(0), 0)
             self.assertEqual(f.tell(), 0)
             self.assertEqual(f.read(), b)
+
+    def test_real_data(self):
+        self.run_with_real_data(ZstdFile)
+        self.run_with_real_data(SeekableZstdFile)
 
     def test_table_info(self):
         # read mode

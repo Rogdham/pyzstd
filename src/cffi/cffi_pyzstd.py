@@ -14,13 +14,14 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
-           'compressionLevel_values', 'PYZSTD_CONFIG')
+           'compressionLevel_values', 'PYZSTD_CONFIG',
+           'ZstdFileReader')
 
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
                  'cffi', bool(m.pyzstd_static_link), False)
 
-# Used in __init__.py
 _ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()
+_ZSTD_DStreamOutSize = m.ZSTD_DStreamOutSize()
 
 zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
 zstd_version_info = tuple(int(i) for i in zstd_version.split('.'))
@@ -1357,6 +1358,150 @@ def decompress(data, zstd_dict=None, option=None):
         raise ZstdError(msg)
 
     return ret
+
+class ZstdFileReader:
+    def __init__(self, fp, zstd_dict, option):
+        # File states, the last three are public attributes.
+        self._fp = fp
+        self.eof = False
+        self.pos = 0     # Decompressed position
+        self.size = -1   # File size, -1 means unknown.
+
+        # Decompression states
+        self._needs_input = True
+        self._at_frame_edge = True
+
+        # Lazy create forward output buffer
+        self._tmp_output = None
+        # Input state, need to be initialized with 0.
+        self._in_buf = ffi.new("ZSTD_inBuffer *")
+        if self._in_buf == ffi.NULL:
+            raise MemoryError
+        # Output state
+        self._out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._out_buf == ffi.NULL:
+            raise MemoryError
+
+        # Decompression context
+        self._dctx = m.ZSTD_createDCtx()
+        if self._dctx == ffi.NULL:
+            raise ZstdError("Unable to create ZSTD_DCtx instance.")
+
+        # Load dictionary to decompression context
+        if zstd_dict is not None:
+            _load_d_dict(self._dctx, zstd_dict)
+            self.__dict = zstd_dict
+
+        # Set option to decompression context
+        if option is not None:
+            _set_d_parameters(self._dctx, option)
+
+    def __del__(self):
+        try:
+            m.ZSTD_freeDCtx(self._dctx)
+            self._dctx = ffi.NULL
+        except AttributeError:
+            pass
+
+    def _decompress_into(self, out_b, fill_full):
+        if self.eof or out_b.size == out_b.pos:
+            return 0
+
+        in_b = self._in_buf
+        while True:
+            if in_b.size == in_b.pos and self._needs_input:
+                self._in_dat = self._fp.read(_ZSTD_DStreamInSize)
+                if not self._in_dat:
+                    if self._at_frame_edge:
+                        self.eof = True
+                        self.pos += out_b.pos
+                        self.size = self.pos
+                        return out_b.pos
+                    else:
+                        raise EOFError("Compressed file ended before the "
+                                       "end-of-stream marker was reached")
+                in_b.src = ffi.from_buffer(self._in_dat)
+                in_b.size = _nbytes(self._in_dat)
+                in_b.pos = 0
+
+            # Decompress
+            zstd_ret = m.ZSTD_decompressStream(self._dctx, out_b, in_b)
+            if m.ZSTD_isError(zstd_ret):
+                _set_zstd_error(_ErrorType.ERR_DECOMPRESS, zstd_ret)
+
+            # Set flags
+            if zstd_ret == 0:
+                self._needs_input = True
+                self._at_frame_edge = True
+            else:
+                self._needs_input = (out_b.size != out_b.pos)
+                self._at_frame_edge = False
+
+            if fill_full and out_b.size != out_b.pos:
+                continue
+            if out_b.pos:
+                self.pos += out_b.pos
+                return out_b.pos
+
+    def readinto(self, b):
+        out_b = self._out_buf
+        out_b.dst = ffi.from_buffer(b)
+        out_b.size = _nbytes(b)
+        out_b.pos = 0
+
+        return self._decompress_into(out_b, False)
+
+    def readall(self):
+        out_b = self._out_buf
+        out = _BlocksOutputBuffer()
+        out.initAndGrow(out_b, -1)
+
+        while True:
+            self._decompress_into(out_b, True)
+            if out_b.size == out_b.pos:
+                # Grow output buffer
+                out.grow(out_b)
+            else:
+                # Finished
+                return out.finish(out_b)
+
+    def forward(self, offset):
+        # Forward output buffer
+        if self._tmp_output is None:
+            self._tmp_output = bytearray(_ZSTD_DStreamOutSize)
+
+            self._out_tmp = _new_nonzero("ZSTD_outBuffer *")
+            if self._out_tmp == ffi.NULL:
+                raise MemoryError
+            self._out_tmp.dst = ffi.from_buffer(self._tmp_output)
+        out_b = self._out_tmp
+
+        # Forward to EOF
+        if offset is None:
+            out_b.size = _ZSTD_DStreamOutSize
+            out_b.pos = 0
+            while self._decompress_into(out_b, True):
+                out_b.pos = 0
+            return
+
+        # Forward to offset
+        while offset > 0:
+            out_b.size = min(_ZSTD_DStreamOutSize, offset)
+            out_b.pos = 0
+            length = self._decompress_into(out_b, True)
+            if not length:
+                break
+            offset -= length
+
+    def reset_session(self):
+        # Reset decompression states
+        self._needs_input = True
+        self._at_frame_edge = True
+        self._in_buf.size = 0
+        self._in_buf.pos = 0
+
+        # Resetting session never fail
+        m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
 
 def _write_to_output(output_stream, out_mv, out_buf):
     write_pos = 0

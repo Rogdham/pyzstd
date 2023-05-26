@@ -14,11 +14,10 @@ __all__ = (# From this file
            'ZstdDict', 'ZstdError', 'decompress', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
-           'PYZSTD_CONFIG')
+           'ZstdFileReader', 'PYZSTD_CONFIG')
 
 
-# Used in __init__.py
-_ZSTD_DStreamInSize = _zstd._ZSTD_DStreamInSize
+_ZSTD_DStreamOutSize = _zstd._ZSTD_DStreamOutSize
 _train_dict = _zstd._train_dict
 _finalize_dict = _zstd._finalize_dict
 

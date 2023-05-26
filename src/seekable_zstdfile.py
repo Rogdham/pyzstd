@@ -297,14 +297,13 @@ class SeekTable:
                 self._full_c_size,
                 self._full_d_size)
 
-_32_KiB = 32*1024
 class SeekableDecompressReader(ZstdDecompressReader):
-    def __init__(self, fp, decomp_factory, trailing_error=(), **decomp_args):
+    def __init__(self, fp, zstd_dict, option):
         self._seek_table = SeekTable(read_mode=True)
         self._seek_table.load_seek_table(fp, seek_to_0=True)
 
-        super().__init__(fp, decomp_factory, trailing_error, **decomp_args)
-        self._size = self._seek_table.get_full_d_size()
+        super().__init__(fp, zstd_dict, option)
+        self._decomp.size = self._seek_table.get_full_d_size()
 
     # The parent class returns self._fp.seekable().
     # In .__init__() method, seekable has been checked in load_seek_table().
@@ -319,12 +318,12 @@ class SeekableDecompressReader(ZstdDecompressReader):
     def seek(self, offset, whence=0):
         # Recalculate offset as an absolute file position.
         # If offset < 0 or offset >= EOF, the code can handle them correctly.
-        if whence == 0:   # SEEK_SET
+        if whence == 0:    # SEEK_SET
             pass
-        elif whence == 1: # SEEK_CUR
-            offset = self._pos + offset
-        elif whence == 2: # SEEK_END
-            offset = self._size + offset
+        elif whence == 1:  # SEEK_CUR
+            offset = self._decomp.pos + offset
+        elif whence == 2:  # SEEK_END
+            offset = self._decomp.size + offset
         else:
             raise ValueError("Invalid value for whence: {}".format(whence))
 
@@ -332,13 +331,13 @@ class SeekableDecompressReader(ZstdDecompressReader):
         new_frame = self._seek_table.index_by_dpos(offset)
         # offset >= EOF
         if new_frame is None:
-            self._eof = True
-            self._pos = self._size
-            self._fp.seek(self._seek_table.get_full_c_size())
-            return self._pos
+            # No need to do self._fp.seek()
+            self._decomp.eof = True
+            self._decomp.pos = self._decomp.size
+            return self._decomp.pos
 
         # Prepare to jump
-        old_frame = self._seek_table.index_by_dpos(self._pos)
+        old_frame = self._seek_table.index_by_dpos(self._decomp.pos)
         c_pos, d_pos = self._seek_table.get_frame_sizes(new_frame)
 
         # If at P1, and the skippable frame is large, seeking to P2
@@ -347,25 +346,21 @@ class SeekableDecompressReader(ZstdDecompressReader):
         #       |--data1--|--skippable--|--data2--|
         # cpos:             ^P1
         # dpos:           ^P1             ^P2
-        if new_frame == old_frame and offset >= self._pos and \
+        if new_frame == old_frame and offset >= self._decomp.pos and \
            c_pos - self._fp.tell() < 1*1024*1024:
             pass
         else:
-            self._eof = False
-            self._pos = d_pos
+            self._decomp.eof = False
+            self._decomp.pos = d_pos
+            self._decomp.reset_session()
             self._fp.seek(c_pos)
-            self._decompressor._reset_session()
 
         # Read and discard data until we reach the desired position.
         # If offset < 0, do nothing.
-        offset -= self._pos
-        while offset > 0:
-            data = self.read(min(_32_KiB, offset))
-            if not data:
-                break
-            offset -= len(data)
+        offset -= self._decomp.pos
+        self._decomp.forward(offset)
 
-        return self._pos
+        return self._decomp.pos
 
     def get_seek_table_info(self):
         return self._seek_table.get_info()

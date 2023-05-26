@@ -1,6 +1,4 @@
-import _compression
 import io
-from sys import maxsize
 try:
     from os import PathLike
 except ImportError:
@@ -8,128 +6,70 @@ except ImportError:
     class PathLike:
         pass
 
-from pyzstd import ZstdCompressor, EndlessZstdDecompressor, \
-                   ZstdError, _ZSTD_DStreamInSize
+from pyzstd import ZstdCompressor, _ZSTD_DStreamOutSize, ZstdFileReader
 
 __all__ = ('ZstdFile', 'open')
 
-# In pyzstd module's blocks output buffer, the first block is 32 KiB. It has a
-# fast path for this size, if the output data is 32 KiB, it only allocates
-# memory and copies data once.
-_32_KiB = 32*1024
+class ZstdDecompressReader(io.RawIOBase):
+    """Adapts the decompressor API to a RawIOBase reader API"""
 
-# Copied from Python stdlib (_compression.py), except:
-# 1, ZstdDecompressReader.read():
-#      Uses ZSTD_DStreamInSize() (131,075 in zstd v1.x) instead of
-#      _compression.BUFFER_SIZE (default is 8 KiB) as read size.
-# 2, ZstdDecompressReader.seek():
-#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as
-#      max_length. See _32_KiB's comment for details.
-class ZstdDecompressReader(_compression.DecompressReader):
-    # Add .readall() method for speedup
-    # https://bugs.python.org/issue41486
+    def __init__(self, fp, zstd_dict, option):
+        self._fp = fp
+        self._decomp = ZstdFileReader(fp, zstd_dict, option)
+
+    def close(self):
+        self._decomp = None
+        return super().close()
+
+    def readable(self):
+        return True
+
+    # Some file-like objects don't have .seekable(), invoke when necessary.
+    def seekable(self):
+        return self._fp.seekable()
+
+    def tell(self):
+        return self._decomp.pos
+
+    def readinto(self, b):
+        return self._decomp.readinto(b)
+
     def readall(self):
-        chunks = []
-        while True:
-            # sys.maxsize means the max length of output buffer is unlimited,
-            # so that the whole input buffer can be decompressed within one
-            # .decompress() call.
-            data = self.read(maxsize)
-            if not data:
-                break
-            chunks.append(data)
-        return b''.join(chunks)
+        return self._decomp.readall()
 
-    # Compare to super().read():
-    # 1, Use ZSTD_DStreamInSize() instead of BUFFER_SIZE (default is 8 KiB)
-    # 2, Use EndlessZstdDecompressor to simplify the code
-    def read(self, size=-1):
-        if size < 0:
-            return self.readall()
-        if not size or self._eof:
-            return b""
-
-        # Depending on the input data, our call to the decompressor may not
-        # return any data. In this case, try again after reading another block.
-        while True:
-            if self._decompressor.needs_input:
-                rawblock = self._fp.read(_ZSTD_DStreamInSize)
-                if not rawblock:
-                    if self._decompressor.at_frame_edge:
-                        self._eof = True
-                        self._size = self._pos
-                        return b""
-                    else:
-                        raise EOFError("Compressed file ended before the "
-                                       "end-of-stream marker was reached")
-            else:
-                rawblock = b""
-
-            data = self._decompressor.decompress(rawblock, size)
-            if data:
-                self._pos += len(data)
-                return data
-
-    # Copied from base class, except use 32 KiB instead of
-    # io.DEFAULT_BUFFER_SIZE (default is 8 KiB) as max_length.
-    # If the new position is within BufferedReader's buffer,
+    # If the new position is within io.BufferedReader's buffer,
     # this method may not be called.
     def seek(self, offset, whence=0):
-        # Recalculate offset as an absolute file position.
-        if whence == 0:   # SEEK_SET
+        # Offset is absolute file position
+        if whence == 0:    # SEEK_SET
             pass
-        elif whence == 1: # SEEK_CUR
-            offset = self._pos + offset
-        elif whence == 2: # SEEK_END
-            # Seeking relative to EOF - we need to know the file's size.
-            if self._size < 0:
-                while self.read(_32_KiB):
-                    pass
-            offset = self._size + offset
+        elif whence == 1:  # SEEK_CUR
+            offset = self._decomp.pos + offset
+        elif whence == 2:  # SEEK_END
+            if self._decomp.size < 0:
+                # Get file size
+                self._decomp.forward(None)
+            offset = self._decomp.size + offset
         else:
-            raise ValueError("Invalid value for whence: {}".format(whence))
+            raise ValueError("Invalid whence value: {}".format(whence))
 
-        # Make it so that offset is the number of bytes to skip forward.
-        if offset < self._pos:
+        # Offset is bytes number to skip forward
+        if offset < self._decomp.pos:
             # Rewind
+            self._decomp.eof = False
+            self._decomp.pos = 0
+            self._decomp.reset_session()
             self._fp.seek(0)
-            self._eof = False
-            self._pos = 0
-            self._decompressor._reset_session()
         else:
-            offset -= self._pos
+            offset -= self._decomp.pos
+        self._decomp.forward(offset)
 
-        # Read and discard data until we reach the desired position.
-        while offset > 0:
-            data = self.read(min(_32_KiB, offset))
-            if not data:
-                break
-            offset -= len(data)
-
-        return self._pos
-
+        return self._decomp.pos
 
 _MODE_CLOSED = 0
 _MODE_READ   = 1
 _MODE_WRITE  = 2
 
-# Copied from Python stdlib (lzma.py), except:
-# 1, Add .readinto()/.readinto1() methods.
-# 2, Implement .flush() method.
-# 3, Remove BaseStream._check_*() overheads.
-#    The implementation needs to ensure:
-#      If in _MODE_READ mode, ._buffer is an io.BufferedReader object.
-#      If in _MODE_WRITE mode, ._compressor is a ZstdCompressor object.
-#      If in _MODE_CLOSED mode, they and ._fp don't exist or are None.
-#    Then if not in a mode, perform the corresponding actions will raise
-#    AttributeError, and ._check_mode() will raise a proper exception.
-# 4, ZstdFile.__init__():
-#      io.BufferedReader uses 32 KiB buffer size instead of default value
-#      io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
-#      See _32_KiB's comment for details.
-# 5, ZstdFile.read1():
-#      Uses 32 KiB instead of io.DEFAULT_BUFFER_SIZE (default is 8 KiB).
-#      Consistent with ZstdFile.__init__().
 class ZstdFile(io.BufferedIOBase):
     """A file object providing transparent zstd (de)compression.
 
@@ -206,10 +146,10 @@ class ZstdFile(io.BufferedIOBase):
 
         # ZstdDecompressReader
         if mode_code == _MODE_READ:
-            raw = self._READER_CLASS(self._fp, EndlessZstdDecompressor,
-                                     trailing_error=ZstdError,
-                                     zstd_dict=zstd_dict, option=level_or_option)
-            self._buffer = io.BufferedReader(raw, _32_KiB)
+            raw = self._READER_CLASS(self._fp,
+                                     zstd_dict=zstd_dict,
+                                     option=level_or_option)
+            self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
 
     def close(self):
         """Flush and close the file.
@@ -348,7 +288,7 @@ class ZstdFile(io.BufferedIOBase):
         Returns b"" if the file is at EOF.
         """
         if size < 0:
-            size = _32_KiB
+            size = _ZSTD_DStreamOutSize
 
         try:
             return self._buffer.read1(size)

@@ -468,7 +468,7 @@ class ClassShapeTestCase(unittest.TestCase):
         # such as SeekableZstdFile(ZstdFile), so pin them down.
         self.assertTrue(issubclass(ZstdFile, io.BufferedIOBase))
         self.assertTrue(issubclass(pyzstd.zstdfile.ZstdDecompressReader,
-                                   _compression.DecompressReader))
+                                   io.RawIOBase))
         self.assertIs(ZstdFile._READER_CLASS,
                       pyzstd.zstdfile.ZstdDecompressReader)
 
@@ -2653,19 +2653,29 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.writable)
 
-    def test_ZstdDecompressReader(self):
-        r = pyzstd.zstdfile.ZstdDecompressReader(
+    def test_ZstdFileReader(self):
+        r = pyzstd.zstdfile.ZstdFileReader(
                             BytesIO(self.FRAME_42),
-                            EndlessZstdDecompressor,
-                            trailing_error=ZstdError)
-        self.assertEqual(r.read(0), b'')
-        self.assertEqual(r.read(42), self.DECOMPRESSED_42)
-        self.assertEqual(r.read(10), b'')
+                            zstd_dict=None, option=None)
+        ba = bytearray(100)
+        mv = memoryview(ba)
+        self.assertEqual(r.readinto(mv[0:0]), 0)
+        self.assertEqual(r.readinto(mv[:42]), 42)
+        self.assertEqual(mv[:42], self.DECOMPRESSED_42)
+        self.assertEqual(r.readinto(mv[:10]), 0)
 
     def test_read(self):
+        with ZstdFile(BytesIO(self.FRAME_42)) as f:
+            self.assertEqual(f.read(), self.DECOMPRESSED_42)
+            self.assertTrue(f._buffer.raw._decomp.eof)
+            self.assertEqual(f.read(), b"")
+            self.assertTrue(f._buffer.raw._decomp.eof)
+
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
+            self.assertTrue(f._buffer.raw._decomp.eof)
             self.assertEqual(f.read(), b"")
+            self.assertTrue(f._buffer.raw._decomp.eof)
 
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
@@ -2679,6 +2689,7 @@ class FileTestCase(unittest.TestCase):
     def test_read_0(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(0), b"")
+            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
             self.assertEqual(f.read(0), b"")
@@ -2741,8 +2752,10 @@ class FileTestCase(unittest.TestCase):
             self.assertRaises(EOFError, f.read)
 
         with ZstdFile(BytesIO(truncated)) as f:
+            # this is an important test, make sure it doesn't raise EOFError.
             self.assertEqual(f.read(130*1024), decompress(TEST_DAT_130KB))
-            self.assertRaises(EOFError, f.read, 1)
+            with self.assertRaises(EOFError):
+                f.read(1)
 
         # Incomplete header
         for i in range(1, 20):
@@ -2808,6 +2821,23 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertRaises(TypeError, f.read1, None)
 
+    def test_readinto(self):
+        arr = array.array("I", range(100))
+        self.assertEqual(len(arr), 100)
+        self.assertEqual(len(arr) * arr.itemsize, 400)
+        ba = bytearray(300)
+        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
+            # 0 length output buffer
+            self.assertEqual(f.readinto(ba[0:0]), 0)
+
+            # use correct length for buffer protocol object
+            self.assertEqual(f.readinto(arr), 400)
+            self.assertEqual(arr.tobytes(), DECOMPRESSED_100_PLUS_32KB[:400])
+
+            # normal readinto
+            self.assertEqual(f.readinto(ba), 300)
+            self.assertEqual(ba, DECOMPRESSED_100_PLUS_32KB[400:700])
+
     def test_peek(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             result = f.peek()
@@ -2845,10 +2875,7 @@ class FileTestCase(unittest.TestCase):
             self.assertListEqual(f.readlines(), lines)
 
     def test_decompress_limited(self):
-        if PYZSTD_CONFIG[1] == 'cffi':
-            _ZSTD_DStreamInSize = pyzstd.cffi.cffi_pyzstd._ZSTD_DStreamInSize
-        else:
-            _ZSTD_DStreamInSize = pyzstd.c._zstd._ZSTD_DStreamInSize
+        _ZSTD_DStreamInSize = 128*1024 + 3
 
         bomb = compress(b'\0' * int(2e6), level_or_option=10)
         self.assertLess(len(bomb), _ZSTD_DStreamInSize)
@@ -2856,8 +2883,8 @@ class FileTestCase(unittest.TestCase):
         decomp = ZstdFile(BytesIO(bomb))
         self.assertEqual(decomp.read(1), b'\0')
 
-        # BufferedReader uses 32 KiB buffer in __init__.py
-        max_decomp = 1 + 32*1024
+        # BufferedReader uses 128 KiB buffer in __init__.py
+        max_decomp = 128*1024
         self.assertLessEqual(decomp._buffer.raw.tell(), max_decomp,
             "Excessive amount of data was decompressed")
 

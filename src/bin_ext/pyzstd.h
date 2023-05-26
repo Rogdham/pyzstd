@@ -135,12 +135,15 @@ struct _zstd_state {
     PyObject *empty_readonly_memoryview;
     PyObject *str_readinto;
     PyObject *str_write;
+    PyObject *str_read;
+    PyObject *int_ZSTD_DStreamInSize;
 
     PyTypeObject *ZstdDict_type;
     PyTypeObject *ZstdCompressor_type;
     PyTypeObject *RichMemZstdCompressor_type;
     PyTypeObject *ZstdDecompressor_type;
     PyTypeObject *EndlessZstdDecompressor_type;
+    PyTypeObject *ZstdFileReader_type;
     PyObject *ZstdError;
 
     PyTypeObject *CParameter_type;
