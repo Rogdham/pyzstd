@@ -53,7 +53,7 @@ class pyzstd_build_ext(build_ext):
 
     def build_extensions(self):
         # Print build config message in actual build
-        print(self.PYZSTD_CONFIG_MSG, flush=True)
+        print(self.PYZSTD_CONFIG_MSG)
 
         # Accept assembly files
         self.compiler.src_extensions.extend(['.s', '.S'])

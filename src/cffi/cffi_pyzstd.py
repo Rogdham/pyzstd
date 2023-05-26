@@ -1372,7 +1372,7 @@ def _write_to_output(output_stream, out_mv, out_buf):
         else:
             if write_bytes < 0 or write_bytes > left_bytes:
                 msg = ("output_stream.write() returned invalid length %d "
-+                      "(should be 0 <= value <= %d)")
+                       "(should be 0 <= value <= %d)")
                 raise ValueError(msg % (write_bytes, left_bytes))
             write_pos += write_bytes
 

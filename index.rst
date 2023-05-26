@@ -660,7 +660,7 @@ Dictionary
         Prefix can be used for :ref:`patching engine<patching_engine>` scenario.
 
         #. Prefix is compatible with "long distance matching", while dictionary is not.
-        #. Prefix only work for the first frame, then the compressor/decompressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames.
+        #. Prefix only work for the first frame, then the compressor/decompressor will return to no prefix state. This is different from dictionary that can be used for all subsequent frames. Therefore, be careful when using with ZstdFile/SeekableZstdFile.
         #. When decompressing, must use the same prefix as when compressing.
         #. Loading prefix to compressor is costly.
         #. Loading prefix to decompressor is not costly.
@@ -967,7 +967,7 @@ Advanced parameters
 
     This section contains class :py:class:`CParameter`, :py:class:`DParameter`, :py:class:`Strategy`, they are subclasses of ``IntEnum``, used for setting advanced parameters.
 
-    :py:class:`CParameter` class' attributes:
+    Attributes of :py:class:`CParameter` class:
 
         - Compression level (:py:attr:`~CParameter.compressionLevel`)
         - Compress algorithm parameters (:py:attr:`~CParameter.windowLog`, :py:attr:`~CParameter.hashLog`, :py:attr:`~CParameter.chainLog`, :py:attr:`~CParameter.searchLog`, :py:attr:`~CParameter.minMatch`, :py:attr:`~CParameter.targetLength`, :py:attr:`~CParameter.strategy`)
@@ -975,11 +975,11 @@ Advanced parameters
         - Misc (:py:attr:`~CParameter.contentSizeFlag`, :py:attr:`~CParameter.checksumFlag`, :py:attr:`~CParameter.dictIDFlag`)
         - Multi-threaded compression (:py:attr:`~CParameter.nbWorkers`, :py:attr:`~CParameter.jobSize`, :py:attr:`~CParameter.overlapLog`)
 
-    :py:class:`DParameter` class' attribute:
+    Attribute of :py:class:`DParameter` class:
 
         - Decompression parameter (:py:attr:`~DParameter.windowLogMax`)
 
-    :py:class:`Strategy` class' attributes:
+    Attributes of :py:class:`Strategy` class:
 
         :py:attr:`~Strategy.fast`, :py:attr:`~Strategy.dfast`, :py:attr:`~Strategy.greedy`, :py:attr:`~Strategy.lazy`, :py:attr:`~Strategy.lazy2`, :py:attr:`~Strategy.btlazy2`, :py:attr:`~Strategy.btopt`, :py:attr:`~Strategy.btultra`, :py:attr:`~Strategy.btultra2`.
 
