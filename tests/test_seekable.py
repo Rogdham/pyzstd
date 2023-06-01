@@ -46,16 +46,16 @@ class SeekTableCase(unittest.TestCase):
         with self.assertRaises(OverflowError):
             t.append_entry(123, -1)
 
-        # test array('Q')
-        arr = array.array('Q')
-        arr.append(0)
-        arr.append(2**64-1)
-        self.assertEqual(arr[0], 0)
-        self.assertEqual(arr[1], 2**64-1)
+        # test array('q')
+        arr = array.array('q')
+        arr.append(-2**63)
+        arr.append(2**63-1)
+        self.assertEqual(arr[0], -2**63)
+        self.assertEqual(arr[1], 2**63-1)
         with self.assertRaises(OverflowError):
-            arr.append(-1)
+            arr.append(-2**63-1)
         with self.assertRaises(OverflowError):
-            arr.append(2**64)
+            arr.append(2**63)
 
     def test_case1(self):
         lst = [(9, 10), (9, 10), (9, 10)]

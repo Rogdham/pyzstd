@@ -14,8 +14,8 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
-           'compressionLevel_values', 'PYZSTD_CONFIG',
-           'ZstdFileReader')
+           'compressionLevel_values', 'ZstdFileReader',
+           'PYZSTD_CONFIG')
 
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
                  'cffi', bool(m.pyzstd_static_link), False)
@@ -1216,8 +1216,8 @@ class _Decompressor:
         m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
 
     def _reset_session(self):
-        """This is an undocumented method, used for ZstdFile/SeekableZstdFile classes.
-        Reset decompressor's states/session, don't reset parameters and dictionary.
+        """This is an undocumented method. Reset decompressor's states/session, don't
+        reset parameters and dictionary.
         """
         with self._lock:
             self.__reset_session()
@@ -1410,7 +1410,9 @@ class ZstdFileReader:
         in_b = self._in_buf
         while True:
             if in_b.size == in_b.pos and self._needs_input:
+                # Read
                 self._in_dat = self._fp.read(_ZSTD_DStreamInSize)
+                # EOF
                 if not self._in_dat:
                     if self._at_frame_edge:
                         self.eof = True
@@ -1465,8 +1467,10 @@ class ZstdFileReader:
                 # Finished
                 return out.finish(out_b)
 
+    # If obj is None, forward to EOF.
+    # If obj <= 0, do nothing.
     def forward(self, offset):
-        # Forward output buffer
+        # Lazy create forward output buffer
         if self._tmp_output is None:
             self._tmp_output = bytearray(_ZSTD_DStreamOutSize)
 

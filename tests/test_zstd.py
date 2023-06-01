@@ -1,4 +1,3 @@
-import _compression
 from io import BytesIO, UnsupportedOperation
 import builtins
 import itertools
@@ -2722,17 +2721,6 @@ class FileTestCase(unittest.TestCase):
 
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB + COMPRESSED_DAT)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_DAT)
-
-    def test_read_multistream_buffer_size_aligned(self):
-        # Test the case where a stream boundary coincides with the end
-        # of the raw read buffer.
-        saved_buffer_size = _compression.BUFFER_SIZE
-        _compression.BUFFER_SIZE = len(COMPRESSED_100_PLUS_32KB)
-        try:
-            with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB *  5)) as f:
-                self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB * 5)
-        finally:
-            _compression.BUFFER_SIZE = saved_buffer_size
 
     def test_read_incomplete(self):
         with ZstdFile(BytesIO(TEST_DAT_130KB[:-200])) as f:

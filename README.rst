@@ -27,6 +27,8 @@ Release note
 
 #. Add *mode* argument to ``ZstdFile.flush()`` method, now it can flush a zstd frame.
 
+#. Optimize ``ZstdFile`` reading performance to C language level.
+
 **0.15.7  (Apr 21, 2023)**
 
 ZstdDict class changes:

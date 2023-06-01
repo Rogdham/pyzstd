@@ -582,8 +582,8 @@ ZstdDecompressor_decompress(ZstdDecompressor *self, PyObject *args, PyObject *kw
 PyDoc_STRVAR(ZstdDecompressor_reset_session_doc,
 "_reset_session()\n"
 "----\n"
-"This is an undocumented method, used for ZstdFile/SeekableZstdFile classes.\n"
-"Reset decompressor's states/session, don't reset parameters and dictionary.");
+"This is an undocumented method. Reset decompressor's states/session, don't\n"
+"reset parameters and dictionary.");
 
 static PyObject *
 ZstdDecompressor_reset_session(ZstdDecompressor *self)

@@ -59,9 +59,9 @@ class SeekTable:
         if self._read_mode:
             # Item: cumulated_size
             # Length: frames_count + 1
-            # Q is uint64_t.
-            self._cumulated_c_size = array('Q', [0])
-            self._cumulated_d_size = array('Q', [0])
+            # q is int64_t. On Windows and Linux, Py_off_t is signed.
+            self._cumulated_c_size = array('q', [0])
+            self._cumulated_d_size = array('q', [0])
         else:
             # Item: (c_size1, d_size1,
             #        c_size2, d_size2,

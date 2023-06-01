@@ -271,6 +271,8 @@ error:
     return NULL;
 }
 
+/* If obj is None, forward to EOF.
+   If obj <= 0, do nothing. */
 static PyObject *
 ZstdFileReader_forward(ZstdFileReader *self, PyObject *obj)
 {
