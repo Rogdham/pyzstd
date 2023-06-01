@@ -613,6 +613,16 @@ set_parameter_error(const _zstd_state* const state, int is_compress,
    -------------------------------------- */
 static const char init_twice_msg[] = "__init__ method is called twice.";
 
+FORCE_INLINE PyObject *
+invoke_method_one_arg(PyObject *obj, PyObject *meth, PyObject *arg)
+{
+#if PY_VERSION_HEX < 0x030900B1
+    return PyObject_CallMethodObjArgs(obj, meth, arg, NULL);
+#else
+    return PyObject_CallMethodOneArg(obj, meth, arg);
+#endif
+}
+
 typedef enum {
     ERR_DECOMPRESS,
     ERR_COMPRESS,

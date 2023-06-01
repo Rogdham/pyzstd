@@ -121,23 +121,6 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
     Py_DECREF(tp);
 }
 
-FORCE_INLINE PyObject *
-fp_read(ZstdFileReader *self)
-{
-    STATE_FROM_OBJ(self);
-
-#if PY_VERSION_HEX < 0x030900B1
-    return PyObject_CallMethodObjArgs(self->fp,
-                                      MS_MEMBER(str_read),
-                                      MS_MEMBER(int_ZSTD_DStreamInSize),
-                                      NULL);
-#else
-    return PyObject_CallMethodOneArg(self->fp,
-                                     MS_MEMBER(str_read),
-                                     MS_MEMBER(int_ZSTD_DStreamInSize));
-#endif
-}
-
 FORCE_INLINE int
 decompress_into(ZstdFileReader *self,
                 ZSTD_outBuffer *out, const int fill_full)
@@ -156,7 +139,13 @@ decompress_into(ZstdFileReader *self,
 
             /* Read */
             Py_XDECREF(self->in_dat);
-            self->in_dat = fp_read(self);
+            {
+                STATE_FROM_OBJ(self);
+                self->in_dat = invoke_method_one_arg(
+                                self->fp,
+                                MS_MEMBER(str_read),
+                                MS_MEMBER(int_ZSTD_DStreamInSize));
+            }
             if (self->in_dat == NULL) {
                 return -1;
             }

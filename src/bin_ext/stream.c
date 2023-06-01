@@ -48,9 +48,9 @@ write_to_output(const _zstd_state* const state,
             goto error;
         }
 
-        write_ret = PyObject_CallMethodObjArgs(output_stream,
-                                               state->str_write,
-                                               memoryview, NULL);
+        write_ret = invoke_method_one_arg(output_stream,
+                                          state->str_write,
+                                          memoryview);
         Py_DECREF(memoryview);
 
         if (write_ret == NULL) {
@@ -310,9 +310,9 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         ZSTD_EndDirective end_directive;
 
         /* Invoke .readinto() method */
-        temp = PyObject_CallMethodObjArgs(input_stream,
-                                          MS_MEMBER(str_readinto),
-                                          in_memoryview, NULL);
+        temp = invoke_method_one_arg(input_stream,
+                                     MS_MEMBER(str_readinto),
+                                     in_memoryview);
         if (temp == NULL) {
             goto error;
         } else if (temp == Py_None) {
@@ -557,9 +557,9 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         size_t callback_read_pos;
 
         /* Invoke .readinto() method */
-        temp = PyObject_CallMethodObjArgs(input_stream,
-                                          MS_MEMBER(str_readinto),
-                                          in_memoryview, NULL);
+        temp = invoke_method_one_arg(input_stream,
+                                     MS_MEMBER(str_readinto),
+                                     in_memoryview);
         if (temp == NULL) {
             goto error;
         } else if (temp == Py_None) {
