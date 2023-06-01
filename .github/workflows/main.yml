@@ -4,23 +4,32 @@ name: pyzstd
 on: [push, pull_request]
 
 env:
-  PYTHON_VER: '3.10'        # Python to run test/cibuildwheel
-  PYTHON_VER_PEP489: '3.11' # Python to run test with multi-phase init
+  PYTHON_VER: '3.11'        # Python to run test/cibuildwheel
   CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
   # Run test on Ubuntu/macOS/Windows for every commit
-  run_test:
+  run_on_cpython:
     name: Test on ${{ matrix.platform }} ${{ matrix.architecture }}
     runs-on: ${{ matrix.platform }}
 
     strategy:
       matrix:
         platform: [ubuntu-latest, macos-latest, windows-latest]
+        build_option: ['--warning-as-error',
+                       '--warning-as-error --multi-phase-init',
+                       '--warning-as-error --cffi']
         architecture: [x64]
         include:
           - platform: windows-latest
+            build_option: '--warning-as-error'
+            architecture: x86
+          - platform: windows-latest
+            build_option: '--warning-as-error --multi-phase-init'
+            architecture: x86
+          - platform: windows-latest
+            build_option: '--warning-as-error --cffi'
             architecture: x86
 
     steps:
@@ -34,34 +43,8 @@ jobs:
 
       - name: Run test
         run: |
-          python -m pip install --config-settings="--build-option=--warning-as-error" -vv .
-          python -m unittest discover tests
-
-  # Run test with multi-phase init on Ubuntu/macOS/Windows
-  run_test_with_multi_phase_init:
-    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} with multi-phase init
-    runs-on: ${{ matrix.platform }}
-
-    strategy:
-      matrix:
-        platform: [ubuntu-latest, macos-latest, windows-latest]
-        architecture: [x64]
-        include:
-          - platform: windows-latest
-            architecture: x86
-
-    steps:
-      - uses: actions/checkout@v3
-        with:
-          submodules: true
-      - uses: actions/setup-python@v4
-        with:
-          python-version: ${{ env.PYTHON_VER_PEP489 }}
-          architecture: ${{ matrix.architecture }}
-
-      - name: Run test with multi-phase init
-        run: |
-          python -m pip install --config-settings="--build-option=--warning-as-error --multi-phase-init" -vv .
+          python -m pip install cffi
+          python -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
           python -m unittest discover tests
 
   # Run test on PyPy for every commit
