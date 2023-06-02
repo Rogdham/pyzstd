@@ -175,6 +175,9 @@ def get_frame_info(frame_buffer: ByteString) -> frame_info: ...
 def get_frame_size(frame_buffer: ByteString) -> int: ...
 
 class ZstdFile(io.BufferedIOBase):
+    FLUSH_BLOCK: ClassVar[Literal[1]]
+    FLUSH_FRAME: ClassVar[Literal[2]]
+
     def __init__(self,
                  filename: Union[str, bytes, PathLike, BinaryIO],
                  mode: str = "r",
