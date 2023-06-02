@@ -9,7 +9,8 @@ typedef struct {
     ZSTD_DCtx *dctx;
     PyObject *dict;
 
-    /* File states. On Windows and Linux, Py_off_t is signed. */
+    /* File states. On Windows and Linux, Py_off_t is signed, so
+       ZstdFile/SeekableZstdFile use int64_t as file position/size. */
     PyObject *fp;
     int eof;
     int64_t pos;    /* Decompressed position */

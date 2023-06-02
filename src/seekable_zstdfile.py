@@ -317,8 +317,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
     # If the new position is within BufferedReader's buffer,
     # this method may not be called.
     def seek(self, offset, whence=0):
-        # Recalculate offset as an absolute file position.
-        # If offset < 0 or offset >= EOF, the code can handle them correctly.
+        # offset is absolute file position
         if whence == 0:    # SEEK_SET
             pass
         elif whence == 1:  # SEEK_CUR
@@ -351,14 +350,15 @@ class SeekableDecompressReader(ZstdDecompressReader):
            c_pos - self._fp.tell() < 1*1024*1024:
             pass
         else:
+            # Jump
             self._decomp.eof = False
             self._decomp.pos = d_pos
             self._decomp.reset_session()
             self._fp.seek(c_pos)
 
-        # Read and discard data until we reach the desired position.
-        # If offset < 0, do nothing.
+        # offset is bytes number to skip forward
         offset -= self._decomp.pos
+        # If offset <= 0, .forward() method does nothing.
         self._decomp.forward(offset)
 
         return self._decomp.pos

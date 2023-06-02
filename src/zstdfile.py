@@ -40,7 +40,7 @@ class ZstdDecompressReader(io.RawIOBase):
     # If the new position is within io.BufferedReader's buffer,
     # this method may not be called.
     def seek(self, offset, whence=0):
-        # Offset is absolute file position
+        # offset is absolute file position
         if whence == 0:    # SEEK_SET
             pass
         elif whence == 1:  # SEEK_CUR
@@ -53,7 +53,7 @@ class ZstdDecompressReader(io.RawIOBase):
         else:
             raise ValueError("Invalid whence value: {}".format(whence))
 
-        # Offset is bytes number to skip forward
+        # offset is bytes number to skip forward
         if offset < self._decomp.pos:
             # Rewind
             self._decomp.eof = False
@@ -62,6 +62,7 @@ class ZstdDecompressReader(io.RawIOBase):
             self._fp.seek(0)
         else:
             offset -= self._decomp.pos
+        # If offset <= 0, .forward() method does nothing.
         self._decomp.forward(offset)
 
         return self._decomp.pos
