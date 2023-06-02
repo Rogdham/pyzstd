@@ -1485,6 +1485,7 @@ class SeekableZstdFileCase(unittest.TestCase):
                               max_frame_content_size=_100KiB) as f:
             self.assertEqual(f.write(b), len(b))
             self.assertEqual(f.tell(), len(b))
+        SEEKABLE_FILE_SIZE = len(bo.getvalue())
 
         # frames
         self.assertEqual(self.get_decompressed_sizes_list(bo.getvalue()),
@@ -1515,6 +1516,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(_1MiB+_100KiB), _1MiB)
             self.assertEqual(f.tell(), _1MiB)
             self.assertEqual(f.read(), b'')
+            self.assertEqual(f._fp.tell(), SEEKABLE_FILE_SIZE)
             # read 2
             self.assertEqual(f.seek(-123), 0)
             self.assertEqual(f.tell(), 0)

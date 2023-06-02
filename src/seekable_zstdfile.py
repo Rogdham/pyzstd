@@ -49,8 +49,10 @@ class SeekTable:
 
     def _clear_seek_table(self):
         self._has_checksum = False
-        # Size of the seek table frame, used for append mode.
+        # The seek table frame size, used for append mode.
         self._seek_frame_size = 0
+        # The file size, used for seeking to EOF.
+        self._file_size = 0
 
         self._frames_count = 0
         self._full_c_size = 0
@@ -202,6 +204,7 @@ class SeekTable:
 
         # Parsed successfully, save for future use.
         self._seek_frame_size = skippable_frame_size
+        self._file_size = fsize
 
     # Find frame index by decompressed position
     def index_by_dpos(self, pos):
@@ -290,6 +293,10 @@ class SeekTable:
     def seek_frame_size(self):
         return self._seek_frame_size
 
+    @property
+    def file_size(self):
+        return self._file_size
+
     def __len__(self):
         return self._frames_count
 
@@ -331,9 +338,9 @@ class SeekableDecompressReader(ZstdDecompressReader):
         new_frame = self._seek_table.index_by_dpos(offset)
         # offset >= EOF
         if new_frame is None:
-            # No need to do self._fp.seek()
             self._decomp.eof = True
             self._decomp.pos = self._decomp.size
+            self._fp.seek(self._seek_table.file_size)
             return self._decomp.pos
 
         # Prepare to jump
