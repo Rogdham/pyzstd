@@ -2661,7 +2661,9 @@ class FileTestCase(unittest.TestCase):
         self.assertEqual(r.readinto(mv[0:0]), 0)
         self.assertEqual(r.readinto(mv[:42]), 42)
         self.assertEqual(mv[:42], self.DECOMPRESSED_42)
+        self.assertFalse(r.eof)
         self.assertEqual(r.readinto(mv[:10]), 0)
+        self.assertTrue(r.eof)
 
     def test_read(self):
         with ZstdFile(BytesIO(self.FRAME_42)) as f:
@@ -3311,17 +3313,23 @@ class OpenTestCase(unittest.TestCase):
             self.assertEqual(file_data, DECOMPRESSED_100_PLUS_32KB * 2)
 
     def test_text_modes(self):
-        uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
+        # empty input
+        with open(BytesIO(b''), "rt", encoding="utf-8", newline='\n') as reader:
+            for _ in reader:
+                pass
 
+        # read
+        uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")
         with open(BytesIO(COMPRESSED_THIS_FILE), "rt", encoding="utf-8") as f:
             self.assertEqual(f.read(), uncompressed)
 
         with BytesIO() as bio:
+            # write
             with open(bio, "wt", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")
             self.assertEqual(file_data.replace(os.linesep, "\n"), uncompressed)
-
+            # append
             with open(bio, "at", encoding="utf-8") as f:
                 f.write(uncompressed)
             file_data = decompress(bio.getvalue()).decode("utf-8")

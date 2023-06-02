@@ -2,7 +2,7 @@
 #include "dict.c"
 #include "compressor.c"
 #include "decompressor.c"
-#include "filereader.c"
+#include "file_reader.c"
 #include "stream.c"
 
 /* --------------------------

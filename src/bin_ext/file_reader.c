@@ -31,12 +31,12 @@ typedef struct {
 } ZstdFileReader;
 
 /* Generate two functions using macro:
-    1, file_set_d_parameters(ZstdFileReader *self, PyObject *option)
-    2, file_load_d_dict(ZstdFileReader *self, PyObject *dict) */
+    1, filereader_set_d_parameters(ZstdFileReader *self, PyObject *option)
+    2, filereader_load_d_dict(ZstdFileReader *self, PyObject *dict) */
 #undef  PYZSTD_DECOMPRESSOR_CLASS
 #define PYZSTD_DECOMPRESSOR_CLASS     ZstdFileReader
 #undef  PYZSTD_DECOMPRESSOR_PREFIX
-#define PYZSTD_DECOMPRESSOR_PREFIX(F) file_##F
+#define PYZSTD_DECOMPRESSOR_PREFIX(F) filereader_##F
 #include "macro_functions.h"
 
 static int
@@ -84,7 +84,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 
     /* Load dictionary to decompression context */
     if (zstd_dict != Py_None) {
-        if (file_load_d_dict(self, zstd_dict) < 0) {
+        if (filereader_load_d_dict(self, zstd_dict) < 0) {
             goto error;
         }
 
@@ -95,7 +95,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 
     /* Set option to decompression context */
     if (option != Py_None) {
-        if (file_set_d_parameters(self, option) < 0) {
+        if (filereader_set_d_parameters(self, option) < 0) {
             goto error;
         }
     }
@@ -145,9 +145,9 @@ decompress_into(ZstdFileReader *self,
                                 self->fp,
                                 MS_MEMBER(str_read),
                                 MS_MEMBER(int_ZSTD_DStreamInSize));
-            }
-            if (self->in_dat == NULL) {
-                return -1;
+                if (self->in_dat == NULL) {
+                    return -1;
+                }
             }
 
             /* Get address and length */
@@ -205,12 +205,12 @@ decompress_into(ZstdFileReader *self,
 }
 
 static PyObject *
-ZstdFileReader_readinto(ZstdFileReader *self, PyObject *obj)
+ZstdFileReader_readinto(ZstdFileReader *self, PyObject *arg)
 {
     ZSTD_outBuffer out;
     Py_buffer buf;
 
-    if (PyObject_GetBuffer(obj, &buf, PyBUF_SIMPLE) < 0) {
+    if (PyObject_GetBuffer(arg, &buf, PyBUF_SIMPLE) < 0) {
         return NULL;
     }
     out.dst = buf.buf;
@@ -263,23 +263,10 @@ error:
 /* If obj is None, forward to EOF.
    If obj <= 0, do nothing. */
 static PyObject *
-ZstdFileReader_forward(ZstdFileReader *self, PyObject *obj)
+ZstdFileReader_forward(ZstdFileReader *self, PyObject *arg)
 {
-    int64_t offset;
     ZSTD_outBuffer out;
     const size_t DStreamOutSize = ZSTD_DStreamOutSize();
-
-    /* Offset argument */
-    if (obj == Py_None) {
-        offset = INT64_MAX;
-    } else {
-        offset = PyLong_AsLongLong(obj);
-        if (offset == -1 && PyErr_Occurred()) {
-            PyErr_SetString(PyExc_TypeError,
-                            "offset argument should be int64_t value");
-            return NULL;
-        }
-    }
 
     /* Lazy create forward output buffer */
     if (self->tmp_output == NULL) {
@@ -291,12 +278,11 @@ ZstdFileReader_forward(ZstdFileReader *self, PyObject *obj)
     }
     out.dst = PyByteArray_AS_STRING(self->tmp_output);
 
-    /* Forward to EOF */
-    if (offset == INT64_MAX) {
+    if (arg == Py_None) {
+        /* Forward to EOF */
         out.size = DStreamOutSize;
         while (1) {
             out.pos = 0;
-
             if (decompress_into(self, &out, 1) < 0) {
                 return NULL;
             }
@@ -304,22 +290,29 @@ ZstdFileReader_forward(ZstdFileReader *self, PyObject *obj)
                 Py_RETURN_NONE;
             }
         }
-    }
-
-    /* Forward to offset */
-    while (offset > 0) {
-        out.size = (size_t) Py_MIN((int64_t)DStreamOutSize, offset);
-        out.pos = 0;
-
-        if (decompress_into(self, &out, 1) < 0) {
+    } else {
+        /* Offset argument */
+        int64_t offset = PyLong_AsLongLong(arg);
+        if (offset == -1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_TypeError,
+                            "offset argument should be int64_t integer");
             return NULL;
         }
-        if (out.pos == 0) {
-            Py_RETURN_NONE;
+
+        /* Forward to offset */
+        while (offset > 0) {
+            out.size = (size_t) Py_MIN((int64_t)DStreamOutSize, offset);
+            out.pos = 0;
+            if (decompress_into(self, &out, 1) < 0) {
+                return NULL;
+            }
+            if (out.pos == 0) {
+                Py_RETURN_NONE;
+            }
+            offset -= out.pos;
         }
-        offset -= out.pos;
+        Py_RETURN_NONE;
     }
-    Py_RETURN_NONE;
 }
 
 static PyObject *

@@ -31,10 +31,9 @@ class SeekTableCase(unittest.TestCase):
     def test_array_append(self):
         # test array('I')
         t = SeekTable(read_mode=False)
-
         t.append_entry(0xFFFFFFFF, 0)
-        # impossible frame
         with self.assertRaises(ValueError):
+            # impossible frame
             t.append_entry(0, 0xFFFFFFFF)
 
         with self.assertRaises(OverflowError):
@@ -47,15 +46,18 @@ class SeekTableCase(unittest.TestCase):
             t.append_entry(123, -1)
 
         # test array('q')
-        arr = array.array('q')
-        arr.append(-2**63)
-        arr.append(2**63-1)
-        self.assertEqual(arr[0], -2**63)
-        self.assertEqual(arr[1], 2**63-1)
+        t = SeekTable(read_mode=True)
+        t.append_entry(-2**63, 2**63-1)
+        self.assertEqual(t._cumulated_c_size[1], -2**63)
+        self.assertEqual(t._cumulated_d_size[1], 2**63-1)
         with self.assertRaises(OverflowError):
-            arr.append(-2**63-1)
+            t.append_entry(-2**63-1, 0)
         with self.assertRaises(OverflowError):
-            arr.append(2**63)
+            t.append_entry(2**63, 0)
+        with self.assertRaises((OverflowError, ValueError)):
+            t.append_entry(0, -2**63-1)
+        with self.assertRaises((OverflowError, ValueError)):
+            t.append_entry(0, 2**63)
 
     def test_case1(self):
         lst = [(9, 10), (9, 10), (9, 10)]
@@ -1474,7 +1476,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         b *= 8
         self.assertEqual(len(b), _1MiB)
 
-        # write
+        # write, -100000 makes low compression ratio.
         bo = BytesIO()
         with SeekableZstdFile(bo, 'w',
                               level_or_option=
@@ -1530,6 +1532,11 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(0), 0)
             self.assertEqual(f.tell(), 0)
             self.assertEqual(f.read(), b)
+            # read all
+            random_offset = random.randint(0, len(b))
+            self.assertEqual(f.seek(random_offset), random_offset)
+            self.assertEqual(f.tell(), random_offset)
+            self.assertEqual(f.read(), b[random_offset:])
 
     def test_real_data(self):
         self.run_with_real_data(ZstdFile)

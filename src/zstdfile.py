@@ -11,7 +11,7 @@ from pyzstd import ZstdCompressor, _ZSTD_DStreamOutSize, ZstdFileReader
 __all__ = ('ZstdFile', 'open')
 
 class ZstdDecompressReader(io.RawIOBase):
-    """Adapts the decompressor API to a RawIOBase reader API"""
+    """Adapt decompressor to RawIOBase reader API"""
 
     def __init__(self, fp, zstd_dict, option):
         self._fp = fp

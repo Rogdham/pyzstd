@@ -59,7 +59,8 @@ class SeekTable:
         if self._read_mode:
             # Item: cumulated_size
             # Length: frames_count + 1
-            # q is int64_t. On Windows and Linux, Py_off_t is signed.
+            # q is int64_t. On Windows and Linux, Py_off_t is signed, so
+            # ZstdFile/SeekableZstdFile use int64_t as file position/size.
             self._cumulated_c_size = array('q', [0])
             self._cumulated_d_size = array('q', [0])
         else:

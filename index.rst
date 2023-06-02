@@ -834,7 +834,7 @@ ZstdFile class and open() function
 
     Open a zstd-compressed file in binary mode.
 
-    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library.
+    This class is very similar to `bz2.BZ2File <https://docs.python.org/3/library/bz2.html#bz2.BZ2File>`_ /  `gzip.GzipFile <https://docs.python.org/3/library/gzip.html#gzip.GzipFile>`_ / `lzma.LZMAFile <https://docs.python.org/3/library/lzma.html#lzma.LZMAFile>`_ classes in Python standard library. But the performance is much better than them.
 
     Like BZ2File/GzipFile/LZMAFile classes, ZstdFile is not thread-safe, so if you need to use a single ZstdFile object from multiple threads, it is necessary to protect it with a lock.
 
