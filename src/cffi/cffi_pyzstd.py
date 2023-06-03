@@ -1439,11 +1439,16 @@ class ZstdFileReader:
                 self._needs_input = (out_b.size != out_b.pos)
                 self._at_frame_edge = False
 
-            if fill_full and out_b.size != out_b.pos:
-                continue
-            if out_b.pos:
-                self.pos += out_b.pos
-                return out_b.pos
+            if fill_full:
+                if out_b.size != out_b.pos:
+                    continue
+                else:
+                    self.pos += out_b.pos
+                    return out_b.pos
+            else:
+                if out_b.pos:
+                    self.pos += out_b.pos
+                    return out_b.pos
 
     def readinto(self, b):
         out_b = self._out_buf

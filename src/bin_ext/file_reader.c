@@ -195,12 +195,18 @@ decompress_into(ZstdFileReader *self,
             self->at_frame_edge = 0;
         }
 
-        if (fill_full && out->size != out->pos) {
-            continue;
-        }
-        if (out->pos != 0) {
-            self->pos += out->pos;
-            return 0;
+        if (fill_full) {
+            if (out->size != out->pos) {
+                continue;
+            } else {
+                self->pos += out->pos;
+                return 0;
+            }
+        } else {
+            if (out->pos != 0) {
+                self->pos += out->pos;
+                return 0;
+            }
         }
     }
 }
@@ -336,7 +342,7 @@ static PyMethodDef ZstdFileReader_methods[] = {
     {"readall",  (PyCFunction)ZstdFileReader_readall,  METH_NOARGS},
     {"forward",  (PyCFunction)ZstdFileReader_forward,  METH_O},
     {"reset_session", (PyCFunction)ZstdFileReader_reset_session, METH_NOARGS},
-    {NULL, NULL, 0, NULL}
+    {NULL, NULL, 0}
 };
 
 static PyMemberDef ZstdFileReader_members[] = {

@@ -2775,6 +2775,14 @@ class FileTestCase(unittest.TestCase):
         with ZstdFile(BytesIO(COMPRESSED_BOGUS)) as f:
             self.assertRaises(ZstdError, f.read)
 
+    def test_read_exception(self):
+        class C:
+            def read(self, size=-1):
+                raise OSError
+        with ZstdFile(C()) as f:
+            with self.assertRaises(OSError):
+                f.read(10)
+
     def test_read1(self):
         with ZstdFile(BytesIO(DAT_130K_C)) as f:
             blocks = []
