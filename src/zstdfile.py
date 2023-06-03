@@ -202,6 +202,7 @@ class ZstdFile(io.BufferedIOBase):
         # Re-raise other AttributeError exception
         raise
 
+    # If modify this method, also modify SeekableZstdFile.write() method.
     def write(self, data):
         """Write a bytes-like object to the file.
 
@@ -232,6 +233,7 @@ class ZstdFile(io.BufferedIOBase):
         self._pos += length
         return length
 
+    # If modify this method, also modify SeekableZstdFile.flush() method.
     def flush(self, mode=FLUSH_BLOCK):
         """Flush remaining data to the underlying stream.
 
