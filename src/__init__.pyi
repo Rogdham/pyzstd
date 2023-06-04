@@ -183,7 +183,9 @@ class ZstdFile(io.BufferedIOBase):
                  mode: str = "r",
                  *,
                  level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
-                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> None: ...
+                 zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
+                 read_size: int = 131075,
+                 write_buffer_size: int = 131591) -> None: ...
     def close(self) -> None: ...
 
     def write(self, data) -> int: ...
@@ -215,6 +217,8 @@ class SeekableZstdFile(ZstdFile):
                  *,
                  level_or_option: Union[None, int, Dict[CParameter, int], Dict[DParameter, int]] = None,
                  zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
+                 read_size: int = 131075,
+                 write_buffer_size: int = 131591,
                  max_frame_content_size: int = 1024*1024*1024) -> None: ...
 
     @property

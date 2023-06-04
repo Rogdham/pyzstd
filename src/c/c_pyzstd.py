@@ -17,8 +17,8 @@ __all__ = (# From this file
            'ZstdFileReader', 'ZstdFileWriter',
            'PYZSTD_CONFIG')
 
-
-_ZSTD_DStreamOutSize = _zstd._ZSTD_DStreamOutSize
+_ZSTD_CStreamSizes = _zstd._ZSTD_CStreamSizes
+_ZSTD_DStreamSizes = _zstd._ZSTD_DStreamSizes
 _train_dict = _zstd._train_dict
 _finalize_dict = _zstd._finalize_dict
 

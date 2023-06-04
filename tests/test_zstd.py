@@ -2529,6 +2529,29 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict=b'dict123456')
 
+    def test_init_sizes_arg(self):
+        with ZstdFile(BytesIO(), 'r', read_size=1):
+            pass
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'r', read_size=0)
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'r', read_size=-1)
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(), 'r', read_size=(10,))
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'w', read_size=10)
+
+        with ZstdFile(BytesIO(), 'w', write_buffer_size=1):
+            pass
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'w', write_buffer_size=0)
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'w', write_buffer_size=-1)
+        with self.assertRaises(TypeError):
+            ZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
+        with self.assertRaises(ValueError):
+            ZstdFile(BytesIO(), 'r', write_buffer_size=10)
+
     def test_close(self):
         with BytesIO(COMPRESSED_100_PLUS_32KB) as src:
             f = ZstdFile(src)
@@ -2670,7 +2693,8 @@ class FileTestCase(unittest.TestCase):
     def test_ZstdFileReader(self):
         r = pyzstd.zstdfile.ZstdFileReader(
                             BytesIO(self.FRAME_42),
-                            zstd_dict=None, option=None)
+                            zstd_dict=None, option=None,
+                            read_size=131075)
         ba = bytearray(100)
         mv = memoryview(ba)
         self.assertEqual(r.readinto(mv[0:0]), 0)

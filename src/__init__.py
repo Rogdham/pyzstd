@@ -1,12 +1,14 @@
 try:
     # Import C implementation
     from .c.c_pyzstd import *
-    from .c.c_pyzstd import _train_dict, _finalize_dict, _ZSTD_DStreamOutSize
+    from .c.c_pyzstd import _train_dict, _finalize_dict, \
+                            _ZSTD_CStreamSizes, _ZSTD_DStreamSizes
 except ImportError:
     try:
         # Import CFFI implementation
         from .cffi.cffi_pyzstd import *
-        from .cffi.cffi_pyzstd import _train_dict, _finalize_dict, _ZSTD_DStreamOutSize
+        from .cffi.cffi_pyzstd import _train_dict, _finalize_dict, \
+                                      _ZSTD_CStreamSizes, _ZSTD_DStreamSizes
     except ImportError:
         raise ImportError(
             "\n\npyzstd module: Can't import compiled .so/.pyd file.\n"

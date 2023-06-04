@@ -841,18 +841,17 @@ ZstdFile class and open() function
 
     It can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_buffer_size=131_591)
 
-        The *filename* parameter can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
+        The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
 
-        The *mode* parameter can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
+        The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
 
-        If in reading mode (decompression):
+        In writing modes (compression), *write_buffer_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-            * The *level_or_option* parameter can only be a ``dict`` object, that represents decompression option. It doesn't support ``int`` type compression level in this case.
-            * The input file may be the concatenation of multiple :ref:`frames<frame_block>`.
+        In reading mode (decompression), *read_size* argument is bytes number that read from the underlying file object each time, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-    In writing mode (compression), these methods are available:
+    In writing modes (compression), these methods are available:
 
         * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
         * `.flush(mode=ZstdFile.FLUSH_BLOCK) <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. The *mode* argument can be ``ZstdFile.FLUSH_BLOCK``, ``ZstdFile.FLUSH_FRAME``, abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Added in version 0.15.1, added mode argument in version 0.15.8.*)

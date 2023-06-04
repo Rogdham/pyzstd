@@ -21,7 +21,8 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
                  'cffi', bool(m.pyzstd_static_link), False)
 
-_ZSTD_DStreamInSize = m.ZSTD_DStreamInSize()
+_ZSTD_CStreamSizes = (m.ZSTD_CStreamInSize(), m.ZSTD_CStreamOutSize())
+_ZSTD_DStreamSizes = (m.ZSTD_DStreamInSize(), m.ZSTD_DStreamOutSize())
 _ZSTD_DStreamOutSize = m.ZSTD_DStreamOutSize()
 
 zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
@@ -1361,7 +1362,11 @@ def decompress(data, zstd_dict=None, option=None):
     return ret
 
 class ZstdFileReader:
-    def __init__(self, fp, zstd_dict, option):
+    def __init__(self, fp, zstd_dict, option, read_size):
+        if read_size <= 0:
+            raise ValueError("read_size argument should > 0")
+        self._read_size = read_size
+
         # File states, the last three are public attributes.
         self._fp = fp
         self.eof = False
@@ -1412,7 +1417,7 @@ class ZstdFileReader:
         while True:
             if in_b.size == in_b.pos and self._needs_input:
                 # Read
-                self._in_dat = self._fp.read(_ZSTD_DStreamInSize)
+                self._in_dat = self._fp.read(self._read_size)
                 # EOF
                 if not self._in_dat:
                     if self._at_frame_edge:
@@ -1514,9 +1519,7 @@ class ZstdFileReader:
         m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
 
 class ZstdFileWriter:
-    def __init__(self, fp,
-                 level_or_option=None, zstd_dict=None,
-                 write_buffer_size=m.ZSTD_CStreamOutSize()):
+    def __init__(self, fp, level_or_option, zstd_dict, write_buffer_size):
         # File object
         self._fp = fp
         self._fp_has_flush = hasattr(fp, "flush")
@@ -1527,6 +1530,8 @@ class ZstdFileWriter:
         level = 0  # 0 means use zstd's default compression level
 
         # Write buffer
+        if write_buffer_size <= 0:
+            raise ValueError("write_buffer_size argument should > 0")
         self._write_buffer = _new_nonzero("char[]", write_buffer_size)
         if self._write_buffer == ffi.NULL:
             raise MemoryError

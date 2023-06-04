@@ -6,6 +6,9 @@ typedef struct {
     ZSTD_DCtx *dctx;
     PyObject *dict;
 
+    /* Read chunk size */
+    PyObject *read_size;
+
     /* File states. On Windows and Linux, Py_off_t is signed, so
        ZstdFile/SeekableZstdFile use int64_t as file position/size. */
     PyObject *fp;
@@ -77,14 +80,18 @@ typedef struct {
 static int
 ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 {
-    static char *kwlist[] = {"fp", "zstd_dict", "option", NULL};
+    static char *kwlist[] = {"fp", "zstd_dict", "option",
+                             "read_size", NULL};
     PyObject *fp;
-    PyObject *zstd_dict = Py_None;
-    PyObject *option = Py_None;
+    PyObject *zstd_dict;
+    PyObject *option;
+    PyObject *read_size;
+
+    assert(ZSTD_DStreamInSize() == 131075);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O|OO:ZstdFileReader.__init__", kwlist,
-                                     &fp, &zstd_dict, &option)) {
+                                     "OOOO:ZstdFileReader.__init__", kwlist,
+                                     &fp, &zstd_dict, &option, &read_size)) {
         return -1;
     }
 
@@ -93,6 +100,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 
     assert(self->dctx == NULL);
     assert(self->dict == NULL);
+    assert(self->read_size == NULL);
     assert(self->fp == NULL);
     assert(self->eof == 0);
     assert(self->pos == 0);
@@ -103,6 +111,23 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     assert(self->in_dat == NULL);
     assert(self->in.size == 0);
     assert(self->in.pos == 0);
+
+    /* Read chunk size */
+    {
+        Py_ssize_t v = PyLong_AsSsize_t(read_size);
+        if (v <= 0) {
+            if (v == -1 && PyErr_Occurred()) {
+                PyErr_SetString(PyExc_TypeError,
+                                "read_size argument should be integer");
+                goto error;
+            }
+            PyErr_SetString(PyExc_ValueError,
+                            "read_size argument should > 0");
+            goto error;
+        }
+    }
+    Py_INCREF(read_size);
+    self->read_size = read_size;
 
     /* File states */
     Py_INCREF(fp);
@@ -152,6 +177,7 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
     /* Py_XDECREF the dict after free decompression context */
     Py_XDECREF(self->dict);
 
+    Py_XDECREF(self->read_size);
     Py_XDECREF(self->fp);
     Py_XDECREF(self->tmp_output);
     Py_XDECREF(self->in_dat);
@@ -184,7 +210,7 @@ decompress_into(ZstdFileReader *self,
                 self->in_dat = invoke_method_one_arg(
                                 self->fp,
                                 MS_MEMBER(str_read),
-                                MS_MEMBER(int_ZSTD_DStreamInSize));
+                                self->read_size);
                 if (self->in_dat == NULL) {
                     return -1;
                 }
@@ -218,7 +244,10 @@ decompress_into(ZstdFileReader *self,
         }
 
         /* Decompress */
+        Py_BEGIN_ALLOW_THREADS
         zstd_ret = ZSTD_decompressStream(self->dctx, out, &self->in);
+        Py_END_ALLOW_THREADS
+
         if (ZSTD_isError(zstd_ret)) {
             STATE_FROM_OBJ(self);
             set_zstd_error(MODULE_STATE, ERR_DECOMPRESS, zstd_ret);
@@ -415,14 +444,14 @@ ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
     static char *kwlist[] = {"fp", "level_or_option", "zstd_dict",
                              "write_buffer_size", NULL};
     PyObject *fp;
-    PyObject *level_or_option = Py_None;
-    PyObject *zstd_dict = Py_None;
-    Py_ssize_t write_buffer_size = ZSTD_CStreamOutSize();
+    PyObject *level_or_option;
+    PyObject *zstd_dict;
+    Py_ssize_t write_buffer_size;
 
-    assert(write_buffer_size == 131591);
+    assert(ZSTD_CStreamOutSize() == 131591);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "O|OOn:ZstdFileWriter.__init__", kwlist,
+                                     "OOOn:ZstdFileWriter.__init__", kwlist,
                                      &fp, &level_or_option,
                                      &zstd_dict, &write_buffer_size)) {
         return -1;
@@ -453,6 +482,11 @@ ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
     self->last_mode = ZSTD_e_end;
 
     /* Write buffer */
+    if (write_buffer_size <= 0) {
+        PyErr_SetString(PyExc_ValueError,
+                        "write_buffer_size argument should > 0");
+        goto error;
+    }
     self->write_buffer = PyMem_Malloc(write_buffer_size);
     if (self->write_buffer == NULL) {
         PyErr_NoMemory();

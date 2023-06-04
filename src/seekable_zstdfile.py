@@ -306,11 +306,11 @@ class SeekTable:
                 self._full_d_size)
 
 class SeekableDecompressReader(ZstdDecompressReader):
-    def __init__(self, fp, zstd_dict, option):
+    def __init__(self, fp, zstd_dict, option, read_size):
         self._seek_table = SeekTable(read_mode=True)
         self._seek_table.load_seek_table(fp, seek_to_0=True)
 
-        super().__init__(fp, zstd_dict, option)
+        super().__init__(fp, zstd_dict, option, read_size)
         self._decomp.size = self._seek_table.get_full_d_size()
 
     # The parent class returns self._fp.seekable().
@@ -392,6 +392,7 @@ class SeekableZstdFile(ZstdFile):
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
+                 read_size=131075, write_buffer_size=131591,
                  max_frame_content_size=1024*1024*1024):
         """Open a Zstandard Seekable Format file or 0-size file in binary mode.
 
@@ -414,6 +415,13 @@ class SeekableZstdFile(ZstdFile):
             support int type compression level in this case.
         zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
             decompression.
+        read_size: In reading mode, this is bytes number that read from the
+            underlying file object each time, default value is zstd's
+            recommended value. If use with Network File System, increasing
+            it may get better performance.
+        write_buffer_size: In writing modes, this is output buffer's size,
+            default value is zstd's recommended value. If use with Network
+            File System, increasing it may get better performance.
         max_frame_content_size: In write/append modes (compression), when
             the uncompressed data size reaches max_frame_content_size, a frame
             is generated automatically. If the size is small, it will increase
@@ -456,7 +464,9 @@ class SeekableZstdFile(ZstdFile):
 
         super().__init__(filename, mode,
                          level_or_option=level_or_option,
-                         zstd_dict=zstd_dict)
+                         zstd_dict=zstd_dict,
+                         read_size=read_size,
+                         write_buffer_size=write_buffer_size)
 
         # Overwrite seek table in append mode
         if mode in ("a", "ab"):
@@ -494,12 +504,10 @@ class SeekableZstdFile(ZstdFile):
             # In ZstdFile.__init__ method, if fails after setting ._mode
             # attribute, _writer attribute doesn't exist.
             if hasattr(self, "_writer"):
-                try:
-                    self.flush(self.FLUSH_FRAME)
-                    self._seek_table.write_seek_table(self._fp)
-                finally:
-                    self._seek_table = None
+                self.flush(self.FLUSH_FRAME)
+                self._seek_table.write_seek_table(self._fp)
         finally:
+            self._seek_table = None
             super().close()
 
     def write(self, data):
@@ -523,17 +531,17 @@ class SeekableZstdFile(ZstdFile):
             # Write size
             write_size = min(nbytes, self._left_d_size)
 
-            #     Use inserted super().write() method, to prevent
-            #     self._fp.tell() from reporting incorrect position.
-            #     -------------------------
-            #       super().write() begin
-            #     -------------------------
-            # Compress
+            # Use inserted super().write() method, to prevent
+            # self._fp.tell() from reporting incorrect position.
+            # -------------------------
+            #   super().write() begin
+            # -------------------------
+            # Compress & write
             _, output_size = self._writer.write(data[pos:pos+write_size])
             self._pos += write_size
-            #     -----------------------
-            #       super().write() end
-            #     -----------------------
+            # -----------------------
+            #   super().write() end
+            # -----------------------
 
             pos += write_size
             nbytes -= write_size
@@ -570,16 +578,16 @@ class SeekableZstdFile(ZstdFile):
             # Closed, raise ValueError.
             self._check_mode()
 
-        #     Use inserted super().flush() method, to prevent
-        #     self._fp.tell() from reporting incorrect position.
-        #     -------------------------
-        #       super().flush() begin
-        #     -------------------------
-        # Flush zstd block/frame
+        # Use inserted super().flush() method, to prevent
+        # self._fp.tell() from reporting incorrect position.
+        # -------------------------
+        #   super().flush() begin
+        # -------------------------
+        # Flush zstd block/frame, and write.
         _, output_size = self._writer.flush(mode)
-        #     -----------------------
-        #       super().flush() end
-        #     -----------------------
+        # -----------------------
+        #   super().flush() end
+        # -----------------------
 
         # Cumulate
         self._current_c_size += output_size

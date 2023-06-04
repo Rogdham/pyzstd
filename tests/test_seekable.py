@@ -773,6 +773,29 @@ class SeekableZstdFileCase(unittest.TestCase):
                                     'only valid in write modes'):
             SeekableZstdFile(b, 'r', max_frame_content_size=100)
 
+    def test_init_sizes_arg(self):
+        with SeekableZstdFile(BytesIO(), 'r', read_size=1):
+            pass
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'r', read_size=0)
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'r', read_size=-1)
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(), 'r', read_size=(10,))
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'w', read_size=10)
+
+        with SeekableZstdFile(BytesIO(), 'w', write_buffer_size=1):
+            pass
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=0)
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=-1)
+        with self.assertRaises(TypeError):
+            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
+        with self.assertRaises(ValueError):
+            SeekableZstdFile(BytesIO(), 'r', write_buffer_size=10)
+
     def test_load(self):
         # empty
         b = BytesIO()

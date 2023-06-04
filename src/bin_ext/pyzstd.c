@@ -270,9 +270,20 @@ add_constants(PyObject *module)
         return -1;
     }
 
-    /* _ZSTD_DStreamOutSize */
-    obj = PyLong_FromSize_t(ZSTD_DStreamOutSize());
-    if (PyModule_AddObject(module, "_ZSTD_DStreamOutSize", obj) < 0) {
+    /* _ZSTD_CStreamSizes */
+    obj = Py_BuildValue("II",
+                        (uint32_t)ZSTD_CStreamInSize(),
+                        (uint32_t)ZSTD_CStreamOutSize());
+    if (PyModule_AddObject(module, "_ZSTD_CStreamSizes", obj) < 0) {
+        Py_XDECREF(obj);
+        return -1;
+    }
+
+    /* _ZSTD_DStreamSizes */
+    obj = Py_BuildValue("II",
+                        (uint32_t)ZSTD_DStreamInSize(),
+                        (uint32_t)ZSTD_DStreamOutSize());
+    if (PyModule_AddObject(module, "_ZSTD_DStreamSizes", obj) < 0) {
         Py_XDECREF(obj);
         return -1;
     }
@@ -389,11 +400,6 @@ static int _zstd_exec(PyObject *module) {
 
     MS_MEMBER(str_flush) = PyUnicode_FromString("flush");
     if (MS_MEMBER(str_flush) == NULL) {
-        return -1;
-    }
-
-    MS_MEMBER(int_ZSTD_DStreamInSize) = PyLong_FromSize_t(ZSTD_DStreamInSize());
-    if (MS_MEMBER(int_ZSTD_DStreamInSize) == NULL) {
         return -1;
     }
 
@@ -522,7 +528,6 @@ _zstd_traverse(PyObject *module, visitproc visit, void *arg)
     Py_VISIT(MS_MEMBER(str_readinto));
     Py_VISIT(MS_MEMBER(str_write));
     Py_VISIT(MS_MEMBER(str_flush));
-    Py_VISIT(MS_MEMBER(int_ZSTD_DStreamInSize));
 
     Py_VISIT(MS_MEMBER(ZstdDict_type));
     Py_VISIT(MS_MEMBER(ZstdCompressor_type));
@@ -549,7 +554,6 @@ _zstd_clear(PyObject *module)
     Py_CLEAR(MS_MEMBER(str_readinto));
     Py_CLEAR(MS_MEMBER(str_write));
     Py_CLEAR(MS_MEMBER(str_flush));
-    Py_CLEAR(MS_MEMBER(int_ZSTD_DStreamInSize));
 
     Py_CLEAR(MS_MEMBER(ZstdDict_type));
     Py_CLEAR(MS_MEMBER(ZstdCompressor_type));

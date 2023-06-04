@@ -137,7 +137,6 @@ struct _zstd_state {
     PyObject *str_readinto;
     PyObject *str_write;
     PyObject *str_flush;
-    PyObject *int_ZSTD_DStreamInSize;
 
     PyTypeObject *ZstdDict_type;
     PyTypeObject *ZstdCompressor_type;

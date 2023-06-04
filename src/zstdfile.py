@@ -6,17 +6,17 @@ except ImportError:
     class PathLike:
         pass
 
-from pyzstd import ZstdCompressor, _ZSTD_DStreamOutSize, \
-                   ZstdFileReader, ZstdFileWriter
+from pyzstd import ZstdCompressor, ZstdFileReader, \
+                   ZstdFileWriter, _ZSTD_DStreamSizes
 
 __all__ = ('ZstdFile', 'open')
 
 class ZstdDecompressReader(io.RawIOBase):
     """Adapt decompressor to RawIOBase reader API"""
 
-    def __init__(self, fp, zstd_dict, option):
+    def __init__(self, fp, zstd_dict, option, read_size):
         self._fp = fp
-        self._decomp = ZstdFileReader(fp, zstd_dict, option)
+        self._decomp = ZstdFileReader(fp, zstd_dict, option, read_size)
 
     def close(self):
         self._decomp = None
@@ -68,6 +68,8 @@ class ZstdDecompressReader(io.RawIOBase):
 
         return self._decomp.pos
 
+_ZSTD_DStreamOutSize = _ZSTD_DStreamSizes[1]
+
 _MODE_CLOSED = 0
 _MODE_READ   = 1
 _MODE_WRITE  = 2
@@ -87,7 +89,8 @@ class ZstdFile(io.BufferedIOBase):
     _READER_CLASS = ZstdDecompressReader
 
     def __init__(self, filename, mode="r", *,
-                 level_or_option=None, zstd_dict=None):
+                 level_or_option=None, zstd_dict=None,
+                 read_size=131075, write_buffer_size=131591):
         """Open a zstd compressed file in binary mode.
 
         filename can be either an actual file name (given as a str, bytes, or
@@ -106,6 +109,13 @@ class ZstdFile(io.BufferedIOBase):
             support int type compression level in this case.
         zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
             decompression.
+        read_size: In reading mode, this is bytes number that read from the
+            underlying file object each time, default value is zstd's
+            recommended value. If use with Network File System, increasing
+            it may get better performance.
+        write_buffer_size: In writing modes, this is output buffer's size,
+            default value is zstd's recommended value. If use with Network
+            File System, increasing it may get better performance.
         """
         self._fp = None
         self._closefp = False
@@ -119,11 +129,17 @@ class ZstdFile(io.BufferedIOBase):
                      "should be a dict object, that represents decompression "
                      "option. It doesn't support int type compression level "
                      "in this case."))
+            if write_buffer_size != 131591:
+                raise ValueError(("write_buffer_size argument is only "
+                                  "valid in write modes (compression)."))
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
                 raise TypeError(("level_or_option argument "
                                  "should be int or dict object."))
+            if read_size != 131075:
+                raise ValueError(("read_size argument is only "
+                                  "valid in read mode (decompression)."))
             mode_code = _MODE_WRITE
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
@@ -147,12 +163,18 @@ class ZstdFile(io.BufferedIOBase):
 
         # ZstdDecompressReader
         if mode_code == _MODE_READ:
-            raw = self._READER_CLASS(self._fp,
-                                     zstd_dict=zstd_dict,
-                                     option=level_or_option)
+            raw = self._READER_CLASS(
+                            self._fp,
+                            zstd_dict=zstd_dict,
+                            option=level_or_option,
+                            read_size=read_size)
             self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
         elif mode_code == _MODE_WRITE:
-            self._writer = ZstdFileWriter(self._fp, level_or_option, zstd_dict)
+            self._writer = ZstdFileWriter(
+                            self._fp,
+                            level_or_option=level_or_option,
+                            zstd_dict=zstd_dict,
+                            write_buffer_size=write_buffer_size)
             self._pos = 0
 
     def close(self):
