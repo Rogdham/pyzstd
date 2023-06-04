@@ -1,8 +1,5 @@
 #include "pyzstd.h"
 
-/* -----------------------
-     ZstdFileReader code
-   ----------------------- */
 typedef struct {
     PyObject_HEAD
 
@@ -31,25 +28,62 @@ typedef struct {
 #endif
 } ZstdFileReader;
 
-/* Generate two functions using macro:
-    1, filereader_set_d_parameters(ZstdFileReader *self, PyObject *option)
-    2, filereader_load_d_dict(ZstdFileReader *self, PyObject *dict) */
-#undef  PYZSTD_DECOMPRESSOR_CLASS
-#define PYZSTD_DECOMPRESSOR_CLASS     ZstdFileReader
-#undef  PYZSTD_DECOMPRESSOR_PREFIX
-#define PYZSTD_DECOMPRESSOR_PREFIX(F) filereader_##F
+typedef struct {
+    PyObject_HEAD
+
+    /* Compression context */
+    ZSTD_CCtx *cctx;
+
+    /* ZstdDict object in use */
+    PyObject *dict;
+
+    PyObject *fp;
+    int fp_has_flush;
+
+    /* Last mode, initialized to ZSTD_e_end */
+    int last_mode;
+
+    /* (nbWorker >= 1) ? 1 : 0 */
+    int use_multithread;
+
+    /* Compression level */
+    int compression_level;
+
+    /* Write buffer */
+    char *write_buffer;
+    size_t write_buffer_size;
+
+#ifdef USE_MULTI_PHASE_INIT
+    _zstd_state *module_state;
+#endif
+} ZstdFileWriter;
+
+/* Generate functions using macro:
+    1, file_set_c_parameters(ZstdFileWriter *self, PyObject *level_or_option)
+    2, file_load_c_dict(ZstdFileWriter *self, PyObject *dict)
+    3, file_set_d_parameters(ZstdFileReader *self, PyObject *option)
+    4, file_load_d_dict(ZstdFileReader *self, PyObject *dict) */
+#undef  PYZSTD_C_CLASS
+#define PYZSTD_C_CLASS       ZstdFileWriter
+#undef  PYZSTD_D_CLASS
+#define PYZSTD_D_CLASS       ZstdFileReader
+#undef  PYZSTD_FUN_PREFIX
+#define PYZSTD_FUN_PREFIX(F) file_##F
 #include "macro_functions.h"
 
+/* -----------------------
+     ZstdFileReader code
+   ----------------------- */
 static int
 ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"fp", "zstd_dict", "option", NULL};
     PyObject *fp;
-    PyObject *zstd_dict;
-    PyObject *option;
+    PyObject *zstd_dict = Py_None;
+    PyObject *option = Py_None;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
-                                     "OOO:ZstdFileReader.__init__", kwlist,
+                                     "O|OO:ZstdFileReader.__init__", kwlist,
                                      &fp, &zstd_dict, &option)) {
         return -1;
     }
@@ -57,10 +91,20 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     /* Keep this first. Set module state to self. */
     SET_STATE_TO_OBJ(Py_TYPE(self), self);
 
-    /* File states */
+    assert(self->dctx == NULL);
+    assert(self->dict == NULL);
+    assert(self->fp == NULL);
     assert(self->eof == 0);
     assert(self->pos == 0);
+    assert(self->size == 0);
+    assert(self->needs_input == 0);
+    assert(self->at_frame_edge == 0);
+    assert(self->tmp_output == NULL);
+    assert(self->in_dat == NULL);
+    assert(self->in.size == 0);
+    assert(self->in.pos == 0);
 
+    /* File states */
     Py_INCREF(fp);
     self->fp = fp;
     self->size = -1;
@@ -68,11 +112,6 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     /* Decompression states */
     self->needs_input = 1;
     self->at_frame_edge = 1;
-
-    assert(self->tmp_output == NULL);
-    assert(self->in_dat == NULL);
-    assert(self->in.size == 0);
-    assert(self->in.pos == 0);
 
     /* Decompression context */
     self->dctx = ZSTD_createDCtx();
@@ -85,7 +124,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 
     /* Load dictionary to decompression context */
     if (zstd_dict != Py_None) {
-        if (filereader_load_d_dict(self, zstd_dict) < 0) {
+        if (file_load_d_dict(self, zstd_dict) < 0) {
             goto error;
         }
 
@@ -96,7 +135,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
 
     /* Set option to decompression context */
     if (option != Py_None) {
-        if (filereader_set_d_parameters(self, option) < 0) {
+        if (file_set_d_parameters(self, option) < 0) {
             goto error;
         }
     }
@@ -365,4 +404,281 @@ static PyType_Spec ZstdFileReader_type_spec = {
     .basicsize = sizeof(ZstdFileReader),
     .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
     .slots = ZstdFileReader_slots,
+};
+
+/* -----------------------
+     ZstdFileWriter code
+   ----------------------- */
+static int
+ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
+{
+    static char *kwlist[] = {"fp", "level_or_option", "zstd_dict",
+                             "write_buffer_size", NULL};
+    PyObject *fp;
+    PyObject *level_or_option = Py_None;
+    PyObject *zstd_dict = Py_None;
+    Py_ssize_t write_buffer_size = ZSTD_CStreamOutSize();
+
+    assert(write_buffer_size == 131591);
+
+    if (!PyArg_ParseTupleAndKeywords(args, kwargs,
+                                     "O|OOn:ZstdFileWriter.__init__", kwlist,
+                                     &fp, &level_or_option,
+                                     &zstd_dict, &write_buffer_size)) {
+        return -1;
+    }
+
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(Py_TYPE(self), self);
+    STATE_FROM_OBJ(self);
+
+    assert(self->cctx == NULL);
+    assert(self->dict == NULL);
+    assert(self->fp == NULL);
+    assert(self->fp_has_flush == 0);
+    assert(self->last_mode == 0);
+    assert(self->use_multithread == 0);
+    assert(self->compression_level == 0);
+    assert(self->write_buffer == NULL);
+    assert(self->write_buffer_size == 0);
+
+    /* File object */
+    Py_INCREF(fp);
+    self->fp = fp;
+    if (PyObject_HasAttr(fp, MS_MEMBER(str_flush))) {
+        self->fp_has_flush = 1;
+    }
+
+    /* Last mode */
+    self->last_mode = ZSTD_e_end;
+
+    /* Write buffer */
+    self->write_buffer = PyMem_Malloc(write_buffer_size);
+    if (self->write_buffer == NULL) {
+        PyErr_NoMemory();
+        goto error;
+    }
+    self->write_buffer_size = (size_t)write_buffer_size;
+
+    /* Compression context */
+    self->cctx = ZSTD_createCCtx();
+    if (self->cctx == NULL) {
+        PyErr_SetString(MS_MEMBER(ZstdError),
+                        "Unable to create ZSTD_CCtx instance.");
+        goto error;
+    }
+
+    /* Set compressLevel/option to compression context */
+    if (level_or_option != Py_None) {
+        if (file_set_c_parameters(self, level_or_option) < 0) {
+            goto error;
+        }
+    }
+
+    /* Load dictionary to compression context */
+    if (zstd_dict != Py_None) {
+        if (file_load_c_dict(self, zstd_dict) < 0) {
+            goto error;
+        }
+
+        /* Py_INCREF the dict */
+        Py_INCREF(zstd_dict);
+        self->dict = zstd_dict;
+    }
+    return 0;
+error:
+    return -1;
+}
+
+static void
+ZstdFileWriter_dealloc(ZstdFileWriter *self)
+{
+    /* Free compression context */
+    ZSTD_freeCCtx(self->cctx);
+    /* Py_XDECREF the dict after free the compression context */
+    Py_XDECREF(self->dict);
+
+    Py_XDECREF(self->fp);
+    PyMem_Free(self->write_buffer);
+
+    PyTypeObject *tp = Py_TYPE(self);
+    tp->tp_free((PyObject*)self);
+    Py_DECREF(tp);
+}
+
+static PyObject *
+ZstdFileWriter_write(ZstdFileWriter *self, PyObject *arg)
+{
+    ZSTD_inBuffer in;
+    ZSTD_outBuffer out;
+    uint64_t output_size = 0;
+    Py_buffer buf;
+    size_t zstd_ret;
+    PyObject *ret;
+    STATE_FROM_OBJ(self);
+
+    /* Input buffer */
+    if (PyObject_GetBuffer(arg, &buf, PyBUF_SIMPLE) < 0) {
+        goto error;
+    }
+    in.src = buf.buf;
+    in.size = buf.len;
+    in.pos = 0;
+    PyBuffer_Release(&buf);
+
+    /* Output buffer, out.pos will be set later. */
+    out.dst = self->write_buffer;
+    out.size = self->write_buffer_size;
+
+    /* State */
+    self->last_mode = ZSTD_e_continue;
+
+    /* Compress & write */
+    while (1) {
+        /* Output position */
+        out.pos = 0;
+
+        /* Compress */
+        Py_BEGIN_ALLOW_THREADS
+        if (!self->use_multithread) {
+            zstd_ret = ZSTD_compressStream2(self->cctx, &out, &in, ZSTD_e_continue);
+        } else {
+            do {
+                zstd_ret = ZSTD_compressStream2(self->cctx, &out, &in, ZSTD_e_continue);
+            } while (out.pos != out.size && in.pos != in.size && !ZSTD_isError(zstd_ret));
+        }
+        Py_END_ALLOW_THREADS
+
+        if (ZSTD_isError(zstd_ret)) {
+            set_zstd_error(MODULE_STATE, ERR_COMPRESS, zstd_ret);
+            goto error;
+        }
+
+        /* Accumulate output bytes */
+        output_size += out.pos;
+
+        /* Write all output to output_stream */
+        if (write_to_output(MODULE_STATE, self->fp, &out) < 0) {
+            goto error;
+        }
+
+        /* Finished. If don't use multi-thread, this can be (zstd_ret == 0). */
+        if (in.size == in.pos && out.size != out.pos) {
+            break;
+        }
+    }
+
+    ret = Py_BuildValue("KK", (uint64_t)in.size, output_size);
+    if (ret != NULL) {
+        return ret;
+    }
+error:
+    return NULL;
+}
+
+static PyObject *
+ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
+{
+    int mode;
+    ZSTD_inBuffer in;
+    ZSTD_outBuffer out;
+    uint64_t output_size = 0;
+    size_t zstd_ret;
+    PyObject *ret;
+    STATE_FROM_OBJ(self);
+
+    /* Mode argument */
+    mode = _PyLong_AsInt(arg);
+    if (mode == -1 && PyErr_Occurred()) {
+        PyErr_SetString(PyExc_TypeError, "mode should be int type");
+        goto error;
+    }
+    if (mode != ZSTD_e_flush && mode != ZSTD_e_end) {
+        PyErr_SetString(PyExc_ValueError,
+                        "mode argument wrong value, it should be "
+                        "ZstdFile.FLUSH_BLOCK or ZstdFile.FLUSH_FRAME.");
+        goto error;
+    }
+
+    /* Don't generate empty content frame */
+    if (mode == self->last_mode) {
+        goto finish;
+    }
+
+    /* Input buffer */
+    in.src = &in;
+    in.size = 0;
+    in.pos = 0;
+
+    /* Output buffer, out.pos will be set later. */
+    out.dst = self->write_buffer;
+    out.size = self->write_buffer_size;
+
+    /* State */
+    self->last_mode = mode;
+
+    /* Compress & write */
+    while (1) {
+        /* Output position */
+        out.pos = 0;
+
+        /* Compress */
+        Py_BEGIN_ALLOW_THREADS
+        zstd_ret = ZSTD_compressStream2(self->cctx, &out, &in, mode);
+        Py_END_ALLOW_THREADS
+
+        if (ZSTD_isError(zstd_ret)) {
+            set_zstd_error(MODULE_STATE, ERR_COMPRESS, zstd_ret);
+            goto error;
+        }
+
+        /* Accumulate output bytes */
+        output_size += out.pos;
+
+        /* Write all output to output_stream */
+        if (write_to_output(MODULE_STATE, self->fp, &out) < 0) {
+            goto error;
+        }
+
+        /* Finished */
+        if (zstd_ret == 0) {
+            break;
+        }
+    }
+
+    /* Flush */
+    if (self->fp_has_flush) {
+        ret = invoke_method_no_arg(self->fp, MS_MEMBER(str_flush));
+        if (ret == NULL) {
+            goto error;
+        }
+    }
+
+finish:
+    ret = Py_BuildValue("KK", (uint64_t)0, output_size);
+    if (ret != NULL) {
+        return ret;
+    }
+error:
+    return NULL;
+}
+
+static PyMethodDef ZstdFileWriter_methods[] = {
+    {"write", (PyCFunction)ZstdFileWriter_write, METH_O},
+    {"flush", (PyCFunction)ZstdFileWriter_flush, METH_O},
+    {NULL, NULL, 0}
+};
+
+static PyType_Slot ZstdFileWriter_slots[] = {
+    {Py_tp_init,    ZstdFileWriter_init},
+    {Py_tp_dealloc, ZstdFileWriter_dealloc},
+    {Py_tp_methods, ZstdFileWriter_methods},
+    {0, 0}
+};
+
+static PyType_Spec ZstdFileWriter_type_spec = {
+    .name = "pyzstd.zstdfile.ZstdFileWriter",
+    .basicsize = sizeof(ZstdFileWriter),
+    .flags = Py_TPFLAGS_DEFAULT | Py_TPFLAGS_BASETYPE,
+    .slots = ZstdFileWriter_slots,
 };

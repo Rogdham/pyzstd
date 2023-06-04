@@ -495,7 +495,7 @@ class ClassShapeTestCase(unittest.TestCase):
         with ZstdFile(bio, 'w') as f:
             self.assertTrue(hasattr(f, '_fp'))
             self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_compressor'))
+            self.assertTrue(hasattr(f, '_writer'))
 
         # file
         with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
@@ -507,7 +507,7 @@ class ClassShapeTestCase(unittest.TestCase):
         with ZstdFile(PATH, 'w') as f:
             self.assertTrue(hasattr(f, '_fp'))
             self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_compressor'))
+            self.assertTrue(hasattr(f, '_writer'))
         os.remove(PATH)
 
 class CompressorDecompressorTestCase(unittest.TestCase):
@@ -692,6 +692,11 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         dat3 = c.compress(b, c.FLUSH_FRAME)
         dat4 = decompress(dat1+dat2+dat3)
         self.assertEqual(dat4, b * 3)
+
+        # ZstdFile
+        with ZstdFile(BytesIO(), 'w',
+                      level_or_option=option) as f:
+            f.write(b)
 
     def test_rich_mem_compress(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
@@ -3253,7 +3258,7 @@ class FileTestCase(unittest.TestCase):
         # write, no .flush() method
         class C:
             def write(self, b):
-                pass
+                return len(b)
         with ZstdFile(C(), 'w') as f:
             self.assertEqual(f.write(DAT), len(DAT))
             self.assertEqual(f.tell(), len(DAT))

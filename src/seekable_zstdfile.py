@@ -491,7 +491,9 @@ class SeekableZstdFile(ZstdFile):
         closed, any other operation on it will raise a ValueError.
         """
         try:
-            if self._mode == _MODE_WRITE:
+            # In ZstdFile.__init__ method, if fails after setting ._mode
+            # attribute, _writer attribute doesn't exist.
+            if hasattr(self, "_writer"):
                 try:
                     self.flush(self.FLUSH_FRAME)
                     self._seek_table.write_seek_table(self._fp)
@@ -527,13 +529,7 @@ class SeekableZstdFile(ZstdFile):
             #       super().write() begin
             #     -------------------------
             # Compress
-            compressed = self._compressor.compress(data[pos:pos+write_size])
-
-            # Write to file. If haven't gathered enough uncompressed data for one
-            # zstd block (128 KiB at most), `compressed` is b''.
-            if compressed:
-                self._fp.write(compressed)
-
+            _, output_size = self._writer.write(data[pos:pos+write_size])
             self._pos += write_size
             #     -----------------------
             #       super().write() end
@@ -543,7 +539,7 @@ class SeekableZstdFile(ZstdFile):
             nbytes -= write_size
 
             # Cumulate
-            self._current_c_size += len(compressed)
+            self._current_c_size += output_size
             self._current_d_size += write_size
             self._left_d_size -= write_size
 
@@ -579,29 +575,14 @@ class SeekableZstdFile(ZstdFile):
         #     -------------------------
         #       super().flush() begin
         #     -------------------------
-        # Don't generate empty content frame.
-        # .last_mode can be ZstdCompressor.CONTINUE.
-        if mode == self._compressor.last_mode and \
-           (mode == self.FLUSH_BLOCK or \
-            mode == self.FLUSH_FRAME):
-            compressed = b""
-        else:
-            # Flush zstd block/frame
-            compressed = self._compressor.flush(mode)
-
-            # Write to file
-            if compressed:
-                self._fp.write(compressed)
-
-            # Flush the file. Some file-like objects don't have .flush() method.
-            if hasattr(self._fp, "flush"):
-                self._fp.flush()
+        # Flush zstd block/frame
+        _, output_size = self._writer.flush(mode)
         #     -----------------------
         #       super().flush() end
         #     -----------------------
 
         # Cumulate
-        self._current_c_size += len(compressed)
+        self._current_c_size += output_size
         # self._current_d_size += 0
         # self._left_d_size -= 0
 

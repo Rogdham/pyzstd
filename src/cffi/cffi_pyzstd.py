@@ -14,7 +14,8 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'decompress', 'get_frame_info', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
-           'compressionLevel_values', 'ZstdFileReader',
+           'compressionLevel_values',
+           'ZstdFileReader', 'ZstdFileWriter',
            'PYZSTD_CONFIG')
 
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
@@ -1511,6 +1512,163 @@ class ZstdFileReader:
 
         # Resetting session never fail
         m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
+
+class ZstdFileWriter:
+    def __init__(self, fp,
+                 level_or_option=None, zstd_dict=None,
+                 write_buffer_size=m.ZSTD_CStreamOutSize()):
+        # File object
+        self._fp = fp
+        self._fp_has_flush = hasattr(fp, "flush")
+
+        # States
+        self._last_mode = m.ZSTD_e_end
+        self._use_multithread = False
+        level = 0  # 0 means use zstd's default compression level
+
+        # Write buffer
+        self._write_buffer = _new_nonzero("char[]", write_buffer_size)
+        if self._write_buffer == ffi.NULL:
+            raise MemoryError
+        self._write_buffer_size = write_buffer_size
+
+        # Singleton buffer objects
+        self._in_buf = _new_nonzero("ZSTD_inBuffer *")
+        if self._in_buf == ffi.NULL:
+            raise MemoryError
+
+        self._out_buf = _new_nonzero("ZSTD_outBuffer *")
+        if self._out_buf == ffi.NULL:
+            raise MemoryError
+
+        self._out_mv = memoryview(ffi.buffer(self._write_buffer))
+
+        # Compression context
+        self._cctx = m.ZSTD_createCCtx()
+        if self._cctx == ffi.NULL:
+            raise ZstdError("Unable to create ZSTD_CCtx instance.")
+
+        # Set compressLevel/option to compression context
+        if level_or_option is not None:
+            level, self._use_multithread = \
+                  _set_c_parameters(self._cctx, level_or_option)
+
+        # Load dictionary to compression context
+        if zstd_dict is not None:
+            _load_c_dict(self._cctx, zstd_dict, level)
+            self.__dict = zstd_dict
+
+    def __del__(self):
+        try:
+            m.ZSTD_freeCCtx(self._cctx)
+            self._cctx = ffi.NULL
+        except AttributeError:
+            pass
+
+    def write(self, data):
+        # Output size
+        output_size = 0
+
+        # Input buffer
+        in_b = self._in_buf
+        in_b.src = ffi.from_buffer(data)
+        in_b.size = _nbytes(data)
+        in_b.pos = 0
+
+        # Output buffer, out.pos will be set later.
+        out_mv = self._out_mv
+        out_b = self._out_buf
+        out_b.dst = self._write_buffer
+        out_b.size = self._write_buffer_size
+
+        # State
+        self._last_mode = m.ZSTD_e_continue
+
+        while True:
+            # Output position
+            out_b.pos = 0
+
+            # Compress
+            if not self._use_multithread:
+                zstd_ret = m.ZSTD_compressStream2(self._cctx, out_b, in_b,
+                                                  m.ZSTD_e_continue)
+            else:
+                while True:
+                    zstd_ret = m.ZSTD_compressStream2(self._cctx, out_b, in_b,
+                                                      m.ZSTD_e_continue)
+                    if (out_b.pos == out_b.size
+                           or in_b.pos == in_b.size
+                           or m.ZSTD_isError(zstd_ret)):
+                        break
+
+            if m.ZSTD_isError(zstd_ret):
+                _set_zstd_error(_ErrorType.ERR_COMPRESS, zstd_ret)
+
+            # Accumulate output bytes
+            output_size += out_b.pos
+
+            # Write all output to output_stream
+            _write_to_output(self._fp, out_mv, out_b)
+
+            # Finished. If don't use multi-thread, this can be (zstd_ret == 0).
+            if in_b.size == in_b.pos and out_b.size != out_b.pos:
+                break
+
+        return (in_b.size, output_size)
+
+    def flush(self, mode):
+        # Mode argument
+        if mode not in (m.ZSTD_e_flush, m.ZSTD_e_end):
+            msg = ("mode argument wrong value, it should be "
+                   "ZstdFile.FLUSH_BLOCK or ZstdFile.FLUSH_FRAME.")
+            raise ValueError(msg)
+
+        # Don't generate empty content frame
+        if mode == self._last_mode:
+            return (0, 0)
+
+        # Output size
+        output_size = 0
+
+        # Input buffer
+        in_b = self._in_buf
+        in_b.src = self._write_buffer
+        in_b.size = 0
+        in_b.pos = 0
+
+        # Output buffer, out.pos will be set later.
+        out_mv = self._out_mv
+        out_b = self._out_buf
+        out_b.dst = self._write_buffer
+        out_b.size = self._write_buffer_size
+
+        # State
+        self._last_mode = mode
+
+        while True:
+            # Output position
+            out_b.pos = 0
+
+            # Compress
+            zstd_ret = m.ZSTD_compressStream2(self._cctx, out_b, in_b, mode)
+            if m.ZSTD_isError(zstd_ret):
+                _set_zstd_error(_ErrorType.ERR_COMPRESS, zstd_ret)
+
+            # Accumulate output bytes
+            output_size += out_b.pos
+
+            # Write all output to output_stream
+            _write_to_output(self._fp, out_mv, out_b)
+
+            # Finished
+            if zstd_ret == 0:
+                break
+
+        # Flush
+        if self._fp_has_flush:
+            self._fp.flush()
+
+        return (0, output_size)
 
 def _write_to_output(output_stream, out_mv, out_buf):
     write_pos = 0

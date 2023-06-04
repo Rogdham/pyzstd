@@ -11,6 +11,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
 * Has a CFFI implementation that can work with PyPy
 * Has a command line interface, ``python -m pyzstd --help``.
+* :py:class:`ZstdFile` class has C language level performance
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 
 Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.

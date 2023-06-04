@@ -9,6 +9,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 * Has a CFFI implementation that can work with PyPy
 * Has a command line interface: ``python -m pyzstd --help``
+* ``ZstdFile`` class has C language level performance
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 
 Links
@@ -27,7 +28,7 @@ Release note
 
 #. Add *mode* argument to ``ZstdFile.flush()`` method, now it can flush a zstd frame.
 
-#. Optimize ``ZstdFile`` reading performance to C language level.
+#. Optimize ``ZstdFile`` performance to C language level.
 
 **0.15.7  (Apr 21, 2023)**
 

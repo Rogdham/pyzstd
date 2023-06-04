@@ -6,7 +6,8 @@ except ImportError:
     class PathLike:
         pass
 
-from pyzstd import ZstdCompressor, _ZSTD_DStreamOutSize, ZstdFileReader
+from pyzstd import ZstdCompressor, _ZSTD_DStreamOutSize, \
+                   ZstdFileReader, ZstdFileWriter
 
 __all__ = ('ZstdFile', 'open')
 
@@ -124,8 +125,6 @@ class ZstdFile(io.BufferedIOBase):
                 raise TypeError(("level_or_option argument "
                                  "should be int or dict object."))
             mode_code = _MODE_WRITE
-            self._compressor = ZstdCompressor(level_or_option, zstd_dict)
-            self._pos = 0
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))
 
@@ -135,15 +134,16 @@ class ZstdFile(io.BufferedIOBase):
                 mode += "b"
             self._fp = io.open(filename, mode)
             self._closefp = True
-            # Set ._mode here for ._closefp in .close(). If the following code
-            # fails, IOBase's cleanup code will call .close(), so that ._fp can
-            # be closed.
-            self._mode = mode_code
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
-            self._mode = mode_code
         else:
-            raise TypeError("filename must be a str, bytes, file or PathLike object")
+            raise TypeError(("filename must be a str, bytes, "
+                             "file or PathLike object"))
+
+        # Set ._mode here for ._closefp in .close(). If the following code
+        # fails, IOBase's cleanup code will call .close(), so that ._fp can
+        # be closed.
+        self._mode = mode_code
 
         # ZstdDecompressReader
         if mode_code == _MODE_READ:
@@ -151,6 +151,9 @@ class ZstdFile(io.BufferedIOBase):
                                      zstd_dict=zstd_dict,
                                      option=level_or_option)
             self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
+        elif mode_code == _MODE_WRITE:
+            self._writer = ZstdFileWriter(self._fp, level_or_option, zstd_dict)
+            self._pos = 0
 
     def close(self):
         """Flush and close the file.
@@ -162,20 +165,20 @@ class ZstdFile(io.BufferedIOBase):
             return
 
         try:
-            # In .__init__ method, if fails after setting ._mode to _MODE_READ,
-            # ._buffer doesn't exist.
+            # In .__init__ method, if fails after setting ._mode attribute,
+            # these attributes don't exist.
             if hasattr(self, "_buffer"):
                 try:
                     self._buffer.close()
                 finally:
                     # Set to None for ._check_mode()
                     self._buffer = None
-            elif self._mode == _MODE_WRITE:
+            elif hasattr(self, "_writer"):
                 try:
                     self.flush(self.FLUSH_FRAME)
                 finally:
                     # Set to None for ._check_mode()
-                    self._compressor = None
+                    self._writer = None
         finally:
             try:
                 if self._closefp:
@@ -211,27 +214,14 @@ class ZstdFile(io.BufferedIOBase):
         the file on disk may not reflect the data written until close()
         is called.
         """
-        # Get the length of uncompressed data
-        if isinstance(data, (bytes, bytearray)):
-            length = len(data)
-        else:
-            # Accept any data that supports the buffer protocol
-            data = memoryview(data)
-            length = data.nbytes
-
         # Compress
         try:
-            compressed = self._compressor.compress(data)
+            input_size, _ = self._writer.write(data)
         except AttributeError:
             self._check_mode(_MODE_WRITE)
 
-        # Write to file. If haven't gathered enough uncompressed data for one
-        # zstd block (128 KiB at most), `compressed` is b''.
-        if compressed:
-            self._fp.write(compressed)
-
-        self._pos += length
-        return length
+        self._pos += input_size
+        return input_size
 
     # If modify this method, also modify SeekableZstdFile.flush() method.
     def flush(self, mode=FLUSH_BLOCK):
@@ -254,23 +244,8 @@ class ZstdFile(io.BufferedIOBase):
             # Closed, raise ValueError.
             self._check_mode()
 
-        # Don't generate empty content frame.
-        # .last_mode can be ZstdCompressor.CONTINUE.
-        if mode == self._compressor.last_mode and \
-           (mode == self.FLUSH_BLOCK or \
-            mode == self.FLUSH_FRAME):
-            return
-
         # Flush zstd block/frame
-        compressed = self._compressor.flush(mode)
-
-        # Write to file
-        if compressed:
-            self._fp.write(compressed)
-
-        # Flush the file. Some file-like objects don't have .flush() method.
-        if hasattr(self._fp, "flush"):
-            self._fp.flush()
+        self._writer.flush(mode)
 
     def read(self, size=-1):
         """Read up to size uncompressed bytes from the file.

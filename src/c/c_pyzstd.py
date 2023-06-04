@@ -14,7 +14,8 @@ __all__ = (# From this file
            'ZstdDict', 'ZstdError', 'decompress', 'get_frame_size',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
-           'ZstdFileReader', 'PYZSTD_CONFIG')
+           'ZstdFileReader', 'ZstdFileWriter',
+           'PYZSTD_CONFIG')
 
 
 _ZSTD_DStreamOutSize = _zstd._ZSTD_DStreamOutSize
