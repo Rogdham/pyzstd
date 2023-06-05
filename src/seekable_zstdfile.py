@@ -313,7 +313,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
         super().__init__(fp, zstd_dict, option, read_size)
         self._decomp.size = self._seek_table.get_full_d_size()
 
-    # The parent class returns self._fp.seekable().
+    # super().seekable() returns self._fp.seekable().
     # In .__init__() method, seekable has been checked in load_seek_table().
     # BufferedReader.seek() checks this in each invoke, if self._fp.seekable()
     # becomes False at runtime, .seek() method just raise OSError instead of

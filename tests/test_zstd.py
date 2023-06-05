@@ -2717,8 +2717,9 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(f.read(), b"")
             self.assertTrue(f._buffer.raw._decomp.eof)
 
-        with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
-            self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
+        with ZstdFile(BytesIO(DAT_130K_C),
+                              read_size=64*1024) as f:
+            self.assertEqual(f.read(), DAT_130K_D)
 
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
@@ -2953,7 +2954,9 @@ class FileTestCase(unittest.TestCase):
         with BytesIO() as dst:
             option = {CParameter.compressionLevel:-5,
                       CParameter.checksumFlag:1}
-            with ZstdFile(dst, "w", level_or_option=option) as f:
+            with ZstdFile(dst, "w",
+                          level_or_option=option,
+                          write_buffer_size=1024) as f:
                 f.write(THIS_FILE_BYTES)
 
             comp = ZstdCompressor(option)

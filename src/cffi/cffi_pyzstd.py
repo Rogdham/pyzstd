@@ -1378,7 +1378,7 @@ class ZstdFileReader:
         self._at_frame_edge = True
 
         # Lazy create forward output buffer
-        self._tmp_output = None
+        self._tmp_output = ffi.NULL
         # Input state, need to be initialized with 0.
         self._in_buf = ffi.new("ZSTD_inBuffer *")
         if self._in_buf == ffi.NULL:
@@ -1482,13 +1482,17 @@ class ZstdFileReader:
     # If obj <= 0, do nothing.
     def forward(self, offset):
         # Lazy create forward output buffer
-        if self._tmp_output is None:
-            self._tmp_output = bytearray(_ZSTD_DStreamOutSize)
-
+        if self._tmp_output == ffi.NULL:
+            # ZSTD_outBuffer struct
             self._out_tmp = _new_nonzero("ZSTD_outBuffer *")
             if self._out_tmp == ffi.NULL:
                 raise MemoryError
-            self._out_tmp.dst = ffi.from_buffer(self._tmp_output)
+            # Forward output buffer
+            self._tmp_output = _new_nonzero("char[]", _ZSTD_DStreamOutSize)
+            if self._tmp_output == ffi.NULL:
+                raise MemoryError
+            # ZSTD_outBuffer.dst
+            self._out_tmp.dst = self._tmp_output
         out_b = self._out_tmp
 
         # Forward to EOF
@@ -1532,10 +1536,11 @@ class ZstdFileWriter:
         # Write buffer
         if write_buffer_size <= 0:
             raise ValueError("write_buffer_size argument should > 0")
+        self._write_buffer_size = write_buffer_size
+
         self._write_buffer = _new_nonzero("char[]", write_buffer_size)
         if self._write_buffer == ffi.NULL:
             raise MemoryError
-        self._write_buffer_size = write_buffer_size
 
         # Singleton buffer objects
         self._in_buf = _new_nonzero("ZSTD_inBuffer *")
@@ -1581,7 +1586,6 @@ class ZstdFileWriter:
         in_b.pos = 0
 
         # Output buffer, out.pos will be set later.
-        out_mv = self._out_mv
         out_b = self._out_buf
         out_b.dst = self._write_buffer
         out_b.size = self._write_buffer_size
@@ -1613,7 +1617,7 @@ class ZstdFileWriter:
             output_size += out_b.pos
 
             # Write all output to output_stream
-            _write_to_output(self._fp, out_mv, out_b)
+            _write_to_output(self._fp, self._out_mv, out_b)
 
             # Finished. If don't use multi-thread, this can be (zstd_ret == 0).
             if in_b.size == in_b.pos and out_b.size != out_b.pos:
@@ -1642,7 +1646,6 @@ class ZstdFileWriter:
         in_b.pos = 0
 
         # Output buffer, out.pos will be set later.
-        out_mv = self._out_mv
         out_b = self._out_buf
         out_b.dst = self._write_buffer
         out_b.size = self._write_buffer_size
@@ -1663,7 +1666,7 @@ class ZstdFileWriter:
             output_size += out_b.pos
 
             # Write all output to output_stream
-            _write_to_output(self._fp, out_mv, out_b)
+            _write_to_output(self._fp, self._out_mv, out_b)
 
             # Finished
             if zstd_ret == 0:

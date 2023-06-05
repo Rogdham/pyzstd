@@ -236,7 +236,7 @@ class ZstdFile(io.BufferedIOBase):
         the file on disk may not reflect the data written until close()
         is called.
         """
-        # Compress
+        # Compress & write
         try:
             input_size, _ = self._writer.write(data)
         except AttributeError:
@@ -266,7 +266,7 @@ class ZstdFile(io.BufferedIOBase):
             # Closed, raise ValueError.
             self._check_mode()
 
-        # Flush zstd block/frame
+        # Flush zstd block/frame, and write.
         self._writer.flush(mode)
 
     def read(self, size=-1):

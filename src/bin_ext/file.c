@@ -179,7 +179,7 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
 
     Py_XDECREF(self->read_size);
     Py_XDECREF(self->fp);
-    Py_XDECREF(self->tmp_output);
+    PyMem_Free(self->tmp_output);
     Py_XDECREF(self->in_dat);
 
     PyTypeObject *tp = Py_TYPE(self);
@@ -345,13 +345,13 @@ ZstdFileReader_forward(ZstdFileReader *self, PyObject *arg)
 
     /* Lazy create forward output buffer */
     if (self->tmp_output == NULL) {
-        self->tmp_output = PyByteArray_FromStringAndSize(
-                                NULL, DStreamOutSize);
+        self->tmp_output = PyMem_Malloc(DStreamOutSize);
         if (self->tmp_output == NULL) {
+            PyErr_NoMemory();
             return NULL;
         }
     }
-    out.dst = PyByteArray_AS_STRING(self->tmp_output);
+    out.dst = self->tmp_output;
 
     if (arg == Py_None) {
         /* Forward to EOF */

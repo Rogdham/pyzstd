@@ -920,7 +920,7 @@ SeekableZstdFile class
 
     .. versionadded:: 0.15.8
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, max_frame_content_size=1024*1024*1024)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_buffer_size=131_591, max_frame_content_size=1024*1024*1024)
 
         Same as :py:meth:`ZstdFile.__init__`. Except in append mode (a, ab), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
 
