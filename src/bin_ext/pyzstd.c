@@ -243,10 +243,36 @@ add_parameters(PyObject *module)
     return 0;
 }
 
+static inline PyObject *
+get_zstd_version_info(void)
+{
+    const uint32_t ver = ZSTD_versionNumber();
+    uint32_t major, minor, release;
+
+    major = ver / 10000;
+    minor = (ver / 100) % 100;
+    release = ver % 100;
+
+    return Py_BuildValue("III", major, minor, release);
+}
+
 static inline int
-add_constants(PyObject *module)
+add_vars_to_module(PyObject *module)
 {
     PyObject *obj;
+
+    /* zstd_version, a str. */
+    if (PyModule_AddStringConstant(module, "zstd_version",
+                                   ZSTD_versionString()) < 0) {
+        return -1;
+    }
+
+    /* zstd_version_info, a tuple. */
+    obj = get_zstd_version_info();
+    if (PyModule_AddObject(module, "zstd_version_info", obj) < 0) {
+        Py_XDECREF(obj);
+        return -1;
+    }
 
     /* Add zstd parameters */
     if (add_parameters(module) < 0) {
@@ -303,7 +329,6 @@ add_constants(PyObject *module)
                         Py_False
 #endif
                         );
-
     if (PyModule_AddObject(module, "PYZSTD_CONFIG", obj) < 0) {
         Py_XDECREF(obj);
         return -1;
@@ -354,22 +379,16 @@ add_constant_to_type(PyTypeObject *type, const char *name, const long value)
     return 0;
 }
 
-static inline PyObject *
-get_zstd_version_info(void)
-{
-    const uint32_t ver = ZSTD_versionNumber();
-    uint32_t major, minor, release;
-
-    major = ver / 10000;
-    minor = (ver / 100) % 100;
-    release = ver % 100;
-
-    return Py_BuildValue("III", major, minor, release);
-}
+#define ADD_STR_TO_STATE_MACRO(STR)                        \
+    do {                                                   \
+        MS_MEMBER(str_##STR) = PyUnicode_FromString(#STR); \
+        if (MS_MEMBER(str_##STR) == NULL) {                \
+            return -1;                                     \
+        }                                                  \
+    } while(0)
 
 static int _zstd_exec(PyObject *module) {
     STATE_FROM_MODULE(module);
-    PyObject *temp;
 
     /* Reusable objects & variables */
     MS_MEMBER(empty_bytes) = PyBytes_FromStringAndSize(NULL, 0);
@@ -383,31 +402,17 @@ static int _zstd_exec(PyObject *module) {
         return -1;
     }
 
-    MS_MEMBER(str_read) = PyUnicode_FromString("read");
-    if (MS_MEMBER(str_read) == NULL) {
-        return -1;
-    }
-
-    MS_MEMBER(str_readinto) = PyUnicode_FromString("readinto");
-    if (MS_MEMBER(str_readinto) == NULL) {
-        return -1;
-    }
-
-    MS_MEMBER(str_write) = PyUnicode_FromString("write");
-    if (MS_MEMBER(str_write) == NULL) {
-        return -1;
-    }
-
-    MS_MEMBER(str_flush) = PyUnicode_FromString("flush");
-    if (MS_MEMBER(str_flush) == NULL) {
-        return -1;
-    }
+    /* Add str to module state */
+    ADD_STR_TO_STATE_MACRO(read);
+    ADD_STR_TO_STATE_MACRO(readinto);
+    ADD_STR_TO_STATE_MACRO(write);
+    ADD_STR_TO_STATE_MACRO(flush);
 
     MS_MEMBER(CParameter_type) = NULL;
     MS_MEMBER(DParameter_type) = NULL;
 
-    /* Constants */
-    if (add_constants(module) < 0) {
+    /* Add variables to module */
+    if (add_vars_to_module(module) < 0) {
         return -1;
     }
 
@@ -498,19 +503,6 @@ static int _zstd_exec(PyObject *module) {
                            "ZstdFileWriter",
                            &ZstdFileWriter_type_spec,
                            &MS_MEMBER(ZstdFileWriter_type)) < 0) {
-        return -1;
-    }
-
-    /* zstd_version, a str. */
-    if (PyModule_AddStringConstant(module, "zstd_version",
-                                   ZSTD_versionString()) < 0) {
-        return -1;
-    }
-
-    /* zstd_version_info, a tuple. */
-    temp = get_zstd_version_info();
-    if (PyModule_AddObject(module, "zstd_version_info", temp) < 0) {
-        Py_XDECREF(temp);
         return -1;
     }
 

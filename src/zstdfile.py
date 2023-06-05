@@ -130,16 +130,16 @@ class ZstdFile(io.BufferedIOBase):
                      "option. It doesn't support int type compression level "
                      "in this case."))
             if write_buffer_size != 131591:
-                raise ValueError(("write_buffer_size argument is only "
-                                  "valid in write modes (compression)."))
+                raise ValueError(
+                    "write_buffer_size argument is only valid in write modes.")
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
                 raise TypeError(("level_or_option argument "
                                  "should be int or dict object."))
             if read_size != 131075:
-                raise ValueError(("read_size argument is only "
-                                  "valid in read mode (decompression)."))
+                raise ValueError(
+                    "read_size argument is only valid in read mode.")
             mode_code = _MODE_WRITE
         else:
             raise ValueError("Invalid mode: {!r}".format(mode))

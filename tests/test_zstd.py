@@ -2538,7 +2538,7 @@ class FileTestCase(unittest.TestCase):
             ZstdFile(BytesIO(), 'r', read_size=-1)
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(), 'r', read_size=(10,))
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, 'read_size'):
             ZstdFile(BytesIO(), 'w', read_size=10)
 
         with ZstdFile(BytesIO(), 'w', write_buffer_size=1):
@@ -2549,7 +2549,7 @@ class FileTestCase(unittest.TestCase):
             ZstdFile(BytesIO(), 'w', write_buffer_size=-1)
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
-        with self.assertRaises(ValueError):
+        with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
             ZstdFile(BytesIO(), 'r', write_buffer_size=10)
 
     def test_close(self):

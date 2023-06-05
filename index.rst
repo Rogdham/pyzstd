@@ -847,14 +847,12 @@ ZstdFile class and open() function
 
         The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
 
-        In writing modes (compression), *write_buffer_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
-
         In reading mode (decompression), *read_size* argument is bytes number that read from the underlying file object each time, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-    In writing modes (compression), these methods are available:
+        In writing modes (compression), *write_buffer_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-        * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
-        * `.flush(mode=ZstdFile.FLUSH_BLOCK) <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. The *mode* argument can be ``ZstdFile.FLUSH_BLOCK``, ``ZstdFile.FLUSH_FRAME``, abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Added in version 0.15.1, added mode argument in version 0.15.8.*)
+    .. versionchanged:: 0.15.8
+        Add *read_size* and *write_buffer_size* arguments.
 
     In reading mode (decompression), these methods and statement are available:
 
@@ -866,6 +864,11 @@ ZstdFile class and open() function
         * `.seek(offset, whence=io.SEEK_SET) <https://docs.python.org/3/library/io.html#io.IOBase.seek>`_, note that if seek to a position before the current position, or seek to a position relative to the end of the file (the first time), the decompression has to be restarted from zero. If seek, consider using :py:class:`SeekableZstdFile` class.
         * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
         * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
+
+    In writing modes (compression), these methods are available:
+
+        * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
+        * `.flush(mode=ZstdFile.FLUSH_BLOCK) <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. The *mode* argument can be ``ZstdFile.FLUSH_BLOCK``, ``ZstdFile.FLUSH_FRAME``. Abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Added in version 0.15.1, added mode argument in version 0.15.8.*)
 
     In both reading and writing modes, these methods and property are available:
 
