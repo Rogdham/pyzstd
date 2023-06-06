@@ -3883,7 +3883,7 @@ class CLITestCase(unittest.TestCase):
         # default
         cmd = [sys.executable, '-m', 'pyzstd', '--compress',
                os.path.join(self.samples_path, '1.dat'),
-               '--output', OUTPUT_FILE]
+               '--output', OUTPUT_FILE, '-f']
         result = subprocess.run(cmd, stdout=subprocess.PIPE)
         self.assertIn(b' - compression level: 3', result.stdout)
 
@@ -3902,7 +3902,7 @@ class CLITestCase(unittest.TestCase):
         # default
         cmd = [sys.executable, '-m', 'pyzstd', '--compress',
                os.path.join(self.samples_path, '1.dat'), '--long',
-               '--output', OUTPUT_FILE]
+               '--output', OUTPUT_FILE, '-f']
         result = subprocess.run(cmd, stdout=subprocess.PIPE)
         self.assertIn(b' - long mode: yes, windowLog is 27', result.stdout)
 

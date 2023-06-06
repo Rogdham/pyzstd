@@ -3,28 +3,31 @@
 typedef struct {
     PyObject_HEAD
 
+    /* Decompression context */
     ZSTD_DCtx *dctx;
+    /* ZstdDict object in use */
     PyObject *dict;
 
-    /* Read chunk size */
+    /* Read chunk size, int object. */
     PyObject *read_size;
 
     /* File states. On Windows and Linux, Py_off_t is signed, so
        ZstdFile/SeekableZstdFile use int64_t as file position/size. */
-    PyObject *fp;
-    int eof;
+    PyObject *fp;   /* File object */
+    int eof;        /* Boolean value */
     int64_t pos;    /* Decompressed position */
     int64_t size;   /* File size, -1 means unknown. */
 
-    /* Decompression states */
+    /* Decompression states, boolean value. */
     int needs_input;
     int at_frame_edge;
 
-    /* Lazy create forward output buffer */
-    PyObject *tmp_output;
     /* Input state, need to be initialized with 0. */
     PyObject *in_dat;
     ZSTD_inBuffer in;
+
+    /* Lazy create forward output buffer */
+    char *tmp_output;
 
 #ifdef USE_MULTI_PHASE_INIT
     _zstd_state *module_state;
@@ -36,17 +39,16 @@ typedef struct {
 
     /* Compression context */
     ZSTD_CCtx *cctx;
-
     /* ZstdDict object in use */
     PyObject *dict;
 
-    PyObject *fp;
-    int fp_has_flush;
+    PyObject *fp;      /* File object */
+    int fp_has_flush;  /* fp has .flush() method, boolean value */
 
     /* Last mode, initialized to ZSTD_e_end */
     int last_mode;
 
-    /* (nbWorker >= 1) ? 1 : 0 */
+    /* Use multi-threaded compression, boolean value. */
     int use_multithread;
 
     /* Compression level */
@@ -107,10 +109,10 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     assert(self->size == 0);
     assert(self->needs_input == 0);
     assert(self->at_frame_edge == 0);
-    assert(self->tmp_output == NULL);
     assert(self->in_dat == NULL);
     assert(self->in.size == 0);
     assert(self->in.pos == 0);
+    assert(self->tmp_output == NULL);
 
     /* Read chunk size */
     {
@@ -179,8 +181,8 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
 
     Py_XDECREF(self->read_size);
     Py_XDECREF(self->fp);
-    PyMem_Free(self->tmp_output);
     Py_XDECREF(self->in_dat);
+    PyMem_Free(self->tmp_output);
 
     PyTypeObject *tp = Py_TYPE(self);
     tp->tp_free((PyObject*)self);
@@ -474,9 +476,7 @@ ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
     /* File object */
     Py_INCREF(fp);
     self->fp = fp;
-    if (PyObject_HasAttr(fp, MS_MEMBER(str_flush))) {
-        self->fp_has_flush = 1;
-    }
+    self->fp_has_flush = PyObject_HasAttr(fp, MS_MEMBER(str_flush));
 
     /* Last mode */
     self->last_mode = ZSTD_e_end;
@@ -487,12 +487,13 @@ ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
                         "write_buffer_size argument should > 0");
         goto error;
     }
+    self->write_buffer_size = (size_t)write_buffer_size;
+
     self->write_buffer = PyMem_Malloc(write_buffer_size);
     if (self->write_buffer == NULL) {
         PyErr_NoMemory();
         goto error;
     }
-    self->write_buffer_size = (size_t)write_buffer_size;
 
     /* Compression context */
     self->cctx = ZSTD_createCCtx();
@@ -686,6 +687,7 @@ ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
         if (ret == NULL) {
             goto error;
         }
+        Py_DECREF(ret);
     }
 
 finish:
