@@ -1379,8 +1379,6 @@ class ZstdFileReader:
         self._needs_input = True
         self._at_frame_edge = True
 
-        # Lazy create forward output buffer
-        self._tmp_output = ffi.NULL
         # Input state, need to be initialized with 0.
         self._in_buf = ffi.new("ZSTD_inBuffer *")
         if self._in_buf == ffi.NULL:
@@ -1389,6 +1387,8 @@ class ZstdFileReader:
         self._out_buf = _new_nonzero("ZSTD_outBuffer *")
         if self._out_buf == ffi.NULL:
             raise MemoryError
+        # Lazy create forward output buffer
+        self._tmp_output = ffi.NULL
 
         # Decompression context
         self._dctx = m.ZSTD_createDCtx()
@@ -1412,10 +1412,12 @@ class ZstdFileReader:
             pass
 
     def _decompress_into(self, out_b, fill_full):
+        # Return
         if self.eof or out_b.size == out_b.pos:
-            return 0
+            return
 
         in_b = self._in_buf
+        orig_pos = out_b.pos
         while True:
             if in_b.size == in_b.pos and self._needs_input:
                 # Read
@@ -1424,9 +1426,9 @@ class ZstdFileReader:
                 if not self._in_dat:
                     if self._at_frame_edge:
                         self.eof = True
-                        self.pos += out_b.pos
+                        self.pos += out_b.pos - orig_pos
                         self.size = self.pos
-                        return out_b.pos
+                        return
                     else:
                         raise EOFError("Compressed file ended before the "
                                        "end-of-stream marker was reached")
@@ -1451,12 +1453,12 @@ class ZstdFileReader:
                 if out_b.size != out_b.pos:
                     continue
                 else:
-                    self.pos += out_b.pos
-                    return out_b.pos
+                    self.pos += out_b.pos - orig_pos
+                    return
             else:
                 if out_b.pos:
-                    self.pos += out_b.pos
-                    return out_b.pos
+                    self.pos += out_b.pos - orig_pos
+                    return
 
     def readinto(self, b):
         out_b = self._out_buf
@@ -1464,7 +1466,8 @@ class ZstdFileReader:
         out_b.size = _nbytes(b)
         out_b.pos = 0
 
-        return self._decompress_into(out_b, False)
+        self._decompress_into(out_b, False)
+        return out_b.pos
 
     def readall(self):
         out_b = self._out_buf
@@ -1473,12 +1476,12 @@ class ZstdFileReader:
 
         while True:
             self._decompress_into(out_b, True)
+            if self.eof:
+                # Finished
+                return out.finish(out_b)
             if out_b.size == out_b.pos:
                 # Grow output buffer
                 out.grow(out_b)
-            else:
-                # Finished
-                return out.finish(out_b)
 
     # If obj is None, forward to EOF.
     # If obj <= 0, do nothing.
@@ -1500,19 +1503,21 @@ class ZstdFileReader:
         # Forward to EOF
         if offset is None:
             out_b.size = _ZSTD_DStreamOutSize
-            out_b.pos = 0
-            while self._decompress_into(out_b, True):
+            while True:
                 out_b.pos = 0
-            return
+                self._decompress_into(out_b, True)
+                if self.eof:
+                    return
 
         # Forward to offset
         while offset > 0:
             out_b.size = min(_ZSTD_DStreamOutSize, offset)
             out_b.pos = 0
-            length = self._decompress_into(out_b, True)
-            if not length:
-                break
-            offset -= length
+            self._decompress_into(out_b, True)
+
+            if self.eof:
+                return
+            offset -= out_b.pos
 
     def reset_session(self):
         # Reset decompression states

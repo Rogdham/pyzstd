@@ -1585,6 +1585,8 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo.seek(0)
         with CLS(bo, 'r') as f:
             self.assertEqual(f.read(), b)
+            self.assertEqual(f.tell(), _1MiB)
+            self.assertEqual(f._buffer.raw.tell(), _1MiB)
         # call .close() again
         self.assertTrue(f.closed)
         f.close()
@@ -1632,6 +1634,8 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(random_offset), random_offset)
             self.assertEqual(f.tell(), random_offset)
             self.assertEqual(f.read(), b[random_offset:])
+            self.assertEqual(f.tell(), _1MiB)
+            self.assertEqual(f._buffer.raw.tell(), _1MiB)
         # call .close() again
         self.assertTrue(f.closed)
         f.close()

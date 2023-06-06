@@ -22,7 +22,7 @@ typedef struct {
     int needs_input;
     int at_frame_edge;
 
-    /* Input state, need to be initialized with 0. */
+    /* Input state, in.size/in.pos need to be initialized with 0. */
     PyObject *in_dat;
     ZSTD_inBuffer in;
 
@@ -189,13 +189,17 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
     Py_DECREF(tp);
 }
 
+/* On success, return 0.
+   On failure, return -1. */
 FORCE_INLINE int
 decompress_into(ZstdFileReader *self,
                 ZSTD_outBuffer *out, const int fill_full)
 {
     Py_buffer buf;
+    const size_t orig_pos = out->pos;
     size_t zstd_ret;
 
+    /* Return */
     if (self->eof || out->size == out->pos) {
         return 0;
     }
@@ -230,7 +234,7 @@ decompress_into(ZstdFileReader *self,
             if (read_len == 0) {
                 if (self->at_frame_edge) {
                     self->eof = 1;
-                    self->pos += out->pos;
+                    self->pos += out->pos - orig_pos;
                     self->size = self->pos;
                     return 0;
                 } else {
@@ -269,12 +273,12 @@ decompress_into(ZstdFileReader *self,
             if (out->size != out->pos) {
                 continue;
             } else {
-                self->pos += out->pos;
+                self->pos += out->pos - orig_pos;
                 return 0;
             }
         } else {
             if (out->pos != 0) {
-                self->pos += out->pos;
+                self->pos += out->pos - orig_pos;
                 return 0;
             }
         }
@@ -317,14 +321,15 @@ ZstdFileReader_readall(ZstdFileReader *self)
             goto error;
         }
 
+        if (self->eof) {
+            /* Finished */
+            break;
+        }
         if (out.size == out.pos) {
             /* Grow output buffer */
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
             }
-        } else {
-            /* Finished */
-            break;
         }
     }
     ret = OutputBuffer_Finish(&buffer, &out);
@@ -363,7 +368,7 @@ ZstdFileReader_forward(ZstdFileReader *self, PyObject *arg)
             if (decompress_into(self, &out, 1) < 0) {
                 return NULL;
             }
-            if (out.pos == 0) {
+            if (self->eof) {
                 Py_RETURN_NONE;
             }
         }
@@ -383,7 +388,7 @@ ZstdFileReader_forward(ZstdFileReader *self, PyObject *arg)
             if (decompress_into(self, &out, 1) < 0) {
                 return NULL;
             }
-            if (out.pos == 0) {
+            if (self->eof) {
                 Py_RETURN_NONE;
             }
             offset -= out.pos;
