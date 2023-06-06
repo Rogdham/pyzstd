@@ -161,7 +161,7 @@ class ZstdFile(io.BufferedIOBase):
         # be closed.
         self._mode = mode_code
 
-        # ZstdDecompressReader
+        # Reader or writer
         if mode_code == _MODE_READ:
             raw = self._READER_CLASS(
                             self._fp,
@@ -170,12 +170,12 @@ class ZstdFile(io.BufferedIOBase):
                             read_size=read_size)
             self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
         elif mode_code == _MODE_WRITE:
+            self._pos = 0
             self._writer = ZstdFileWriter(
                             self._fp,
                             level_or_option=level_or_option,
                             zstd_dict=zstd_dict,
                             write_buffer_size=write_buffer_size)
-            self._pos = 0
 
     def close(self):
         """Flush and close the file.

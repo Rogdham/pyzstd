@@ -15,7 +15,9 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            'compress_stream', 'decompress_stream',
            'zstd_version', 'zstd_version_info',
            'compressionLevel_values',
+           '_train_dict', '_finalize_dict',
            'ZstdFileReader', 'ZstdFileWriter',
+           '_ZSTD_CStreamSizes', '_ZSTD_DStreamSizes',
            'PYZSTD_CONFIG')
 
 PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,

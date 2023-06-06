@@ -429,6 +429,9 @@ class SeekableZstdFile(ZstdFile):
             it will reduce seeking speed, but increase compression ratio. You
             can also manually generate a frame using f.flush(f.FLUSH_FRAME).
         """
+        # For self.close()
+        self._write_in_close = False
+        # For super().close()
         self._fp = None
         self._closefp = False
         self._mode = _MODE_CLOSED
@@ -489,6 +492,9 @@ class SeekableZstdFile(ZstdFile):
                         self._seek_table.seek_frame_size,
                      RuntimeWarning, 2)
 
+        # Initialized successfully
+        self._write_in_close = (self._mode == _MODE_WRITE)
+
     def _reset_frame_sizes(self):
         self._current_c_size = 0
         self._current_d_size = 0
@@ -501,12 +507,15 @@ class SeekableZstdFile(ZstdFile):
         closed, any other operation on it will raise a ValueError.
         """
         try:
-            # In ZstdFile.__init__ method, if fails after setting ._mode
-            # attribute, _writer attribute doesn't exist.
-            if hasattr(self, "_writer"):
-                self.flush(self.FLUSH_FRAME)
-                self._seek_table.write_seek_table(self._fp)
+            if self._write_in_close:
+                try:
+                    self.flush(self.FLUSH_FRAME)
+                    self._seek_table.write_seek_table(self._fp)
+                finally:
+                    # For multiple calls to .close()
+                    self._write_in_close = False
         finally:
+            # Clear write mode's seek table
             self._seek_table = None
             super().close()
 

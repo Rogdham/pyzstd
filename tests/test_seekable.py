@@ -796,6 +796,33 @@ class SeekableZstdFileCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
             SeekableZstdFile(BytesIO(), 'r', write_buffer_size=10)
 
+    def test_init_append_fail(self):
+        # get a temp file name
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            tmp_f.write(self.two_frames)
+            filename = tmp_f.name
+
+        # mock io.open, .seek() raises OSError.
+        def mock_open(io_open):
+            def get_file(*args, **kwargs):
+                f = io_open(*args, **kwargs)
+                if len(args) > 1 and args[1] == 'ab':
+                    def seekable():
+                        return True
+                    def seek(offset, whence=0):
+                        raise OSError("xyz")
+                    f.seekable = seekable
+                    f.seek = seek
+                return f
+            return get_file
+
+        # test .close() method
+        with patch("io.open", mock_open(io.open)):
+            with self.assertRaisesRegex(OSError, 'xyz'):
+                SeekableZstdFile(filename, 'ab')
+
+        os.remove(filename)
+
     def test_load(self):
         # empty
         b = BytesIO()
@@ -944,6 +971,37 @@ class SeekableZstdFileCase(unittest.TestCase):
             with self.assertRaisesRegex(io.UnsupportedOperation,
                                         'File not open for writing'):
                 f.write(b'1234')
+
+    def test_write_chunks(self):
+        CHUNK_SIZE = 100
+        b1 = BytesIO()
+        b1.write(b'a' * CHUNK_SIZE)
+        b1.write(b'b' * CHUNK_SIZE)
+        b1.write(b'c' * CHUNK_SIZE)
+        b1.write(b'd' * CHUNK_SIZE)
+        b1.seek(0)
+
+        b2 = BytesIO()
+        with SeekableZstdFile(b2, 'w',
+                              max_frame_content_size=CHUNK_SIZE) as f:
+            dat = b1.read(CHUNK_SIZE)
+            self.assertEqual(f.write(dat), CHUNK_SIZE)
+            self.assertEqual(f.tell(), CHUNK_SIZE)
+
+            dat = b1.read(CHUNK_SIZE-1)
+            self.assertEqual(f.write(dat), CHUNK_SIZE-1)
+            self.assertEqual(f.tell(), 2*CHUNK_SIZE-1)
+
+            dat = b1.read(CHUNK_SIZE+1)
+            self.assertEqual(f.write(dat), CHUNK_SIZE+1)
+            self.assertEqual(f.tell(), 3*CHUNK_SIZE)
+
+            dat = b1.read(CHUNK_SIZE)
+            self.assertEqual(f.write(dat), CHUNK_SIZE)
+            self.assertEqual(f.tell(), 4*CHUNK_SIZE)
+
+        self.assertEqual(decompress(b2.getvalue()),
+                         b1.getvalue())
 
     def test_write_arg(self):
         b = BytesIO()
@@ -1250,6 +1308,10 @@ class SeekableZstdFileCase(unittest.TestCase):
 
             self.assertIsNone(f.flush(f.FLUSH_FRAME))
             self.assertEqual(f.tell(), DSIZE*2)
+        # call .close() again
+        self.assertTrue(f.closed)
+        f.close()
+        f.close()
 
         # verify
         with SeekableZstdFile(filename, 'r') as f:
@@ -1508,6 +1570,10 @@ class SeekableZstdFileCase(unittest.TestCase):
                               max_frame_content_size=_100KiB) as f:
             self.assertEqual(f.write(b), len(b))
             self.assertEqual(f.tell(), len(b))
+        # call .close() again
+        self.assertTrue(f.closed)
+        f.close()
+        f.close()
         SEEKABLE_FILE_SIZE = len(bo.getvalue())
 
         # frames
@@ -1519,6 +1585,10 @@ class SeekableZstdFileCase(unittest.TestCase):
         bo.seek(0)
         with CLS(bo, 'r') as f:
             self.assertEqual(f.read(), b)
+        # call .close() again
+        self.assertTrue(f.closed)
+        f.close()
+        f.close()
 
         # test 2
         bo.seek(0)
@@ -1562,6 +1632,10 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.seek(random_offset), random_offset)
             self.assertEqual(f.tell(), random_offset)
             self.assertEqual(f.read(), b[random_offset:])
+        # call .close() again
+        self.assertTrue(f.closed)
+        f.close()
+        f.close()
 
     def test_real_data(self):
         self.run_with_real_data(ZstdFile)
