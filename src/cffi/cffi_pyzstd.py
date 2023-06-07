@@ -1472,7 +1472,12 @@ class ZstdFileReader:
     def readall(self):
         out_b = self._out_buf
         out = _BlocksOutputBuffer()
-        out.initAndGrow(out_b, -1)
+        if self.size >= 0:
+            # Known file size
+            out.initWithSize(out_b, -1, self.size - self.pos)
+        else:
+            # Unknown file size
+            out.initAndGrow(out_b, -1)
 
         while True:
             self._decompress_into(out_b, True)

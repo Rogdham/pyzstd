@@ -312,8 +312,22 @@ ZstdFileReader_readall(ZstdFileReader *self)
     ZSTD_outBuffer out;
     PyObject *ret;
 
-    if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
-        goto error;
+    if (self->size >= 0) {
+        /* Known file size */
+        const int64_t length = self->size - self->pos;
+        if (length > (int64_t)PY_SSIZE_T_MAX) {
+            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            goto error;
+        }
+        if (OutputBuffer_InitWithSize(&buffer, &out, -1,
+                                      (Py_ssize_t)length) < 0) {
+            goto error;
+        }
+    } else {
+        /* Unknown file size */
+        if (OutputBuffer_InitAndGrow(&buffer, &out, -1) < 0) {
+            goto error;
+        }
     }
 
     while (1) {
