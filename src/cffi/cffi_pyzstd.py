@@ -1826,19 +1826,16 @@ def compress_stream(input_stream, output_stream, *,
         while True:
             # Invoke .readinto() method
             read_bytes = input_stream.readinto(_input_block)
-            if read_bytes is None:
-                # Non-blocking mode and no bytes are available
-                continue
-            else:
-                if read_bytes < 0 or read_bytes > read_size:
-                    msg = ("input_stream.readinto() returned invalid length "
-                           "%d (should be 0 <= value <= %d)")
-                    raise ValueError(msg % (read_bytes, read_size))
+            if read_bytes < 0 or read_bytes > read_size:
+                msg = ("input_stream.readinto() returned invalid length "
+                       "%d (should be 0 <= value <= %d)") % \
+                       (read_bytes, read_size)
+                raise ValueError(msg)
 
-                # Don't generate empty frame
-                if read_bytes == 0 and total_input_size == 0:
-                    break
-                total_input_size += read_bytes
+            # Don't generate empty frame
+            if read_bytes == 0 and total_input_size == 0:
+                break
+            total_input_size += read_bytes
 
             in_buf.size = read_bytes
             in_buf.pos = 0
@@ -1978,16 +1975,13 @@ def decompress_stream(input_stream, output_stream, *,
         while True:
             # Invoke .readinto() method
             read_bytes = input_stream.readinto(_input_block)
-            if read_bytes is None:
-                # Non-blocking mode and no bytes are available
-                continue
-            else:
-                if read_bytes < 0 or read_bytes > read_size:
-                    msg = ("input_stream.readinto() returned invalid length "
-                           "%d (should be 0 <= value <= %d)")
-                    raise ValueError(msg % (read_bytes, read_size))
+            if read_bytes < 0 or read_bytes > read_size:
+                msg = ("input_stream.readinto() returned invalid length "
+                       "%d (should be 0 <= value <= %d)") % \
+                       (read_bytes, read_size)
+                raise ValueError(msg)
 
-                total_input_size += read_bytes
+            total_input_size += read_bytes
 
             in_buf.size = read_bytes
             in_buf.pos = 0

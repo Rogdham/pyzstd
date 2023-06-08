@@ -235,26 +235,17 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         temp = invoke_method_one_arg(input_stream,
                                      MS_MEMBER(str_readinto),
                                      in_memoryview);
-        if (temp == NULL) {
+        read_bytes = check_and_get_fp_ret("input_stream.readinto()",
+                                          temp, 0, read_size);
+        if (read_bytes < 0) {
             goto error;
-        } else if (temp == Py_None) {
-            /* Non-blocking mode and no bytes are available */
-            Py_DECREF(temp);
-            continue;
-        } else {
-            /* Get read length value */
-            read_bytes = check_and_get_fp_ret("input_stream.readinto()",
-                                              temp, 0, read_size);
-            if (read_bytes < 0) {
-                goto error;
-            }
-
-            /* Don't generate empty frame */
-            if (read_bytes == 0 && total_input_size == 0) {
-                break;
-            }
-            total_input_size += (size_t) read_bytes;
         }
+
+        /* Don't generate empty frame */
+        if (read_bytes == 0 && total_input_size == 0) {
+            break;
+        }
+        total_input_size += (size_t) read_bytes;
 
         in.size = (size_t) read_bytes;
         in.pos = 0;
@@ -483,22 +474,13 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
         temp = invoke_method_one_arg(input_stream,
                                      MS_MEMBER(str_readinto),
                                      in_memoryview);
-        if (temp == NULL) {
+        read_bytes = check_and_get_fp_ret("input_stream.readinto()",
+                                          temp, 0, read_size);
+        if (read_bytes < 0) {
             goto error;
-        } else if (temp == Py_None) {
-            /* Non-blocking mode and no bytes are available */
-            Py_DECREF(temp);
-            continue;
-        } else {
-            /* Get read length value */
-            read_bytes = check_and_get_fp_ret("input_stream.readinto()",
-                                              temp, 0, read_size);
-            if (read_bytes < 0) {
-                goto error;
-            }
-
-            total_input_size += (size_t) read_bytes;
         }
+
+        total_input_size += (size_t) read_bytes;
 
         in.size = (size_t) read_bytes;
         in.pos = 0;
