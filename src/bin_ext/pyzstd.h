@@ -824,77 +824,78 @@ _get_DDict(ZstdDict *self)
 #define PYZSTD_FUN_PREFIX(F) F
 #include "macro_functions.h"
 
-/* Get Py_ssize_t value from the object returned by .readinto()/.write(), and
-   Py_DECREF() the object. If fails, or (value < 0 || value > upper_bound), set
+/* Get Py_ssize_t value from the returned object of .readinto()/.write()
+   methods, and Py_DECREF() the object.
+   If fp_ret is NULL, or not an integer, or (v < lower || v > upper), set
    an error and return -1. */
 FORCE_INLINE Py_ssize_t
-get_stream_return_value(char *func_name, PyObject *stream_ret,
-                        Py_ssize_t upper_bound)
+check_and_get_fp_ret(char *func_name, PyObject *fp_ret,
+                     Py_ssize_t lower, Py_ssize_t upper)
 {
+    Py_ssize_t ret_value;
+
+    /* .readinto()/.write() return value should >= 0.
+       This function returns -1 for failure. */
+    assert(lower >= 0);
+
+    /* .readinto()/.write() failed */
+    if (fp_ret == NULL) {
+        return -1;
+    }
+
     /* Get Py_ssize_t value */
-    Py_ssize_t ret_value = PyLong_AsSsize_t(stream_ret);
-    Py_DECREF(stream_ret);
+    ret_value = PyLong_AsSsize_t(fp_ret);
+    Py_DECREF(fp_ret);
+
+    /* Check PyLong_AsSsize_t() failed */
+    if (ret_value == -1 && PyErr_Occurred()) {
+        PyErr_Format(PyExc_TypeError,
+                     "%s return value should be int type",
+                     func_name);
+        return -1;
+    }
 
     /* Check bounds */
-    if (ret_value < 0 || ret_value > upper_bound) {
-        /* Check PyLong_AsSsize_t() failed */
-        if (ret_value == -1 && PyErr_Occurred()) {
-            PyErr_Format(PyExc_TypeError,
-                         "%s returned wrong type.", func_name);
-            return -1;
-        }
-
+    if (ret_value < lower || ret_value > upper) {
         PyErr_Format(PyExc_ValueError,
                      "%s returned invalid length %zd "
-                     "(should be 0 <= value <= %zd)",
-                     func_name, ret_value, upper_bound);
+                     "(should be %zd <= value <= %zd)",
+                     func_name, ret_value,
+                     lower, upper);
         return -1;
     }
     return ret_value;
 }
 
-/* Write all output data to output_stream */
+/* Write output data to fp.
+   If (out->pos == 0), do nothing. */
 FORCE_INLINE int
-write_to_output(const _zstd_state* const state,
-                PyObject *output_stream, ZSTD_outBuffer *out)
+write_to_fp(const _zstd_state* const state,
+            char *func_name,
+            PyObject *fp, ZSTD_outBuffer *out)
 {
-    PyObject *memoryview;
+    PyObject *mv;
     PyObject *write_ret;
-    size_t write_pos = 0;
 
-    while (write_pos < out->pos) {
-        const Py_ssize_t left_bytes = out->pos - write_pos;
+    /* Data length is 0 */
+    if (out->pos == 0) {
+        return 0;
+    }
 
-        /* Invoke .write() method */
-        memoryview = PyMemoryView_FromMemory((char*) out->dst + write_pos,
-                                             left_bytes, PyBUF_READ);
-        if (memoryview == NULL) {
-            goto error;
-        }
+    /* memoryview object */
+    mv = PyMemoryView_FromMemory((char*)out->dst, out->pos, PyBUF_READ);
+    if (mv == NULL) {
+        goto error;
+    }
 
-        write_ret = invoke_method_one_arg(output_stream,
-                                          state->str_write,
-                                          memoryview);
-        Py_DECREF(memoryview);
+    /* Write */
+    write_ret = invoke_method_one_arg(fp, state->str_write, mv);
+    Py_DECREF(mv);
 
-        if (write_ret == NULL) {
-            goto error;
-        } else if (write_ret == Py_None) {
-            /* The raw stream is set not to block and no single
-               byte could be readily written to it */
-            Py_DECREF(write_ret);
-            continue;
-        } else {
-            /* Get write length value */
-            Py_ssize_t write_bytes = get_stream_return_value(
-                                            "output_stream.write()",
-                                            write_ret, left_bytes);
-            if (write_bytes < 0) {
-                goto error;
-            }
-
-            write_pos += (size_t) write_bytes;
-        }
+    /* Check .write() return value */
+    if (check_and_get_fp_ret(func_name, write_ret,
+                             out->pos, out->pos) < 0) {
+        goto error;
     }
 
     return 0;

@@ -1628,8 +1628,9 @@ class ZstdFileWriter:
             # Accumulate output bytes
             output_size += out_b.pos
 
-            # Write all output to output_stream
-            _write_to_output(self._fp, self._out_mv, out_b)
+            # Write output to fp
+            _write_to_fp("self._fp.write()", self._fp,
+                         self._out_mv, out_b)
 
             # Finished. If don't use multi-thread, this can be (zstd_ret == 0).
             if in_b.size == in_b.pos and out_b.size != out_b.pos:
@@ -1677,8 +1678,9 @@ class ZstdFileWriter:
             # Accumulate output bytes
             output_size += out_b.pos
 
-            # Write all output to output_stream
-            _write_to_output(self._fp, self._out_mv, out_b)
+            # Write output to fp
+            _write_to_fp("self._fp.write()", self._fp,
+                         self._out_mv, out_b)
 
             # Finished
             if zstd_ret == 0:
@@ -1690,23 +1692,18 @@ class ZstdFileWriter:
 
         return (0, output_size)
 
-def _write_to_output(output_stream, out_mv, out_buf):
-    write_pos = 0
+# Write output data to fp.
+# If (out_b.pos == 0), do nothing.
+def _write_to_fp(func_name, fp, out_mv, out_b):
+    if out_b.pos == 0:
+        return
 
-    while write_pos < out_buf.pos:
-        left_bytes = out_buf.pos - write_pos
-
-        write_bytes = output_stream.write(out_mv[write_pos:out_buf.pos])
-        if write_bytes is None:
-            # The raw stream is set not to block and no single
-            # byte could be readily written to it
-            continue
-        else:
-            if write_bytes < 0 or write_bytes > left_bytes:
-                msg = ("output_stream.write() returned invalid length %d "
-                       "(should be 0 <= value <= %d)")
-                raise ValueError(msg % (write_bytes, left_bytes))
-            write_pos += write_bytes
+    write_ret = fp.write(out_mv[:out_b.pos])
+    if write_ret != out_b.pos:
+        msg = ("%s returned invalid length %d "
+               "(should be %d <= value <= %d)") % \
+               (func_name, write_ret, out_b.pos, out_b.pos)
+        raise ValueError(msg)
 
 def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
                      out_mv, out_buf, total_input_size, total_output_size):
@@ -1874,7 +1871,8 @@ def compress_stream(input_stream, output_stream, *,
 
                 # Write all output to output_stream
                 if output_stream is not None:
-                    _write_to_output(output_stream, out_mv, out_buf)
+                    _write_to_fp("output_stream.write()", output_stream,
+                                 out_mv, out_buf)
 
                 # Invoke callback
                 if callback is not None:
@@ -2018,7 +2016,8 @@ def decompress_stream(input_stream, output_stream, *,
 
                 # Write all output to output_stream
                 if output_stream is not None:
-                    _write_to_output(output_stream, out_mv, out_buf)
+                    _write_to_fp("output_stream.write()", output_stream,
+                                 out_mv, out_buf)
 
                 # Invoke callback
                 if callback is not None:

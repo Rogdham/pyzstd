@@ -611,8 +611,9 @@ ZstdFileWriter_write(ZstdFileWriter *self, PyObject *arg)
         /* Accumulate output bytes */
         output_size += out.pos;
 
-        /* Write all output to output_stream */
-        if (write_to_output(MODULE_STATE, self->fp, &out) < 0) {
+        /* Write output to fp */
+        if (write_to_fp(MODULE_STATE, "self._fp.write()",
+                        self->fp, &out) < 0) {
             goto error;
         }
 
@@ -689,8 +690,9 @@ ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
         /* Accumulate output bytes */
         output_size += out.pos;
 
-        /* Write all output to output_stream */
-        if (write_to_output(MODULE_STATE, self->fp, &out) < 0) {
+        /* Write output to fp */
+        if (write_to_fp(MODULE_STATE, "self._fp.write()",
+                        self->fp, &out) < 0) {
             goto error;
         }
 

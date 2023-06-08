@@ -243,8 +243,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
             continue;
         } else {
             /* Get read length value */
-            read_bytes = get_stream_return_value("input_stream.readinto()",
-                                                 temp, read_size);
+            read_bytes = check_and_get_fp_ret("input_stream.readinto()",
+                                              temp, 0, read_size);
             if (read_bytes < 0) {
                 goto error;
             }
@@ -287,7 +287,8 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Write all output to output_stream */
             if (output_stream != Py_None) {
-                if (write_to_output(MODULE_STATE, output_stream, &out) < 0) {
+                if (write_to_fp(MODULE_STATE, "output_stream.write()",
+                                output_stream, &out) < 0) {
                     goto error;
                 }
             }
@@ -490,8 +491,8 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
             continue;
         } else {
             /* Get read length value */
-            read_bytes = get_stream_return_value("input_stream.readinto()",
-                                                 temp, read_size);
+            read_bytes = check_and_get_fp_ret("input_stream.readinto()",
+                                              temp, 0, read_size);
             if (read_bytes < 0) {
                 goto error;
             }
@@ -532,7 +533,8 @@ decompress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Write all output to output_stream */
             if (output_stream != Py_None) {
-                if (write_to_output(MODULE_STATE, output_stream, &out) < 0) {
+                if (write_to_fp(MODULE_STATE, "output_stream.write()",
+                                output_stream, &out) < 0) {
                     goto error;
                 }
             }
