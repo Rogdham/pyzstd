@@ -1,5 +1,6 @@
 from io import BytesIO, UnsupportedOperation
 import builtins
+import gc
 import itertools
 import io
 import os
@@ -2551,6 +2552,20 @@ class FileTestCase(unittest.TestCase):
             ZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
         with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
             ZstdFile(BytesIO(), 'r', write_buffer_size=10)
+
+    def test_init_close_fp(self):
+        # get a temp file name
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            tmp_f.write(DAT_130K_C)
+            filename = tmp_f.name
+
+        with self.assertRaises(ValueError):
+            ZstdFile(filename, level_or_option={'a':'b'})
+
+        # for PyPy
+        gc.collect()
+
+        os.remove(filename)
 
     def test_close(self):
         with BytesIO(COMPRESSED_100_PLUS_32KB) as src:

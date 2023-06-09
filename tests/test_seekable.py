@@ -1,4 +1,5 @@
 import array
+import gc
 import io
 import os
 import pathlib
@@ -810,6 +811,8 @@ class SeekableZstdFileCase(unittest.TestCase):
                     def seekable():
                         return True
                     def seek(offset, whence=0):
+                        assert offset > 0
+                        assert whence == 0
                         raise OSError("xyz")
                     f.seekable = seekable
                     f.seek = seek
@@ -820,6 +823,9 @@ class SeekableZstdFileCase(unittest.TestCase):
         with patch("io.open", mock_open(io.open)):
             with self.assertRaisesRegex(OSError, 'xyz'):
                 SeekableZstdFile(filename, 'ab')
+
+        # for PyPy
+        gc.collect()
 
         os.remove(filename)
 
