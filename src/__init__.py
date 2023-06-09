@@ -82,7 +82,8 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
 def _nbytes(dat):
     if isinstance(dat, (bytes, bytearray)):
         return len(dat)
-    return memoryview(dat).nbytes
+    with memoryview(dat) as mv:
+        return mv.nbytes
 
 
 def train_dict(samples, dict_size):

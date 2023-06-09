@@ -40,7 +40,8 @@ _new_nonzero = ffi.new_allocator(should_clear_after_alloc=False)
 def _nbytes(dat):
     if isinstance(dat, (bytes, bytearray)):
         return len(dat)
-    return memoryview(dat).nbytes
+    with memoryview(dat) as mv:
+        return mv.nbytes
 
 class ZstdError(Exception):
     "Call to the underlying zstd library failed."

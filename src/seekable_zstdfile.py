@@ -532,40 +532,41 @@ class SeekableZstdFile(ZstdFile):
 
         # Accept any data that supports the buffer protocol.
         # And memoryview's subview is faster than slice.
-        data = memoryview(data).cast('B')
-        nbytes = data.nbytes
-        pos = 0
+        with memoryview(data) as view, view.cast('B') as byte_view:
+            nbytes = byte_view.nbytes
+            pos = 0
 
-        while nbytes > 0:
-            # Write size
-            write_size = min(nbytes, self._left_d_size)
+            while nbytes > 0:
+                # Write size
+                write_size = min(nbytes, self._left_d_size)
 
-            # Use inserted super().write() method, to prevent
-            # self._fp.tell() from reporting incorrect position.
-            # -------------------------
-            #   super().write() begin
-            # -------------------------
-            # Compress & write
-            _, output_size = self._writer.write(data[pos:pos+write_size])
-            self._pos += write_size
-            # -----------------------
-            #   super().write() end
-            # -----------------------
+                # Use inserted super().write() method, to prevent
+                # self._fp.tell() from reporting incorrect position.
+                # -------------------------
+                #   super().write() begin
+                # -------------------------
+                # Compress & write
+                _, output_size = self._writer.write(
+                                        byte_view[pos:pos+write_size])
+                self._pos += write_size
+                # -----------------------
+                #   super().write() end
+                # -----------------------
 
-            pos += write_size
-            nbytes -= write_size
+                pos += write_size
+                nbytes -= write_size
 
-            # Cumulate
-            self._current_c_size += output_size
-            self._current_d_size += write_size
-            self._left_d_size -= write_size
+                # Cumulate
+                self._current_c_size += output_size
+                self._current_d_size += write_size
+                self._left_d_size -= write_size
 
-            # Should flush a frame
-            if self._left_d_size == 0 or \
-               self._current_c_size >= self.FRAME_MAX_C_SIZE:
-                self.flush(self.FLUSH_FRAME)
+                # Should flush a frame
+                if self._left_d_size == 0 or \
+                self._current_c_size >= self.FRAME_MAX_C_SIZE:
+                    self.flush(self.FLUSH_FRAME)
 
-        return pos
+            return pos
 
     def flush(self, mode=ZstdFile.FLUSH_BLOCK):
         """Flush remaining data to the underlying stream.
