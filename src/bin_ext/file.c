@@ -1,5 +1,10 @@
 #include "pyzstd.h"
 
+/* This file has two classes:
+   1, ZstdFileReader is expected to be used with io.BufferedReader.
+   2, ZstdFileWriter is expected to be used with ZstdFile/SeekableZstdFile.
+*/
+
 typedef struct {
     PyObject_HEAD
 
@@ -617,9 +622,19 @@ ZstdFileWriter_write(ZstdFileWriter *self, PyObject *arg)
             goto error;
         }
 
-        /* Finished. If don't use multi-thread, this can be (zstd_ret == 0). */
-        if (in.size == in.pos && out.size != out.pos) {
-            break;
+        /* Finished */
+        if (!self->use_multithread) {
+            /* Single-thread compression + .CONTINUE mode */
+            if (zstd_ret == 0) {
+                break;
+            }
+        } else {
+            /* Multi-thread compression + .CONTINUE mode */
+            if (in.size == in.pos &&
+                out.size != out.pos)
+            {
+                break;
+            }
         }
     }
 

@@ -2705,9 +2705,73 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.writable)
 
+    def test_ZstdFileWriter(self):
+        bo = BytesIO()
+
+        # wrong arg
+        with self.assertRaisesRegex(TypeError, 'level_or_option'):
+            pyzstd.zstdfile.ZstdFileWriter(
+                                fp=bo,
+                                level_or_option=TRAINED_DICT,
+                                zstd_dict=None,
+                                write_buffer_size=131591)
+        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
+            pyzstd.zstdfile.ZstdFileWriter(
+                                fp=bo,
+                                level_or_option=3,
+                                zstd_dict={1:2},
+                                write_buffer_size=131591)
+        with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
+            pyzstd.zstdfile.ZstdFileWriter(
+                                fp=bo,
+                                level_or_option=3,
+                                zstd_dict=TRAINED_DICT,
+                                write_buffer_size=0)
+
+        w = pyzstd.zstdfile.ZstdFileWriter(
+                            fp=bo,
+                            level_or_option=None,
+                            zstd_dict=None,
+                            write_buffer_size=131591)
+        # write
+        ret = w.write(DAT_130K_D)
+        self.assertEqual(ret[0], len(DAT_130K_D))
+        self.assertGreater(ret[1], 0)
+        # flush block
+        ret = w.flush(ZstdCompressor.FLUSH_BLOCK)
+        self.assertEqual(ret[0], 0)
+        self.assertGreaterEqual(ret[1], 0)
+        # flush frame
+        ret = w.flush(ZstdCompressor.FLUSH_FRAME)
+        self.assertEqual(ret[0], 0)
+        self.assertGreaterEqual(ret[1], 0)
+        # flush .CONTINUE
+        with self.assertRaisesRegex(ValueError,
+                                    'mode argument wrong value'):
+            w.flush(ZstdCompressor.CONTINUE)
+
+        self.assertEqual(decompress(bo.getvalue()), DAT_130K_D)
+
     def test_ZstdFileReader(self):
+        # wrong arg
+        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
+            pyzstd.zstdfile.ZstdFileReader(
+                                fp=BytesIO(self.FRAME_42),
+                                zstd_dict={1:2}, option=None,
+                                read_size=131075)
+        with self.assertRaisesRegex(TypeError, 'option'):
+            pyzstd.zstdfile.ZstdFileReader(
+                                fp=BytesIO(self.FRAME_42),
+                                zstd_dict=TRAINED_DICT, option=3,
+                                read_size=131075)
+        with self.assertRaisesRegex(ValueError, 'read_size'):
+            pyzstd.zstdfile.ZstdFileReader(
+                                fp=BytesIO(self.FRAME_42),
+                                zstd_dict=TRAINED_DICT, option=3,
+                                read_size=0)
+
         r = pyzstd.zstdfile.ZstdFileReader(
-                            BytesIO(self.FRAME_42),
+                            fp=BytesIO(self.FRAME_42),
                             zstd_dict=None, option=None,
                             read_size=131075)
         ba = bytearray(100)

@@ -226,17 +226,14 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
             goto error;
         }
 
-        /* Finished */
-        if (in.pos == in.size) {
-            break;
-        }
-
-        /* Output buffer should be exhausted, grow the buffer. */
-        assert(out.pos == out.size);
+        /* Like compress_impl(), output as much as possible. */
         if (out.pos == out.size) {
             if (OutputBuffer_Grow(&buffer, &out) < 0) {
                 goto error;
             }
+        } else if (in.pos == in.size) {
+            /* Finished */
+            break;
         }
     }
 

@@ -750,13 +750,12 @@ class _Compressor:
             if m.ZSTD_isError(zstd_ret):
                 _set_zstd_error(_ErrorType.ERR_COMPRESS, zstd_ret)
 
-            # Finished
-            if in_buf.pos == in_buf.size:
-                return out.finish(out_buf)
-
-            # Output buffer should be exhausted, grow the buffer.
+            # Like ._compress_impl(), output as much as possible.
             if out_buf.pos == out_buf.size:
                 out.grow(out_buf)
+            elif in_buf.pos == in_buf.size:
+                # Finished
+                return out.finish(out_buf)
 
     def __reduce__(self):
         msg = "Cannot pickle %s object." % type(self)
@@ -1633,9 +1632,16 @@ class ZstdFileWriter:
             _write_to_fp("self._fp.write()", self._fp,
                          self._out_mv, out_b)
 
-            # Finished. If don't use multi-thread, this can be (zstd_ret == 0).
-            if in_b.size == in_b.pos and out_b.size != out_b.pos:
-                break
+            # Finished
+            if not self._use_multithread:
+                # Single-thread compression + .CONTINUE mode
+                if zstd_ret == 0:
+                    break
+            else:
+                # Multi-thread compression + .CONTINUE mode
+                if in_b.size == in_b.pos and \
+                   out_b.size != out_b.pos:
+                    break
 
         return (in_b.size, output_size)
 
@@ -1879,8 +1885,9 @@ def compress_stream(input_stream, output_stream, *,
                                      out_mv, out_buf, total_input_size, total_output_size)
 
                 # Finished
-                if end_directive == m.ZSTD_e_continue:
-                    if in_buf.pos == in_buf.size:
+                if use_multithread and end_directive == m.ZSTD_e_continue:
+                    if in_buf.pos == in_buf.size and \
+                       out_buf.pos != out_buf.size:
                         break
                 else:
                     if zstd_ret == 0:
