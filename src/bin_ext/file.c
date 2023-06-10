@@ -296,7 +296,7 @@ ZstdFileReader_readinto(ZstdFileReader *self, PyObject *arg)
     ZSTD_outBuffer out;
     Py_buffer buf;
 
-    if (PyObject_GetBuffer(arg, &buf, PyBUF_SIMPLE) < 0) {
+    if (PyObject_GetBuffer(arg, &buf, PyBUF_WRITABLE) < 0) {
         return NULL;
     }
     out.dst = buf.buf;

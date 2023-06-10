@@ -2776,6 +2776,12 @@ class FileTestCase(unittest.TestCase):
                             read_size=131075)
         ba = bytearray(100)
         mv = memoryview(ba)
+
+        # cffi implementation can't distinguish read-only buffer
+        if PYZSTD_CONFIG[1] != 'cffi':
+            with self.assertRaisesRegex(BufferError, 'not writable'):
+                r.readinto(b'123')
+
         self.assertEqual(r.readinto(mv[0:0]), 0)
         self.assertEqual(r.readinto(mv[:42]), 42)
         self.assertEqual(mv[:42], self.DECOMPRESSED_42)
