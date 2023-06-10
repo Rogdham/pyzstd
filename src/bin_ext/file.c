@@ -8,17 +8,17 @@ typedef struct {
     /* ZstdDict object in use */
     PyObject *dict;
 
-    /* Read chunk size, int object. */
+    /* Read chunk size, an int object. */
     PyObject *read_size;
 
-    /* File states. On Windows and Linux, Py_off_t is signed, so
+    /* File states. On Linux/macOS/Windows, Py_off_t is signed, so
        ZstdFile/SeekableZstdFile use int64_t as file position/size. */
     PyObject *fp;   /* File object */
-    int eof;        /* Boolean value */
-    int64_t pos;    /* Decompressed position */
+    int eof;        /* At EOF, 0 or 1. */
+    int64_t pos;    /* Decompressed position, >= 0. */
     int64_t size;   /* File size, -1 means unknown. */
 
-    /* Decompression states, boolean value. */
+    /* Decompression states, 0 or 1. */
     int needs_input;
     int at_frame_edge;
 
@@ -43,12 +43,12 @@ typedef struct {
     PyObject *dict;
 
     PyObject *fp;      /* File object */
-    int fp_has_flush;  /* fp has .flush() method, boolean value */
+    int fp_has_flush;  /* fp has .flush() method, 0 or 1. */
 
-    /* Last mode, initialized to ZSTD_e_end */
+    /* Last mode, initialized to ZSTD_e_end. */
     int last_mode;
 
-    /* Use multi-threaded compression, boolean value. */
+    /* Use multi-threaded compression, 0 or 1. */
     int use_multithread;
 
     /* Compression level */
@@ -63,7 +63,7 @@ typedef struct {
 #endif
 } ZstdFileWriter;
 
-/* Generate functions using macro:
+/* Generate 4 functions using macro:
     1, file_set_c_parameters(ZstdFileWriter *self, PyObject *level_or_option)
     2, file_load_c_dict(ZstdFileWriter *self, PyObject *dict)
     3, file_set_d_parameters(ZstdFileReader *self, PyObject *option)
@@ -214,9 +214,9 @@ decompress_into(ZstdFileReader *self,
             {
                 STATE_FROM_OBJ(self);
                 self->in_dat = invoke_method_one_arg(
-                                self->fp,
-                                MS_MEMBER(str_read),
-                                self->read_size);
+                                    self->fp,
+                                    MS_MEMBER(str_read),
+                                    self->read_size);
                 if (self->in_dat == NULL) {
                     return -1;
                 }
@@ -712,7 +712,7 @@ ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
     }
 
 finish:
-    ret = Py_BuildValue("KK", (uint64_t)0, output_size);
+    ret = Py_BuildValue("IK", (uint32_t)0, output_size);
     if (ret != NULL) {
         return ret;
     }

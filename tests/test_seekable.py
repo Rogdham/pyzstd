@@ -1098,7 +1098,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             self.assertEqual(f.tell(), 0)
             self.assertEqual(f._fp.tell(), 0)
 
-    def test_buffer_protocol(self):
+    def test_write_buffer_protocol(self):
         # don't use len() for buffer protocol objects
         arr = array.array("I", range(1000))
         LENGTH = len(arr) * arr.itemsize
@@ -1164,12 +1164,14 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.flush(f.FLUSH_FRAME)
             f.flush(mode=f.FLUSH_FRAME)
 
+            self.assertEqual(ZstdCompressor.CONTINUE, 0)
+            with self.assertRaises(ValueError):
+                f.flush(ZstdCompressor.CONTINUE)
+
             with self.assertRaises((TypeError, ValueError)):
                 f.flush(b'123')
             with self.assertRaises(TypeError):
                 f.flush(b'123', f.FLUSH_BLOCK)
-            with self.assertRaises(ValueError):
-                f.flush(0) # CONTINUE
             with self.assertRaises(TypeError):
                 f.flush(node=f.FLUSH_FRAME)
 

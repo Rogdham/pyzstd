@@ -873,7 +873,7 @@ ZstdFile class and open() function
     In both reading and writing modes, these methods and property are available:
 
         * `.close() <https://docs.python.org/3/library/io.html#io.IOBase.close>`_
-        * `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_
+        * `.tell() <https://docs.python.org/3/library/io.html#io.IOBase.tell>`_, return the current position of uncompressed content. In append mode, the initial position is 0.
         * `.fileno() <https://docs.python.org/3/library/io.html#io.IOBase.fileno>`_
         * `.closed <https://docs.python.org/3/library/io.html#io.IOBase.closed>`_ (a property attribute)
         * `.writable() <https://docs.python.org/3/library/io.html#io.IOBase.writable>`_
