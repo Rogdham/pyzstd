@@ -442,8 +442,6 @@ class _ErrorType:
         return _ErrorType._TYPE_MSG[type]
 
 def _set_zstd_error(type, zstd_ret):
-    assert m.ZSTD_isError(zstd_ret)
-
     msg = _ErrorType.get_type_msg(type) % \
           ffi.string(m.ZSTD_getErrorName(zstd_ret)).decode('utf-8')
     raise ZstdError(msg)
@@ -1089,7 +1087,6 @@ class _Decompressor:
                 in_buf.pos = 0
             elif len(data) == 0:
                 # Has unconsumed data, fast path for b"".
-                assert self._in_begin < self._in_end
                 use_input_buffer = True
 
                 in_buf.src = self._input_buffer + self._in_begin
@@ -1106,10 +1103,6 @@ class _Decompressor:
                 # Number of bytes we can append if we move existing
                 # contents to beginning of buffer
                 avail_total = self._input_buffer_size - used_now
-
-                assert (used_now > 0
-                        and avail_now >= 0
-                        and avail_total >= 0)
 
                 if avail_total < len(data):
                     new_size = used_now + len(data)

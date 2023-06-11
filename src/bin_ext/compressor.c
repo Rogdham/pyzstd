@@ -233,6 +233,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
             }
         } else if (in.pos == in.size) {
             /* Finished */
+            assert(mt_continue_should_break(&in, &out));
             break;
         }
     }

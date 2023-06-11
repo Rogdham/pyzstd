@@ -299,7 +299,7 @@ compress_stream(PyObject *module, PyObject *args, PyObject *kwargs)
 
             /* Finished */
             if (self.use_multithread && end_directive == ZSTD_e_continue) {
-                if (in.pos == in.size && out.pos != out.size) {
+                if (mt_continue_should_break(&in, &out)) {
                     break;
                 }
             } else {

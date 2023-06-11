@@ -630,9 +630,7 @@ ZstdFileWriter_write(ZstdFileWriter *self, PyObject *arg)
             }
         } else {
             /* Multi-thread compression + .CONTINUE mode */
-            if (in.size == in.pos &&
-                out.size != out.pos)
-            {
+            if (mt_continue_should_break(&in, &out)) {
                 break;
             }
         }

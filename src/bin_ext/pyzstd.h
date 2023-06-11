@@ -824,6 +824,14 @@ _get_DDict(ZstdDict *self)
 #define PYZSTD_FUN_PREFIX(F) F
 #include "macro_functions.h"
 
+/* In multi-thread compression + .CONTINUE mode: If input buffer exhausted,
+   there may be a lot of data in internal buffer that can be outputted.
+   This conditional expression output as much as possible. */
+FORCE_INLINE int
+mt_continue_should_break(ZSTD_inBuffer *in, ZSTD_outBuffer *out) {
+    return in->size == in->pos && out->size != out->pos;
+}
+
 /* Get Py_ssize_t value from the returned object of .readinto()/.write()
    methods, and Py_DECREF() the object.
    If fp_ret is NULL, or not an integer, or (v < lower || v > upper), set
@@ -847,16 +855,17 @@ check_and_get_fp_ret(char *func_name, PyObject *fp_ret,
     ret_value = PyLong_AsSsize_t(fp_ret);
     Py_DECREF(fp_ret);
 
-    /* Check PyLong_AsSsize_t() failed */
-    if (ret_value == -1 && PyErr_Occurred()) {
-        PyErr_Format(PyExc_TypeError,
-                     "%s return value should be int type",
-                     func_name);
-        return -1;
-    }
-
     /* Check bounds */
+    assert(lower >= 0);
     if (ret_value < lower || ret_value > upper) {
+        /* Check PyLong_AsSsize_t() failed */
+        if (ret_value == -1 && PyErr_Occurred()) {
+            PyErr_Format(PyExc_TypeError,
+                         "%s return value should be int type",
+                         func_name);
+            return -1;
+        }
+
         PyErr_Format(PyExc_ValueError,
                      "%s returned invalid length %zd "
                      "(should be %zd <= value <= %zd)",
