@@ -13,11 +13,16 @@ invoke_callback(const _zstd_state* const state, PyObject *callback,
     PyObject *cb_args;
     PyObject *cb_ret;
 
-    /* Input memoryview */
+    /* Only yield input data once */
     const size_t in_size = in->size - *callback_read_pos;
-    /* Only yield read data once */
     *callback_read_pos = in->size;
 
+    /* Don't yield empty data */
+    if (in_size == 0 && out->pos == 0) {
+        return 0;
+    }
+
+    /* Input memoryview */
     if (in_size != 0) {
         in_memoryview = PyMemoryView_FromMemory((char*) in->src, in_size, PyBUF_READ);
         if (in_memoryview == NULL) {

@@ -1714,13 +1714,16 @@ def _write_to_fp(func_name, fp, out_mv, out_b):
 
 def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
                      out_mv, out_buf, total_input_size, total_output_size):
-    # Input memoryview
+    # Only yield input data once
     in_size = in_buf.size - callback_read_pos
-    # Only yield read data once
     callback_read_pos = in_buf.size
-    in_memoryview = in_mv[:in_size]
 
-    # Output memoryview
+    # Don't yield empty data
+    if in_size == 0 and out_buf.pos == 0:
+        return callback_read_pos
+
+    # memoryview
+    in_memoryview = in_mv[:in_size]
     out_memoryview = out_mv[:out_buf.pos]
 
     # Callback
