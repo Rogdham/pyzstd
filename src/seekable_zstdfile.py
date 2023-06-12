@@ -563,7 +563,7 @@ class SeekableZstdFile(ZstdFile):
 
                 # Should flush a frame
                 if self._left_d_size == 0 or \
-                self._current_c_size >= self.FRAME_MAX_C_SIZE:
+                   self._current_c_size >= self.FRAME_MAX_C_SIZE:
                     self.flush(self.FLUSH_FRAME)
 
             return pos

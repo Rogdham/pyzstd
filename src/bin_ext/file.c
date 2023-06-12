@@ -194,7 +194,9 @@ ZstdFileReader_dealloc(ZstdFileReader *self)
     Py_DECREF(tp);
 }
 
-/* On success, return 0.
+/* If fill_full is true, fill the output buffer.
+   If fill_full is false, only output once, then exit.
+   On success, return 0.
    On failure, return -1. */
 FORCE_INLINE int
 decompress_into(ZstdFileReader *self,
@@ -282,7 +284,7 @@ decompress_into(ZstdFileReader *self,
                 return 0;
             }
         } else {
-            if (out->pos != 0) {
+            if (out->pos != orig_pos) {
                 self->pos += out->pos - orig_pos;
                 return 0;
             }
@@ -657,11 +659,15 @@ ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
 
     /* Mode argument */
     mode = _PyLong_AsInt(arg);
-    if (mode == -1 && PyErr_Occurred()) {
-        PyErr_SetString(PyExc_TypeError, "mode should be int type");
-        goto error;
-    }
+
+    assert(ZSTD_e_flush == 1 && ZSTD_e_end == 2);
     if (mode != ZSTD_e_flush && mode != ZSTD_e_end) {
+        /* Wrong type */
+        if (mode == -1 && PyErr_Occurred()) {
+            PyErr_SetString(PyExc_TypeError, "mode should be int type");
+            goto error;
+        }
+        /* Wrong value */
         PyErr_SetString(PyExc_ValueError,
                         "mode argument wrong value, it should be "
                         "ZstdFile.FLUSH_BLOCK or ZstdFile.FLUSH_FRAME.");

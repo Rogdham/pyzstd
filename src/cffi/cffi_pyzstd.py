@@ -1449,7 +1449,7 @@ class ZstdFileReader:
                     self.pos += out_b.pos - orig_pos
                     return
             else:
-                if out_b.pos:
+                if out_b.pos != orig_pos:
                     self.pos += out_b.pos - orig_pos
                     return
 

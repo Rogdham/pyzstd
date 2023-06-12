@@ -811,7 +811,7 @@ _get_DDict(ZstdDict *self)
     return ret;
 }
 
-/* Generate functions using macro:
+/* Generate 4 functions using macro:
     1, set_c_parameters(ZstdCompressor *self, PyObject *level_or_option)
     2, load_c_dict(ZstdCompressor *self, PyObject *dict)
     3, set_d_parameters(ZstdDecompressor *self, PyObject *option)
