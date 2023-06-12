@@ -47,6 +47,24 @@ jobs:
           python -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
           python -m unittest discover tests
 
+  # Test debug build on Ubuntu for every commit
+  run_on_cpython_debug:
+    name: Test debug build on Ubuntu
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Run test
+        run: |
+          sudo apt-get update
+          sudo apt-get install python3-dbg
+          sudo python3-dbg -m pip install -U pip
+          python3-dbg -m pip install --config-settings="--build-option=--warning-as-error --debug" -vv .
+          python3-dbg -m unittest discover tests
+
   # Run test on PyPy for every commit
   test_on_pypy:
     name: Test on ${{ matrix.py }}
