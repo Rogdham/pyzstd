@@ -1124,6 +1124,9 @@ class SeekableZstdFileCase(unittest.TestCase):
         DSIZE = len(DECOMPRESSED)
         b = BytesIO()
         with SeekableZstdFile(b, 'w') as f:
+            self.assertEqual(f.flush(mode=f.FLUSH_FRAME), None)
+            self.assertEqual(b.getvalue(), b'')
+
             self.assertEqual(f.write(DECOMPRESSED), DSIZE)
             self.assertEqual(f.tell(), DSIZE)
 

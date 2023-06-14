@@ -865,10 +865,19 @@ ZstdFile class and open() function
         * `.peek(size=-1) <https://docs.python.org/3/library/io.html#io.BufferedReader.peek>`_
         * `Iteration <https://docs.python.org/3/library/io.html#io.IOBase>`_, yield lines, line terminator is ``b'\n'``.
 
+.. _write_methods:
+
     In writing modes (compression), these methods are available:
 
         * `.write(b) <https://docs.python.org/3/library/io.html#io.BufferedIOBase.write>`_
-        * `.flush(mode=ZstdFile.FLUSH_BLOCK) <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream. The *mode* argument can be ``ZstdFile.FLUSH_BLOCK``, ``ZstdFile.FLUSH_FRAME``. Abuse of this method will reduce compression ratio, use it only when necessary. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.  (*Added in version 0.15.1, added mode argument in version 0.15.8.*)
+        * `.flush(mode=ZstdFile.FLUSH_BLOCK) <https://docs.python.org/3/library/io.html#io.IOBase.flush>`_, flush to the underlying stream:
+
+            #. The *mode* argument can be ``ZstdFile.FLUSH_BLOCK``, ``ZstdFile.FLUSH_FRAME``.
+            #. Contiguously invoking this method with ``.FLUSH_FRAME`` will not generate empty content frames.
+            #. Abuse of this method will reduce compression ratio, use it only when necessary.
+            #. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.
+
+            (*Added in version 0.15.1, added mode argument in version 0.15.8.*)
 
     In both reading and writing modes, these methods and property are available:
 
@@ -928,7 +937,7 @@ SeekableZstdFile class
 
             *max_frame_content_size* argument is used for compression modes (w, wb, a, ab, x, xb).
 
-            When the uncompressed data size reaches *max_frame_content_size*, a :ref:`frame<frame_block>` is generated automatically.
+            When the uncompressed data length reaches *max_frame_content_size*, the current :ref:`frame<frame_block>` is closed automatically.
 
             The default value (1 GiB) is almost useless. User should set this value based on the data and seeking requirement.
 
@@ -936,7 +945,7 @@ SeekableZstdFile class
 
             Avoid really tiny frame sizes (<1 KiB), that would hurt compression ratio considerably.
 
-            You can also manually generate a frame using ``f.flush(mode=f.FLUSH_FRAME)``.
+            You can also manually close a frame using :ref:`f.flush(mode=f.FLUSH_FRAME)<write_methods>`.
 
     .. py:staticmethod:: is_seekable_format_file(filename)
 
