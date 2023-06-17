@@ -392,7 +392,7 @@ class SeekableZstdFile(ZstdFile):
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
-                 read_size=131075, write_buffer_size=131591,
+                 read_size=131075, write_size=131591,
                  max_frame_content_size=1024*1024*1024):
         """Open a Zstandard Seekable Format file or 0-size file in binary mode.
 
@@ -419,9 +419,9 @@ class SeekableZstdFile(ZstdFile):
             underlying file object each time, default value is zstd's
             recommended value. If use with Network File System, increasing
             it may get better performance.
-        write_buffer_size: In writing modes, this is output buffer's size,
-            default value is zstd's recommended value. If use with Network
-            File System, increasing it may get better performance.
+        write_size: In writing modes, this is output buffer's size, default
+            value is zstd's recommended value. If use with Network File
+            System, increasing it may get better performance.
         max_frame_content_size: In write/append modes (compression), when
             the uncompressed data size reaches max_frame_content_size, a frame
             is generated automatically. If the size is small, it will increase
@@ -469,7 +469,7 @@ class SeekableZstdFile(ZstdFile):
                          level_or_option=level_or_option,
                          zstd_dict=zstd_dict,
                          read_size=read_size,
-                         write_buffer_size=write_buffer_size)
+                         write_size=write_size)
 
         # Overwrite seek table in append mode
         if mode in ("a", "ab"):

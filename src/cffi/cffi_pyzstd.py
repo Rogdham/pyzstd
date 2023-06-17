@@ -1528,7 +1528,7 @@ class ZstdFileReader:
         m.ZSTD_DCtx_reset(self._dctx, m.ZSTD_reset_session_only)
 
 class ZstdFileWriter:
-    def __init__(self, fp, level_or_option, zstd_dict, write_buffer_size):
+    def __init__(self, fp, level_or_option, zstd_dict, write_size):
         # File object
         self._fp = fp
         self._fp_has_flush = hasattr(fp, "flush")
@@ -1539,11 +1539,11 @@ class ZstdFileWriter:
         level = 0  # 0 means use zstd's default compression level
 
         # Write buffer
-        if write_buffer_size <= 0:
-            raise ValueError("write_buffer_size argument should > 0")
-        self._write_buffer_size = write_buffer_size
+        if write_size <= 0:
+            raise ValueError("write_size argument should > 0")
+        self._write_buffer_size = write_size
 
-        self._write_buffer = _new_nonzero("char[]", write_buffer_size)
+        self._write_buffer = _new_nonzero("char[]", write_size)
         if self._write_buffer == ffi.NULL:
             raise MemoryError
 

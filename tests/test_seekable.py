@@ -786,16 +786,16 @@ class SeekableZstdFileCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'read_size'):
             SeekableZstdFile(BytesIO(), 'w', read_size=10)
 
-        with SeekableZstdFile(BytesIO(), 'w', write_buffer_size=1):
+        with SeekableZstdFile(BytesIO(), 'w', write_size=1):
             pass
         with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=0)
+            SeekableZstdFile(BytesIO(), 'w', write_size=0)
         with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=-1)
+            SeekableZstdFile(BytesIO(), 'w', write_size=-1)
         with self.assertRaises(TypeError):
-            SeekableZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
-            SeekableZstdFile(BytesIO(), 'r', write_buffer_size=10)
+            SeekableZstdFile(BytesIO(), 'w', write_size=(10,))
+        with self.assertRaisesRegex(ValueError, 'write_size'):
+            SeekableZstdFile(BytesIO(), 'r', write_size=10)
 
     def test_init_append_fail(self):
         # get a temp file name

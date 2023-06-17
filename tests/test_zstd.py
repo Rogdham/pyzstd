@@ -2542,16 +2542,16 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'read_size'):
             ZstdFile(BytesIO(), 'w', read_size=10)
 
-        with ZstdFile(BytesIO(), 'w', write_buffer_size=1):
+        with ZstdFile(BytesIO(), 'w', write_size=1):
             pass
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'w', write_buffer_size=0)
+            ZstdFile(BytesIO(), 'w', write_size=0)
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'w', write_buffer_size=-1)
+            ZstdFile(BytesIO(), 'w', write_size=-1)
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(), 'w', write_buffer_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
-            ZstdFile(BytesIO(), 'r', write_buffer_size=10)
+            ZstdFile(BytesIO(), 'w', write_size=(10,))
+        with self.assertRaisesRegex(ValueError, 'write_size'):
+            ZstdFile(BytesIO(), 'r', write_size=10)
 
     def test_init_close_fp(self):
         # get a temp file name
@@ -2714,25 +2714,25 @@ class FileTestCase(unittest.TestCase):
                                 fp=bo,
                                 level_or_option=TRAINED_DICT,
                                 zstd_dict=None,
-                                write_buffer_size=131591)
+                                write_size=131591)
         with self.assertRaisesRegex(TypeError, 'zstd_dict'):
             pyzstd.zstdfile.ZstdFileWriter(
                                 fp=bo,
                                 level_or_option=3,
                                 zstd_dict={1:2},
-                                write_buffer_size=131591)
-        with self.assertRaisesRegex(ValueError, 'write_buffer_size'):
+                                write_size=131591)
+        with self.assertRaisesRegex(ValueError, 'write_size'):
             pyzstd.zstdfile.ZstdFileWriter(
                                 fp=bo,
                                 level_or_option=3,
                                 zstd_dict=TRAINED_DICT,
-                                write_buffer_size=0)
+                                write_size=0)
 
         w = pyzstd.zstdfile.ZstdFileWriter(
                             fp=bo,
                             level_or_option=None,
                             zstd_dict=None,
-                            write_buffer_size=131591)
+                            write_size=131591)
         # write
         ret = w.write(DAT_130K_D)
         self.assertEqual(ret[0], len(DAT_130K_D))
@@ -3041,7 +3041,7 @@ class FileTestCase(unittest.TestCase):
                       CParameter.checksumFlag:1}
             with ZstdFile(dst, "w",
                           level_or_option=option,
-                          write_buffer_size=1024) as f:
+                          write_size=1024) as f:
                 f.write(THIS_FILE_BYTES)
 
             comp = ZstdCompressor(option)

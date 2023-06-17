@@ -90,7 +90,7 @@ class ZstdFile(io.BufferedIOBase):
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
-                 read_size=131075, write_buffer_size=131591):
+                 read_size=131075, write_size=131591):
         """Open a zstd compressed file in binary mode.
 
         filename can be either an actual file name (given as a str, bytes, or
@@ -113,9 +113,9 @@ class ZstdFile(io.BufferedIOBase):
             underlying file object each time, default value is zstd's
             recommended value. If use with Network File System, increasing
             it may get better performance.
-        write_buffer_size: In writing modes, this is output buffer's size,
-            default value is zstd's recommended value. If use with Network
-            File System, increasing it may get better performance.
+        write_size: In writing modes, this is output buffer's size, default
+            value is zstd's recommended value. If use with Network File
+            System, increasing it may get better performance.
         """
         self._fp = None
         self._closefp = False
@@ -129,9 +129,9 @@ class ZstdFile(io.BufferedIOBase):
                      "should be a dict object, that represents decompression "
                      "option. It doesn't support int type compression level "
                      "in this case."))
-            if write_buffer_size != 131591:
+            if write_size != 131591:
                 raise ValueError(
-                    "write_buffer_size argument is only valid in write modes.")
+                    "write_size argument is only valid in write modes.")
             mode_code = _MODE_READ
         elif mode in ("w", "wb", "a", "ab", "x", "xb"):
             if not isinstance(level_or_option, (type(None), int, dict)):
@@ -175,7 +175,7 @@ class ZstdFile(io.BufferedIOBase):
                             self._fp,
                             level_or_option=level_or_option,
                             zstd_dict=zstd_dict,
-                            write_buffer_size=write_buffer_size)
+                            write_size=write_size)
 
     def close(self):
         """Flush and close the file.

@@ -841,7 +841,7 @@ ZstdFile class and open() function
 
     It can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_buffer_size=131_591)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_size=131_591)
 
         The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
 
@@ -849,10 +849,10 @@ ZstdFile class and open() function
 
         In reading mode (decompression), *read_size* argument is bytes number that read from the underlying file object each time, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-        In writing modes (compression), *write_buffer_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
+        In writing modes (compression), *write_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
 
-    .. versionchanged:: 0.15.8
-        Add *read_size* and *write_buffer_size* arguments.
+    .. versionchanged:: 0.15.9
+        Add *read_size* and *write_size* arguments.
 
     In reading mode (decompression), these methods and statement are available:
 
@@ -877,7 +877,7 @@ ZstdFile class and open() function
             #. Abuse of this method will reduce compression ratio, use it only when necessary.
             #. If the program is interrupted afterwards, all data can be recovered. To ensure saving to disk, also need `os.fsync(fd) <https://docs.python.org/3/library/os.html#os.fsync>`_.
 
-            (*Added in version 0.15.1, added mode argument in version 0.15.8.*)
+            (*Added in version 0.15.1, added mode argument in version 0.15.9.*)
 
     In both reading and writing modes, these methods and property are available:
 
@@ -917,7 +917,7 @@ SeekableZstdFile class
 
     An error related to "Zstandard Seekable Format". Subclass of ``Exception``.
 
-    .. versionadded:: 0.15.8
+    .. versionadded:: 0.15.9
 
 .. py:class:: SeekableZstdFile
 
@@ -927,9 +927,9 @@ SeekableZstdFile class
 
     :py:class:`ZstdFile` class can also read "Zstandard Seekable Format" file, but no fast seeking ability.
 
-    .. versionadded:: 0.15.8
+    .. versionadded:: 0.15.9
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_buffer_size=131_591, max_frame_content_size=1024*1024*1024)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_size=131_591, max_frame_content_size=1024*1024*1024)
 
         Same as :py:meth:`ZstdFile.__init__`. Except in append mode (a, ab), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
 

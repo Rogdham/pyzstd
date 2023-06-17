@@ -470,18 +470,18 @@ static int
 ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
 {
     static char *kwlist[] = {"fp", "level_or_option", "zstd_dict",
-                             "write_buffer_size", NULL};
+                             "write_size", NULL};
     PyObject *fp;
     PyObject *level_or_option;
     PyObject *zstd_dict;
-    Py_ssize_t write_buffer_size;
+    Py_ssize_t write_size;
 
     assert(ZSTD_CStreamOutSize() == 131591);
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs,
                                      "OOOn:ZstdFileWriter.__init__", kwlist,
                                      &fp, &level_or_option,
-                                     &zstd_dict, &write_buffer_size)) {
+                                     &zstd_dict, &write_size)) {
         return -1;
     }
 
@@ -508,14 +508,14 @@ ZstdFileWriter_init(ZstdFileWriter *self, PyObject *args, PyObject *kwargs)
     self->last_mode = ZSTD_e_end;
 
     /* Write buffer */
-    if (write_buffer_size <= 0) {
+    if (write_size <= 0) {
         PyErr_SetString(PyExc_ValueError,
-                        "write_buffer_size argument should > 0");
+                        "write_size argument should > 0");
         goto error;
     }
-    self->write_buffer_size = (size_t)write_buffer_size;
+    self->write_buffer_size = (size_t)write_size;
 
-    self->write_buffer = PyMem_Malloc(write_buffer_size);
+    self->write_buffer = PyMem_Malloc(write_size);
     if (self->write_buffer == NULL) {
         PyErr_NoMemory();
         goto error;
