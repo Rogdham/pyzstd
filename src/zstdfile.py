@@ -81,7 +81,8 @@ class ZstdFile(io.BufferedIOBase):
     directly to a named file on disk.
 
     Note that ZstdFile provides a *binary* file interface - data read is
-    returned as bytes, and data to be written must be given as bytes.
+    returned as bytes, and data to be written should be an object that
+    supports the Buffer Protocol.
     """
     FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
     FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME

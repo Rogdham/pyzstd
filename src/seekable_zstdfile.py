@@ -103,15 +103,13 @@ class SeekTable:
                 'The file object should have .readable()/.seekable() methods.')
         if not fp.readable():
             raise TypeError(
-                ('To load the seek table of Zstandard Seekable Format, '
-                 'the file object should be readable.'))
+                ("In SeekableZstdFile's reading mode, the file object should "
+                 "be readable."))
         if not fp.seekable():
             raise TypeError(
-                ("To load the seek table of Zstandard Seekable Format, "
-                 "the file object should be seekable. In SeekableZstdFile's "
-                 "reading mode, the file object must be seekable. If the "
-                 "file object is not seekable, it can be read sequentially "
-                 "using ZstdFile class."))
+                ("In SeekableZstdFile's reading mode, the file object should "
+                 "be seekable. If the file object is not seekable, it can be "
+                 "read sequentially using ZstdFile class."))
 
         # Get file size
         fsize = fp.seek(0, 2) # 2 is SEEK_END
@@ -229,6 +227,9 @@ class SeekTable:
     def get_full_d_size(self):
         return self._full_d_size
 
+    # Merge the seek table to max_frames frames.
+    # The format allows up to 0xFFFF_FFFF frames. When frames
+    # number exceeds, use this method to merge.
     def _merge_frames(self, max_frames):
         if self._frames_count <= max_frames:
             return
@@ -394,7 +395,8 @@ class SeekableZstdFile(ZstdFile):
                  level_or_option=None, zstd_dict=None,
                  read_size=131075, write_size=131591,
                  max_frame_content_size=1024*1024*1024):
-        """Open a Zstandard Seekable Format file or 0-size file in binary mode.
+        """Open a Zstandard Seekable Format file in binary mode. In read mode,
+        the file can be 0-size file.
 
         filename can be either an actual file name (given as a str, bytes, or
         PathLike object), in which case the named file is opened, or it can be
@@ -649,7 +651,7 @@ class SeekableZstdFile(ZstdFile):
             orig_pos = fp.tell()
         else:
             raise TypeError(
-                ('filename argument must be a str/bytes/PathLike object, '
+                ('filename argument should be a str/bytes/PathLike object, '
                  'or a file object that is readable and seekable.'))
 
         # Write mode uses less RAM
