@@ -1,7 +1,7 @@
+import sys
 from collections import namedtuple
 from enum import IntEnum
 from functools import lru_cache
-from sys import maxsize
 from threading import Lock
 from warnings import warn
 
@@ -20,7 +20,7 @@ __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
            '_ZSTD_CStreamSizes', '_ZSTD_DStreamSizes',
            'PYZSTD_CONFIG')
 
-PYZSTD_CONFIG = (64 if maxsize > 2**32 else 32,
+PYZSTD_CONFIG = (64 if sys.maxsize > 2**32 else 32,
                  'cffi', bool(m.pyzstd_static_link), False)
 
 _ZSTD_CStreamSizes = (m.ZSTD_CStreamInSize(), m.ZSTD_CStreamOutSize())
@@ -499,10 +499,10 @@ def _set_parameter_error(is_compress, key, value):
     # Error message
     msg = ('Error when setting zstd %s parameter "%s", it '
            'should %d <= value <= %d, provided value is %d. '
-           '(zstd v%s, %s-bit build)') % \
+           '(zstd v%s, %d-bit build)') % \
           (type_msg, name,
            bounds.lowerBound, bounds.upperBound, value,
-           zstd_version, '64' if maxsize > 2**32 else '32')
+           zstd_version, PYZSTD_CONFIG[0])
     raise ZstdError(msg)
 
 def _check_int32_value(value, name):

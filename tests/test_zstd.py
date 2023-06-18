@@ -613,11 +613,6 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         d1[CParameter.ldmBucketSizeLog] = 2**31
         self.assertRaises(ValueError, ZstdCompressor, d1)
 
-        # value out of bounds, ZstdError
-        d2 = d.copy()
-        d2[CParameter.ldmBucketSizeLog] = 10
-        self.assertRaises(ZstdError, ZstdCompressor, d2)
-
         # clamp compressionLevel
         compress(b'', compressionLevel_values.max+1)
         compress(b'', compressionLevel_values.min-1)
@@ -634,6 +629,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             with self.assertRaises(ZstdError):
                 ZstdCompressor({CParameter.overlapLog:4})
 
+        # out of bounds error msg
+        option = {CParameter.windowLog:100}
+        with self.assertRaisesRegex(ZstdError,
+                (r'Error when setting zstd compression parameter "windowLog", '
+                 r'it should \d+ <= value <= \d+, provided value is 100\. '
+                 r'\(zstd v\d\.\d\.\d, (?:32|64)-bit build\)')):
+            compress(b'', option)
+
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
         EndlessZstdDecompressor(option=d)
@@ -643,10 +646,13 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         d1[DParameter.windowLogMax] = 2**31
         self.assertRaises(ValueError, EndlessZstdDecompressor, None, d1)
 
-        # value out of bounds, ZstdError
-        d2 = d.copy()
-        d2[DParameter.windowLogMax] = 32
-        self.assertRaises(ZstdError, EndlessZstdDecompressor, None, d2)
+        # out of bounds error msg
+        option = {DParameter.windowLogMax:100}
+        with self.assertRaisesRegex(ZstdError,
+                (r'Error when setting zstd decompression parameter "windowLogMax", '
+                 r'it should \d+ <= value <= \d+, provided value is 100\. '
+                 r'\(zstd v\d\.\d\.\d, (?:32|64)-bit build\)')):
+            decompress(b'', option=option)
 
     def test_unknown_compression_parameter(self):
         KEY = 100001234
