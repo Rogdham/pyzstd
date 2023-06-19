@@ -351,14 +351,14 @@ class SeekableDecompressReader(ZstdDecompressReader):
         old_frame = self._seek_table.index_by_dpos(self._decomp.pos)
         c_pos, d_pos = self._seek_table.get_frame_sizes(new_frame)
 
-        # If at P1, and the skippable frame is large, seeking to P2
-        # will unnecessarily read the entire skippable frame. So skip
-        # large skippable frame (>= 1 MiB).
+        # If at P1, seeking to P2 will unnecessarily read the skippable
+        # frame. So check self._fp position to skip the skippable frame.
         #       |--data1--|--skippable--|--data2--|
         # cpos:             ^P1
         # dpos:           ^P1             ^P2
-        if new_frame == old_frame and offset >= self._decomp.pos and \
-           c_pos - self._fp.tell() < 1*1024*1024:
+        if new_frame == old_frame and \
+           offset >= self._decomp.pos and \
+           self._fp.tell() >= c_pos:
             pass
         else:
             # Jump
