@@ -97,20 +97,6 @@ class SeekTable:
     # seek_to_0 is True or False.
     # In read mode, seeking to 0 is necessary.
     def load_seek_table(self, fp, seek_to_0):
-        # Check fp readable/seekable
-        if not (hasattr(fp, 'readable') and hasattr(fp, "seekable")):
-            raise TypeError(
-                'The file object should have .readable()/.seekable() methods.')
-        if not fp.readable():
-            raise TypeError(
-                ("In SeekableZstdFile's reading mode, the file object should "
-                 "be readable."))
-        if not fp.seekable():
-            raise TypeError(
-                ("In SeekableZstdFile's reading mode, the file object should "
-                 "be seekable. If the file object is not seekable, it can be "
-                 "read sequentially using ZstdFile class."))
-
         # Get file size
         fsize = fp.seek(0, 2) # 2 is SEEK_END
         if fsize == 0:
@@ -308,14 +294,31 @@ class SeekTable:
 
 class SeekableDecompressReader(ZstdDecompressReader):
     def __init__(self, fp, zstd_dict, option, read_size):
+        # Check fp readable/seekable
+        if not hasattr(fp, 'readable') or not hasattr(fp, "seekable"):
+            raise TypeError(
+                ("In SeekableZstdFile's reading mode, the file object should "
+                 "have .readable()/.seekable() methods."))
+        if not fp.readable():
+            raise TypeError(
+                ("In SeekableZstdFile's reading mode, the file object should "
+                 "be readable."))
+        if not fp.seekable():
+            raise TypeError(
+                ("In SeekableZstdFile's reading mode, the file object should "
+                 "be seekable. If the file object is not seekable, it can be "
+                 "read sequentially using ZstdFile class."))
+
+        # Load seek table
         self._seek_table = SeekTable(read_mode=True)
         self._seek_table.load_seek_table(fp, seek_to_0=True)
 
+        # Initialize super()
         super().__init__(fp, zstd_dict, option, read_size)
         self._decomp.size = self._seek_table.get_full_d_size()
 
     # super().seekable() returns self._fp.seekable().
-    # In .__init__() method, seekable has been checked in load_seek_table().
+    # Seekable has been checked in .__init__() method.
     # BufferedReader.seek() checks this in each invoke, if self._fp.seekable()
     # becomes False at runtime, .seek() method just raise OSError instead of
     # io.UnsupportedOperation.
