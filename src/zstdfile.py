@@ -234,8 +234,8 @@ class ZstdFile(io.BufferedIOBase):
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,
-        the file on disk may not reflect the data written until close()
-        is called.
+        the file on disk may not reflect the data written until .flush()
+        or .close() is called.
         """
         # Compress & write
         try:

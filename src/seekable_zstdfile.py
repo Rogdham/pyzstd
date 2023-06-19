@@ -15,7 +15,7 @@ class SeekableFormatError(Exception):
         super().__init__('Zstandard Seekable Format error: ' + msg)
 
 __doc__ = '''\
-Zstandard Seekable Format (Ver 0.1.0, 2017 Apr)
+Zstandard Seekable Format (Ver 0.1.0, Apr 2017)
 Square brackets are used to indicate optional fields.
 All numeric fields are little-endian unless specified otherwise.
 A. Seek table is a skippable frame at the end of file:
@@ -493,7 +493,7 @@ class SeekableZstdFile(ZstdFile):
                       "zstd skippable frame) at the end of the file "
                       "can't be overwritten. Each time open such file "
                       "in append mode, it will waste some storage "
-                      "space, %d bytes were wasted this time.") % \
+                      "space. %d bytes were wasted this time.") % \
                         self._seek_table.seek_frame_size,
                      RuntimeWarning, 2)
 
@@ -520,7 +520,8 @@ class SeekableZstdFile(ZstdFile):
                     # For multiple calls to .close()
                     self._write_in_close = False
         finally:
-            # Clear write mode's seek table
+            # Clear write mode's seek table.
+            # Put here for failures in/after super().__init__().
             self._seek_table = None
             super().close()
 
@@ -529,8 +530,8 @@ class SeekableZstdFile(ZstdFile):
 
         Returns the number of uncompressed bytes written, which is
         always the length of data in bytes. Note that due to buffering,
-        the file on disk may not reflect the data written until close()
-        is called.
+        the file on disk may not reflect the data written until .flush()
+        or .close() is called.
         """
         if self._mode != _MODE_WRITE:
             self._check_mode(_MODE_WRITE)

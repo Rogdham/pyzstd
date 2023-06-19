@@ -1371,7 +1371,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             with self.assertWarnsRegex(RuntimeWarning,
                                        (r"at the end of the file "
                                         r"can't be overwritten"
-                                        r".*?, 0 bytes")):
+                                        r".*?\. 0 bytes")):
                 f = SeekableZstdFile(filename, 'a')
             f.write(DECOMPRESSED)
             f.flush(f.FLUSH_FRAME)
