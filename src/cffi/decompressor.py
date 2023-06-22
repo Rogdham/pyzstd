@@ -1,9 +1,10 @@
 from threading import Lock
 
-from .cffi_pyzstd import m, ffi, ZstdError, _new_nonzero, \
-                         _set_d_parameters, _load_d_dict, \
-                         _set_zstd_error, _ErrorType, \
-                         _BlocksOutputBuffer
+from .common import m, ffi, ZstdError, \
+                    _new_nonzero, _set_d_parameters, \
+                    _set_zstd_error, _ErrorType
+from .dict import _load_d_dict
+from .output_buffer import _BlocksOutputBuffer
 
 _TYPE_DEC         = 0
 _TYPE_ENDLESS_DEC = 1

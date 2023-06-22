@@ -5,25 +5,11 @@ from functools import lru_cache
 
 from ._cffi_zstd import ffi, lib as m
 
-__all__ = ('ZstdCompressor', 'RichMemZstdCompressor',
-           'ZstdDecompressor', 'EndlessZstdDecompressor',
-           'ZstdDict', 'ZstdError',
-           'CParameter', 'DParameter', 'Strategy',
-           'decompress', 'get_frame_info', 'get_frame_size',
-           'compress_stream', 'decompress_stream',
-           'zstd_version', 'zstd_version_info',
-           'compressionLevel_values',
-           '_train_dict', '_finalize_dict',
-           'ZstdFileReader', 'ZstdFileWriter',
-           '_ZSTD_CStreamSizes', '_ZSTD_DStreamSizes',
-           'PYZSTD_CONFIG')
-
 PYZSTD_CONFIG = (64 if sys.maxsize > 2**32 else 32,
                  'cffi', bool(m.pyzstd_static_link), False)
 
 _ZSTD_CStreamSizes = (m.ZSTD_CStreamInSize(), m.ZSTD_CStreamOutSize())
 _ZSTD_DStreamSizes = (m.ZSTD_DStreamInSize(), m.ZSTD_DStreamOutSize())
-_ZSTD_DStreamOutSize = m.ZSTD_DStreamOutSize()
 
 zstd_version = ffi.string(m.ZSTD_versionString()).decode('ascii')
 zstd_version_info = tuple(int(i) for i in zstd_version.split('.'))
@@ -457,10 +443,3 @@ def get_frame_size(frame_buffer):
         raise ZstdError(msg)
 
     return frame_size
-
-from .output_buffer import _BlocksOutputBuffer
-from .dict import ZstdDict, _load_c_dict, _load_d_dict
-from .compressor import ZstdCompressor, RichMemZstdCompressor
-from .decompressor import ZstdDecompressor, EndlessZstdDecompressor, decompress
-from .stream import compress_stream, decompress_stream
-from .file import ZstdFileReader, ZstdFileWriter

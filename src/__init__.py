@@ -1,10 +1,10 @@
 try:
     # Import C implementation
-    from .c.c_pyzstd import *
+    from .c import *
 except ImportError:
     try:
         # Import CFFI implementation
-        from .cffi.cffi_pyzstd import *
+        from .cffi import *
     except ImportError:
         raise ImportError(
             "\n\npyzstd module: Can't import compiled .so/.pyd file.\n"

@@ -1,9 +1,11 @@
-from .cffi_pyzstd import m, ffi, ZstdError, _new_nonzero, _nbytes, \
-                         _set_c_parameters, _load_c_dict, \
-                         _set_d_parameters, _load_d_dict, \
-                         _write_to_fp, _BlocksOutputBuffer, \
-                         _set_zstd_error, _ErrorType, \
-                         _ZSTD_DStreamOutSize
+from .common import m, ffi, ZstdError, _new_nonzero, _nbytes, \
+                    _set_c_parameters, _set_d_parameters, \
+                    _write_to_fp, _ZSTD_DStreamSizes, \
+                    _set_zstd_error, _ErrorType
+from .dict import _load_c_dict, _load_d_dict
+from .output_buffer import _BlocksOutputBuffer
+
+_ZSTD_DStreamOutSize = _ZSTD_DStreamSizes[1]
 
 class ZstdFileReader:
     def __init__(self, fp, zstd_dict, option, read_size):

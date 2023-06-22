@@ -1,4 +1,4 @@
-from .cffi_pyzstd import m, ffi, _new_nonzero
+from .common import m, ffi, _new_nonzero
 
 class _BlocksOutputBuffer:
     KB = 1024

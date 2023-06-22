@@ -1,10 +1,11 @@
 from threading import Lock
 from warnings import warn
 
-from .cffi_pyzstd import m, ffi, ZstdError, _new_nonzero, _nbytes, \
-                         _set_c_parameters, _load_c_dict, \
-                         _set_zstd_error, _ErrorType, \
-                         _BlocksOutputBuffer
+from .common import m, ffi, _new_nonzero, _nbytes, \
+                    ZstdError, _set_c_parameters, \
+                    _set_zstd_error, _ErrorType
+from .dict import _load_c_dict
+from .output_buffer import _BlocksOutputBuffer
 
 class _Compressor:
     def __init__(self, level_or_option=None, zstd_dict=None):

@@ -1,8 +1,8 @@
-from .cffi_pyzstd import m, ffi, ZstdError, _new_nonzero, \
-                         _set_c_parameters, _load_c_dict, \
-                         _set_d_parameters, _load_d_dict, \
-                         _set_zstd_error, _ErrorType, \
-                         _write_to_fp
+from .common import m, ffi, ZstdError, _new_nonzero, \
+                    _set_c_parameters, _set_d_parameters, \
+                    _set_zstd_error, _ErrorType, \
+                    _write_to_fp
+from .dict import _load_c_dict, _load_d_dict
 
 def _invoke_callback(callback, in_mv, in_buf, callback_read_pos,
                      out_mv, out_buf, total_input_size, total_output_size):

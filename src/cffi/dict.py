@@ -1,11 +1,11 @@
 from threading import Lock
 
-from .cffi_pyzstd import m, ffi, ZstdError, \
-                         _set_zstd_error, _ErrorType
+from .common import m, ffi, ZstdError, \
+                    _set_zstd_error, _ErrorType
 
-_DICT_TYPE_DIGESTED = 0
+_DICT_TYPE_DIGESTED   = 0
 _DICT_TYPE_UNDIGESTED = 1
-_DICT_TYPE_PREFIX = 2
+_DICT_TYPE_PREFIX     = 2
 
 class ZstdDict:
     """Zstd dictionary, used for compression/decompression."""
