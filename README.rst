@@ -22,7 +22,9 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
-**0.15.9  (Jun xx, 2023)**
+**0.15.9  (Jun 24, 2023)**
+
+ZstdFile class related changes:
 
 #. Add `SeekableZstdFile <https://pyzstd.readthedocs.io/en/latest/#SeekableZstdFile>`_ class, it's a subclass of ``ZstdFile``, supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
 
