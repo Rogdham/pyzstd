@@ -5,7 +5,7 @@ on: [push, pull_request]
 
 env:
   PYTHON_VER: '3.11'        # Python to run test/cibuildwheel
-  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-*
+  CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* cp311-* pp37-* pp38-* pp39-* pp310-*
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
@@ -77,7 +77,7 @@ jobs:
 
     strategy:
       matrix:
-        py: ['pypy-3.7', 'pypy-3.8', 'pypy-3.9']
+        py: ['pypy-3.7', 'pypy-3.8', 'pypy-3.9', 'pypy-3.10']
 
     steps:
       - uses: actions/checkout@v3
