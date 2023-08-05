@@ -462,8 +462,14 @@ class SeekableZstdFile(ZstdFile):
             # Load seek table in append mode
             if mode in ("a", "ab"):
                 if isinstance(filename, (str, bytes, PathLike)):
+                    # Load seek table if file exists
                     if isfile(filename):
                         with io.open(filename, "rb") as f:
+                            if not hasattr(f, "seekable") or not f.seekable():
+                                raise TypeError(
+                                    ("In SeekableZstdFile's appending mode, "
+                                     "the opened 'rb' file object should be "
+                                     "seekable for loading the seek table."))
                             self._seek_table.load_seek_table(f, seek_to_0=False)
                 else:
                     raise TypeError(

@@ -1411,6 +1411,39 @@ class SeekableZstdFileCase(unittest.TestCase):
 
         os.remove(filename)
 
+    def test_append_loading_not_seekable(self):
+        # in append mode, and 'rb' mode file object is not seekable,
+        # the seek table can't be loaded.
+
+        # get a temp file name
+        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
+            filename = tmp_f.name
+
+        # write
+        with SeekableZstdFile(filename, 'w') as f:
+            f.write(DECOMPRESSED)
+
+        # mock io.open, return False in 'rb' mode.
+        def mock_open(io_open):
+            def get_file(*args, **kwargs):
+                f = io_open(*args, **kwargs)
+                if len(args) > 1 and args[1] == 'rb':
+                    def seekable(*args, **kwargs):
+                        return False
+                    f.seekable = seekable
+                return f
+            return get_file
+
+        # append
+        with patch("io.open", mock_open(io.open)):
+            with self.assertRaisesRegex(
+                    TypeError,
+                    (r"In SeekableZstdFile's appending mode"
+                     r".*?should be seekable")):
+                SeekableZstdFile(filename, 'a')
+
+        os.remove(filename)
+
     def test_bad_append(self):
         # can't accept file object
         with self.assertRaisesRegex(TypeError,
