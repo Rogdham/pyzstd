@@ -3438,6 +3438,16 @@ class FileTestCase(unittest.TestCase):
         lines = [l for l in ZstdFile(BytesIO(COMPRESSED_THIS_FILE))]
         self.assertGreater(len(lines), 0)
 
+    def test_append_new_file(self):
+        with tempfile.NamedTemporaryFile(delete=True) as tmp_f:
+            filename = tmp_f.name
+
+        with ZstdFile(filename, 'a') as f:
+            pass
+        self.assertTrue(os.path.isfile(filename))
+
+        os.remove(filename)
+
 class OpenTestCase(unittest.TestCase):
 
     def test_binary_modes(self):

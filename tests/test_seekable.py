@@ -1347,6 +1347,16 @@ class SeekableZstdFileCase(unittest.TestCase):
 
         os.remove(filename)
 
+    def test_append_new_file(self):
+        with tempfile.NamedTemporaryFile(delete=True) as tmp_f:
+            filename = tmp_f.name
+
+        with SeekableZstdFile(filename, 'a'):
+            pass
+        self.assertTrue(os.path.isfile(filename))
+
+        os.remove(filename)
+
     def test_append_not_seekable(self):
         # in append mode, and the file is not seekable, the
         # current seek table frame can't be overwritten.

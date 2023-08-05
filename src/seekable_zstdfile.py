@@ -1,5 +1,6 @@
 from array import array
 from bisect import bisect_right
+from os.path import isfile
 from struct import Struct
 from warnings import warn
 
@@ -461,8 +462,9 @@ class SeekableZstdFile(ZstdFile):
             # Load seek table in append mode
             if mode in ("a", "ab"):
                 if isinstance(filename, (str, bytes, PathLike)):
-                    with io.open(filename, "rb") as f:
-                        self._seek_table.load_seek_table(f, seek_to_0=False)
+                    if isfile(filename):
+                        with io.open(filename, "rb") as f:
+                            self._seek_table.load_seek_table(f, seek_to_0=False)
                 else:
                     raise TypeError(
                             ("In append mode ('a', 'ab'), "
