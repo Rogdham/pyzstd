@@ -1438,7 +1438,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         with patch("io.open", mock_open(io.open)):
             with self.assertRaisesRegex(
                     TypeError,
-                    (r"In SeekableZstdFile's appending mode"
+                    (r"In SeekableZstdFile's append mode \('a', 'ab'\),"
                      r".*?should be seekable")):
                 SeekableZstdFile(filename, 'a')
 

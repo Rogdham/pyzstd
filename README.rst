@@ -22,6 +22,10 @@ GitHub: https://github.com/animalize/pyzstd
 
 Release note
 ------------
+**0.15.10  (xxx xx, 202x)**
+
+#. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
+
 **0.15.9  (Jun 24, 2023)**
 
 ZstdFile class related changes:
