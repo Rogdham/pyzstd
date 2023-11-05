@@ -119,8 +119,6 @@ def do_setup():
                 '+-------------------------+------------------+\n'
                 '| Implementation          | {!s:<16} |\n'
                 '+-------------------------+------------------+\n'
-                '| Enable multi-phase-init | {!s:<16} |\n'
-                '+-------------------------+------------------+\n'
                 '| Link to zstd library    | {!s:<16} |\n'
                 '+-------------------------+------------------+\n'
                 '| Enable AVX2/BMI2        | {!s:<16} |\n'
@@ -131,7 +129,6 @@ def do_setup():
                 '+-------------------------+------------------+').format(
                     module_version,
                     'CFFI' if CFFI else 'C',
-                    'Not for CFFI' if CFFI else MULTI_PHASE_INIT,
                     'Dynamically link' if DYNAMIC_LINK else 'Statically link',
                     pyzstd_build_ext.PYZSTD_AVX2,
                     pyzstd_build_ext.PYZSTD_DEBUG,

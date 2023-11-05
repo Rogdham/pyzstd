@@ -8,6 +8,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Includes zstd v1.5.5 source code
 * Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
 * Has a CFFI implementation that can work with PyPy
+* Support sub-interpreter on CPython 3.12+
 * ``ZstdFile`` class has C language level performance
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 * Has a command line interface: ``python -m pyzstd --help``
@@ -25,6 +26,8 @@ Release note
 **0.15.10  (xxx xx, 202x)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
+
+#. Support sub-interpreter on CPython 3.12+, can utilize `per-interpreter GIL <https://docs.python.org/3.12/whatsnew/3.12.html#pep-684-a-per-interpreter-gil>`_.
 
 **0.15.9  (Jun 24, 2023)**
 

@@ -10,6 +10,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Includes the latest zstd library source code
 * Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
 * Has a CFFI implementation that can work with PyPy
+* Support sub-interpreter on CPython 3.12+
 * :py:class:`ZstdFile` class has C language level performance
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 * Has a command line interface, ``python -m pyzstd --help``.
@@ -1678,9 +1679,3 @@ Build pyzstd module with options
         * %SystemRoot%\System32
 
     Note that the above list doesn't include the current working directory and %PATH% directories.
-
-    3️⃣ Use "multi-phase initialization" on CPython.
-
-    If provide ``--multi-phase-init`` build option, it will build with "multi-phase initialization" (`PEP-489 <https://peps.python.org/pep-0489/>`_) on CPython 3.11+.
-
-    Since it adds a tiny overhead, it's disabled by default. It can be enabled after CPython's `sub-interpreters <https://peps.python.org/pep-0554/>`_ is mature.

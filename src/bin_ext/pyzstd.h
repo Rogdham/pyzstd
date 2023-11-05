@@ -24,10 +24,15 @@
     #define Py_UNREACHABLE() assert(0)
 #endif
 
-/* PyType_GetModuleByDef() function was added in Python 3.11.
-   0x030B00B1 is CPython 3.11 Beta1. */
-#if defined(USE_MULTI_PHASE_INIT) && PY_VERSION_HEX < 0x030B00B1
+/* Multi-phase init (PEP-489) */
+#if PY_VERSION_HEX < 0x030B00B1 && defined(USE_MULTI_PHASE_INIT)
+    /* PyType_GetModuleByDef() function is available on CPython 3.11+.
+       0x030B00B1 is 3.11 Beta 1. */
     #undef USE_MULTI_PHASE_INIT
+#elif PY_VERSION_HEX >= 0x030C00B1 && !defined(USE_MULTI_PHASE_INIT)
+    /* CPython 3.12+ have per-interpreter GIL, always enable to prevent
+       confusion. 0x030C00B1 is 3.12 Beta 1. */
+    #define USE_MULTI_PHASE_INIT
 #endif
 
 /* Forward declaration */
