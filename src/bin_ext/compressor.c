@@ -122,7 +122,7 @@ compress_impl(ZstdCompressor *self, Py_buffer *data,
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer = {.list = NULL};
+    PYZSTD_OUTPUT_BUFFER(buffer);
     size_t zstd_ret;
     PyObject *ret;
 
@@ -198,7 +198,7 @@ compress_mt_continue_impl(ZstdCompressor *self, Py_buffer *data)
 {
     ZSTD_inBuffer in;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer = {.list = NULL};
+    PYZSTD_OUTPUT_BUFFER(buffer);
     size_t zstd_ret;
     PyObject *ret;
 

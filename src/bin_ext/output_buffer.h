@@ -1,7 +1,7 @@
 #include "pyzstd.h"
 
 /* ----------------------------
-     BlocksOutputBuffer code
+     OutputBuffer code
    ---------------------------- */
 typedef struct {
     /* List of blocks */
@@ -10,7 +10,9 @@ typedef struct {
     Py_ssize_t allocated;
     /* Max length of the buffer, negative number for unlimited length. */
     Py_ssize_t max_length;
-} BlocksOutputBuffer;
+} OutputBuffer;
+#define PYZSTD_OUTPUT_BUFFER(BUFFER) \
+        OutputBuffer BUFFER = {.list = NULL};
 
 static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 
@@ -60,7 +62,7 @@ static const Py_ssize_t BUFFER_BLOCK_SIZE[] =
    Return -1 on failure
 */
 static inline int
-OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitAndGrow(OutputBuffer *buffer, ZSTD_outBuffer *ob,
                          const Py_ssize_t max_length)
 {
     PyObject *b;
@@ -106,7 +108,7 @@ OutputBuffer_InitAndGrow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
    Return -1 on failure
 */
 static inline int
-OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitWithSize(OutputBuffer *buffer, ZSTD_outBuffer *ob,
                           const Py_ssize_t max_length,
                           const Py_ssize_t init_size)
 {
@@ -153,7 +155,7 @@ OutputBuffer_InitWithSize(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob,
    Return -1 on failure
 */
 static inline int
-OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Grow(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *b;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
@@ -214,7 +216,7 @@ OutputBuffer_Grow(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 /* Whether the output data has reached max_length.
    The avail_out must be 0, please check it before calling. */
 static inline int
-OutputBuffer_ReachedMaxLength(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_ReachedMaxLength(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     /* Ensure (data size == allocated size) */
     assert(ob->pos == ob->size);
@@ -227,7 +229,7 @@ OutputBuffer_ReachedMaxLength(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
    Return NULL on failure
 */
 static inline PyObject *
-OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Finish(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
@@ -274,7 +276,7 @@ OutputBuffer_Finish(BlocksOutputBuffer *buffer, ZSTD_outBuffer *ob)
 
 /* Clean up the buffer */
 static inline void
-OutputBuffer_OnError(BlocksOutputBuffer *buffer)
+OutputBuffer_OnError(OutputBuffer *buffer)
 {
     Py_CLEAR(buffer->list);
 }

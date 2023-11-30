@@ -67,7 +67,7 @@ decompress_impl(ZstdDecompressor *self, ZSTD_inBuffer *in,
 {
     size_t zstd_ret;
     ZSTD_outBuffer out;
-    BlocksOutputBuffer buffer = {.list = NULL};
+    PYZSTD_OUTPUT_BUFFER(buffer);
     PyObject *ret;
 
     /* The first AFE check for setting .at_frame_edge flag */

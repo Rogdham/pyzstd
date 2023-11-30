@@ -315,7 +315,7 @@ ZstdFileReader_readinto(ZstdFileReader *self, PyObject *arg)
 static PyObject *
 ZstdFileReader_readall(ZstdFileReader *self)
 {
-    BlocksOutputBuffer buffer = {.list = NULL};
+    PYZSTD_OUTPUT_BUFFER(buffer);
     ZSTD_outBuffer out;
     PyObject *ret;
 
