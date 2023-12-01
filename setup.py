@@ -109,6 +109,7 @@ def do_setup():
     DYNAMIC_LINK = has_option('--dynamic-link-zstd')
     CFFI = has_option('--cffi') or platform.python_implementation() == 'PyPy'
     MULTI_PHASE_INIT = has_option('--multi-phase-init')
+    NO_MREMAP = has_option('--no-mremap')
 
     # build config message
     pyzstd_build_ext.PYZSTD_CONFIG_MSG = \
@@ -176,6 +177,8 @@ def do_setup():
         if MULTI_PHASE_INIT:
             # use multi-phase initialization (PEP-489) on CPython 3.11+
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
+        if NO_MREMAP:
+            kwargs['define_macros'].append(('PYZSTD_NO_MREMAP', None))
 
         binary_extension = Extension(**kwargs)
 

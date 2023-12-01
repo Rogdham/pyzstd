@@ -1679,3 +1679,7 @@ Build pyzstd module with options
         * %SystemRoot%\System32
 
     Note that the above list doesn't include the current working directory and %PATH% directories.
+
+    3️⃣ Disable mremap output buffer on CPython+Linux.
+
+    On CPython+Linux, pyzstd uses another output buffer code to utilize the ``mremap`` mechanism, which brings some performance improvements. If this causes problems, you can use ``--no-mremap`` option to disable this code.
