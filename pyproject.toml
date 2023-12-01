@@ -1,4 +1,4 @@
 [build-system]
 # setuptools 64.0+ support --build-option
-requires = ["setuptools>=64.0"]
+requires = ["setuptools>=64.0", "cffi"]
 build-backend = "setuptools.build_meta"
