@@ -5,6 +5,7 @@ include *.rst
 recursive-include zstd/lib *
 recursive-include src *
 recursive-include tests *
+recursive-include build_script *
 
 recursive-exclude * __pycache__
 recursive-exclude * *.pyc

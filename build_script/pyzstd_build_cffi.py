@@ -7,10 +7,7 @@ except ImportError:
            '\n    On CPython, CFFI implementation '
            'is slower than C implementation.\n')
     print(msg)
-
-    # Used for PEP-517 get_requires_for_build_wheel hook
-    from setuptools.build_meta import SetupRequirementsError
-    raise SetupRequirementsError(['cffi'])
+    raise
 
 ffibuilder = cffi.FFI()
 

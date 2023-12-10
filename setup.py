@@ -164,7 +164,7 @@ def do_setup():
         # binary extension
         kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
-        sys.path.append('src/bin_ext')
+        sys.path.append('build_script')
         import pyzstd_build_cffi
         binary_extension = pyzstd_build_cffi.get_extension(**kwargs)
     else:  # C implementation
