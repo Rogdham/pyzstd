@@ -22,7 +22,7 @@ static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 /* -----------------------------
      mremap output buffer code
    ----------------------------- */
-#define PYZSTD_OB_INIT_SIZE (64*KB)
+#define PYZSTD_OB_INIT_SIZE (16*KB)
 
 typedef struct {
     /* Bytes object */
@@ -122,13 +122,14 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
     /* Ensure no gaps in the data */
     assert(ob->pos == ob->size);
 
-    /* Get new size. Note that it can't be 0.
-       This sequence works well on Ubuntu 22.04:
-       64 KB, 64 KB, 128 KB, 128 KB, 128 KB... */
+    /* Get new size, note that it can't be 0.
+       This growth works well on Ubuntu 22.04. */
     if (old_size == 0) {
         new_size = PYZSTD_OB_INIT_SIZE;
-    } else if (old_size < 128*KB) {
-        new_size = old_size + 64*KB;
+    } else if (old_size <= 16*KB) {
+        new_size = 64*KB;
+    } else if (old_size <= 64*KB) {
+        new_size = 128*KB;
     } else {
         new_size = old_size + 128*KB;
     }
