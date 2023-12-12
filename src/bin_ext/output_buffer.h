@@ -9,7 +9,7 @@
       provide decent performance on systems without mremap. */
 
 /* Only use mremap output buffer on Linux.
-   On macOS, mremap can only be used for shrinking, can't be used for extending. */
+   On macOS, mremap can only be used for shrinking, can't be used for expanding. */
 #if defined(__linux__) && defined(_GNU_SOURCE) && !defined(PYZSTD_NO_MREMAP)
 #  define PYZSTD_MREMAP_OUTPUT_BUFFER
 #endif
@@ -427,18 +427,26 @@ OutputBuffer_Finish(BlocksBuffer *buffer, ZSTD_outBuffer *ob)
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
 
     /* Fast path for single block */
-    if ((list_len == 1 && ob->pos == ob->size) ||
-        (list_len == 2 && ob->pos == 0))
-    {
+    if (list_len == 1 || (list_len == 2 && ob->pos == 0)) {
+        /* Clear .list */
         block = PyList_GET_ITEM(buffer->list, 0);
         Py_INCREF(block);
-
         Py_CLEAR(buffer->list);
+
+        /* Resize */
+        if (list_len == 1) {
+            if (_PyBytes_Resize(&block, ob->pos) < 0) {
+                /* block is set to NULL */
+                PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            }
+        }
         return block;
     }
 
     /* Final bytes object */
-    result = PyBytes_FromStringAndSize(NULL, buffer->allocated - (ob->size - ob->pos));
+    result = PyBytes_FromStringAndSize(
+                        NULL,
+                        buffer->allocated - (ob->size - ob->pos));
     if (result == NULL) {
         PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return NULL;
