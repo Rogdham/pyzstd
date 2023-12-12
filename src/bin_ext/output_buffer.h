@@ -146,11 +146,21 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
         assert(new_size > old_size);
     }
 
-    /* Resize */
-    if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
-        /* buffer->obj is set to NULL */
-        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-        return -1;
+    if (old_size == 0 && PY_VERSION_HEX < 0x030800B1) {
+        /* In CPython 3.7-, 0-length bytes object can't be resized.
+           0x030800B1 is 3.8 Beta 1. */
+        Py_DECREF(buffer->obj);
+        buffer->obj = PyBytes_FromStringAndSize(NULL, new_size);
+        if (buffer->obj == NULL) {
+            return -1;
+        }
+    } else {
+        /* Resize */
+        if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
+            /* buffer->obj is set to NULL */
+            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            return -1;
+        }
     }
 
     /* Set variables */
