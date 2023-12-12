@@ -143,6 +143,7 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
     /* Check max_length */
     if (0 <= max_length && max_length < new_size) {
         new_size = max_length;
+        assert(new_size > old_size);
     }
 
     /* Resize */
