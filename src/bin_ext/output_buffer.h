@@ -8,7 +8,8 @@
       This code uses blocks to represent output buffer, it can
       provide decent performance on systems without mremap. */
 
-/* On Linux, use mremap output buffer. */
+/* Only use mremap output buffer on Linux.
+   On macOS, mremap can only be used for shrinking, can't be used for extending. */
 #if defined(__linux__) && defined(_GNU_SOURCE) && !defined(PYZSTD_NO_MREMAP)
 #  define PYZSTD_MREMAP_OUTPUT_BUFFER
 #endif
@@ -28,16 +29,16 @@ typedef struct {
     PyObject *obj;
     /* Max length of the buffer, negative number for unlimited length. */
     Py_ssize_t max_length;
-} OutputBuffer;
+} MremapBuffer;
 #define PYZSTD_OUTPUT_BUFFER(BUFFER) \
-        OutputBuffer BUFFER = {.obj = NULL};
+        MremapBuffer BUFFER = {.obj = NULL};
 
 /* Initialize the buffer, and grow the buffer.
    max_length: Max length of the buffer, -1 for unlimited length.
    Return 0 on success
    Return -1 on failure */
 static inline int
-OutputBuffer_InitAndGrow(OutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitAndGrow(MremapBuffer *buffer, ZSTD_outBuffer *ob,
                          const Py_ssize_t max_length)
 {
     PyObject *b;
@@ -74,7 +75,7 @@ OutputBuffer_InitAndGrow(OutputBuffer *buffer, ZSTD_outBuffer *ob,
    Return 0 on success
    Return -1 on failure */
 static inline int
-OutputBuffer_InitWithSize(OutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitWithSize(MremapBuffer *buffer, ZSTD_outBuffer *ob,
                           const Py_ssize_t max_length,
                           const Py_ssize_t init_size)
 {
@@ -112,7 +113,7 @@ OutputBuffer_InitWithSize(OutputBuffer *buffer, ZSTD_outBuffer *ob,
    Return 0 on success
    Return -1 on failure */
 static inline int
-OutputBuffer_Grow(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
 {
     Py_ssize_t new_size;
     const Py_ssize_t old_size = Py_SIZE(buffer->obj);
@@ -157,11 +158,10 @@ OutputBuffer_Grow(OutputBuffer *buffer, ZSTD_outBuffer *ob)
     return 0;
 }
 
-
 /* Whether the output data has reached max_length.
    The avail_out must be 0, please check it before calling. */
 static inline int
-OutputBuffer_ReachedMaxLength(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_ReachedMaxLength(MremapBuffer *buffer, ZSTD_outBuffer *ob)
 {
     /* Ensure (data size == allocated size) */
     assert(ob->pos == ob->size);
@@ -173,7 +173,7 @@ OutputBuffer_ReachedMaxLength(OutputBuffer *buffer, ZSTD_outBuffer *ob)
    Return a bytes object on success
    Return NULL on failure */
 static inline PyObject *
-OutputBuffer_Finish(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Finish(MremapBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *ret;
     const Py_ssize_t new_size = Py_SIZE(buffer->obj) - (ob->size - ob->pos);
@@ -192,7 +192,7 @@ OutputBuffer_Finish(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 
 /* Clean up the buffer */
 static inline void
-OutputBuffer_OnError(OutputBuffer *buffer)
+OutputBuffer_OnError(MremapBuffer *buffer)
 {
     Py_CLEAR(buffer->obj);
 }
@@ -208,9 +208,9 @@ typedef struct {
     Py_ssize_t allocated;
     /* Max length of the buffer, negative number for unlimited length. */
     Py_ssize_t max_length;
-} OutputBuffer;
+} BlocksBuffer;
 #define PYZSTD_OUTPUT_BUFFER(BUFFER) \
-        OutputBuffer BUFFER = {.list = NULL};
+        BlocksBuffer BUFFER = {.list = NULL};
 
 /* Block size sequence */
 static const Py_ssize_t BUFFER_BLOCK_SIZE[] =
@@ -253,10 +253,9 @@ static const Py_ssize_t BUFFER_BLOCK_SIZE[] =
 /* Initialize the buffer, and grow the buffer.
    max_length: Max length of the buffer, -1 for unlimited length.
    Return 0 on success
-   Return -1 on failure
-*/
+   Return -1 on failure */
 static inline int
-OutputBuffer_InitAndGrow(OutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitAndGrow(BlocksBuffer *buffer, ZSTD_outBuffer *ob,
                          const Py_ssize_t max_length)
 {
     PyObject *b;
@@ -299,10 +298,9 @@ OutputBuffer_InitAndGrow(OutputBuffer *buffer, ZSTD_outBuffer *ob,
 /* Initialize the buffer, with an initial size.
    init_size: the initial size.
    Return 0 on success
-   Return -1 on failure
-*/
+   Return -1 on failure */
 static inline int
-OutputBuffer_InitWithSize(OutputBuffer *buffer, ZSTD_outBuffer *ob,
+OutputBuffer_InitWithSize(BlocksBuffer *buffer, ZSTD_outBuffer *ob,
                           const Py_ssize_t max_length,
                           const Py_ssize_t init_size)
 {
@@ -346,10 +344,9 @@ OutputBuffer_InitWithSize(OutputBuffer *buffer, ZSTD_outBuffer *ob,
 
 /* Grow the buffer. The avail_out must be 0, please check it before calling.
    Return 0 on success
-   Return -1 on failure
-*/
+   Return -1 on failure */
 static inline int
-OutputBuffer_Grow(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Grow(BlocksBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *b;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
@@ -410,7 +407,7 @@ OutputBuffer_Grow(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 /* Whether the output data has reached max_length.
    The avail_out must be 0, please check it before calling. */
 static inline int
-OutputBuffer_ReachedMaxLength(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_ReachedMaxLength(BlocksBuffer *buffer, ZSTD_outBuffer *ob)
 {
     /* Ensure (data size == allocated size) */
     assert(ob->pos == ob->size);
@@ -420,10 +417,9 @@ OutputBuffer_ReachedMaxLength(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 
 /* Finish the buffer.
    Return a bytes object on success
-   Return NULL on failure
-*/
+   Return NULL on failure */
 static inline PyObject *
-OutputBuffer_Finish(OutputBuffer *buffer, ZSTD_outBuffer *ob)
+OutputBuffer_Finish(BlocksBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *result, *block;
     const Py_ssize_t list_len = Py_SIZE(buffer->list);
@@ -470,7 +466,7 @@ OutputBuffer_Finish(OutputBuffer *buffer, ZSTD_outBuffer *ob)
 
 /* Clean up the buffer */
 static inline void
-OutputBuffer_OnError(OutputBuffer *buffer)
+OutputBuffer_OnError(BlocksBuffer *buffer)
 {
     Py_CLEAR(buffer->list);
 }
