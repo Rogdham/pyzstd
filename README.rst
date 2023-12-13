@@ -29,7 +29,7 @@ Release note
 
 #. Support sub-interpreter on CPython 3.12+, can utilize `per-interpreter GIL <https://docs.python.org/3.12/whatsnew/3.12.html#pep-684-a-per-interpreter-gil>`_.
 
-#. On CPython+Linux, use another output buffer code than can utilize the ``mremap`` mechanism.
+#. On CPython+Linux, use another output buffer code that can utilize the ``mremap`` mechanism.
 
 **0.15.9  (Jun 24, 2023)**
 

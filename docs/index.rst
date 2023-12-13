@@ -924,7 +924,7 @@ SeekableZstdFile class
 
     Subclass of :py:class:`ZstdFile`. This class can **only** create/write/read `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file, or read 0-size file. It provides relatively fast seeking ability in read mode.
 
-    Note that it doesn't verify/write the XXH64 checksum fields, using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
+    Note that it doesn't verify/write the XXH64 checksum fields. Using :py:attr:`~CParameter.checksumFlag` is faster and more flexible, see `this code <https://github.com/animalize/pyzstd_ext#2-verifyxxh64_seekablezstdfile-class>`_.
 
     :py:class:`ZstdFile` class can also read "Zstandard Seekable Format" file, but no fast seeking ability.
 
@@ -1508,13 +1508,13 @@ Use with tarfile module
 
         @contextlib.contextmanager
         def ZstdTarReader(name, *, zstd_dict=None, option=None, **kwargs):
-            with io.open(name, 'rb') as ifh:
-                with tempfile.TemporaryFile() as tmp_file:
+            with tempfile.TemporaryFile() as tmp_file:
+                with io.open(name, 'rb') as ifh:
                     decompress_stream(ifh, tmp_file,
                                       zstd_dict=zstd_dict, option=option)
-                    tmp_file.seek(0)
-                    with tarfile.TarFile(fileobj=tmp_file, **kwargs) as tar:
-                        yield tar
+                tmp_file.seek(0)
+                with tarfile.TarFile(fileobj=tmp_file, **kwargs) as tar:
+                    yield tar
 
         with ZstdTarReader('archive.tar.zst') as tar:
             # do something
