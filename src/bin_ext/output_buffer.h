@@ -123,15 +123,17 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
     assert(ob->pos == ob->size);
 
     /* Get new size, note that it can't be 0.
-       This growth works well on Ubuntu 22.04. */
+       This growth works well on 64-bit Ubuntu 22.04. */
     if (old_size == 0) {
         new_size = PYZSTD_OB_INIT_SIZE;
     } else if (old_size <= 16*KB) {
         new_size = 64*KB;
     } else if (old_size <= 64*KB) {
         new_size = 128*KB;
-    } else {
+    } else if (old_size <= 64*MB) {
         new_size = old_size + 128*KB;
+    } else {
+        new_size = old_size + (old_size >> 6);
     }
 
     /* Check overflow */
