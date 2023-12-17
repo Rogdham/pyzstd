@@ -1235,6 +1235,45 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         bi.close()
         bo.close()
 
+    def test_decompress_empty_content_frame(self):
+        DAT = compress(b'')
+        # decompress
+        self.assertGreaterEqual(len(DAT), 4)
+        self.assertEqual(decompress(DAT), b'')
+
+        with self.assertRaises(ZstdError):
+            decompress(DAT[:-1])
+
+        # ZstdDecompressor
+        d = ZstdDecompressor()
+        dat = d.decompress(DAT)
+        self.assertEqual(dat, b'')
+        self.assertTrue(d.eof)
+        self.assertFalse(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
+        self.assertEqual(d.unused_data, b'') # twice
+
+        d = ZstdDecompressor()
+        dat = d.decompress(DAT[:-1])
+        self.assertEqual(dat, b'')
+        self.assertFalse(d.eof)
+        self.assertTrue(d.needs_input)
+        self.assertEqual(d.unused_data, b'')
+        self.assertEqual(d.unused_data, b'') # twice
+
+        # EndlessZstdDecompressor
+        d = EndlessZstdDecompressor()
+        dat = d.decompress(DAT)
+        self.assertEqual(dat, b'')
+        self.assertTrue(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
+        d = EndlessZstdDecompressor()
+        dat = d.decompress(DAT[:-1])
+        self.assertEqual(dat, b'')
+        self.assertFalse(d.at_frame_edge)
+        self.assertTrue(d.needs_input)
+
     def test_parameter_bounds_cache(self):
         a = CParameter.compressionLevel.bounds()
         b = CParameter.compressionLevel.bounds()

@@ -190,13 +190,20 @@ static inline PyObject *
 OutputBuffer_Finish(MremapBuffer *buffer, ZSTD_outBuffer *ob)
 {
     PyObject *ret;
-    const Py_ssize_t new_size = Py_SIZE(buffer->obj) - (ob->size - ob->pos);
+    const Py_ssize_t old_size = Py_SIZE(buffer->obj);
+    const Py_ssize_t new_size = old_size - (ob->size - ob->pos);
 
     /* Resize */
-    if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
-        /* buffer->obj is NULL */
-        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-        return NULL;
+    if (old_size == 0 && PY_VERSION_HEX < 0x030800B1) {
+        /* In CPython 3.7-, 0-length bytes object can't be resized.
+           0x030800B1 is 3.8 Beta 1. */
+        assert(new_size == 0);
+    } else {
+        if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
+            /* buffer->obj is NULL */
+            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            return NULL;
+        }
     }
 
     ret = buffer->obj;
