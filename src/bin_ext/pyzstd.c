@@ -315,7 +315,7 @@ add_vars_to_module(PyObject *module)
     }
 
     /* PYZSTD_CONFIG */
-    obj = Py_BuildValue("isOO", 8*(int)sizeof(Py_ssize_t), "c",
+    obj = Py_BuildValue("isOOO", 8*(int)sizeof(Py_ssize_t), "c",
 /* Statically link to zstd lib */
 #ifdef PYZSTD_STATIC_LINK
                         Py_True,
@@ -324,6 +324,12 @@ add_vars_to_module(PyObject *module)
 #endif
 /* Use multi-phase initialization */
 #ifdef USE_MULTI_PHASE_INIT
+                        Py_True,
+#else
+                        Py_False,
+#endif
+/* User mremap output buffer */
+#ifdef PYZSTD_MREMAP_OUTPUT_BUFFER
                         Py_True
 #else
                         Py_False

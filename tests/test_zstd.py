@@ -39,6 +39,7 @@ build_info = ('Pyzstd build information:\n'
               '   * Pyzstd version: {}\n'
               '   * Implementation: {}\n'
               '   * Enable multi-phase init: {}\n'
+              '   * Use mremap output buffer: {}\n'
               '   * Link to zstd library: {}\n'
               ' - Zstd:\n'
               '   * Zstd version: {}\n'
@@ -54,6 +55,9 @@ build_info = ('Pyzstd build information:\n'
                     'Not for CFFI implementation' \
                         if PYZSTD_CONFIG[1] == 'cffi' \
                         else PYZSTD_CONFIG[3],
+                    'Not for CFFI implementation' \
+                        if PYZSTD_CONFIG[1] == 'cffi' \
+                        else PYZSTD_CONFIG[4],
                     'Statically link' if PYZSTD_CONFIG[2] else 'Dynamically link',
                     zstd_version,       # Zstd
                     zstd_support_multithread)
@@ -464,7 +468,7 @@ class ClassShapeTestCase(unittest.TestCase):
             self.assertFalse(True, 'unreachable code path')
 
     def test_pyzstd_config(self):
-        self.assertEqual(len(PYZSTD_CONFIG), 4)
+        self.assertEqual(len(PYZSTD_CONFIG), 5)
         if sys.maxsize > 2**32:
             self.assertEqual(PYZSTD_CONFIG[0], 64)
         else:
@@ -472,6 +476,7 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertIn(PYZSTD_CONFIG[1], ('c', 'cffi'))
         self.assertEqual(type(PYZSTD_CONFIG[2]), bool)
         self.assertEqual(type(PYZSTD_CONFIG[3]), bool)
+        self.assertEqual(type(PYZSTD_CONFIG[4]), bool)
 
     def test_ZstdFile_extend(self):
         # These classes and variables can be used to extend ZstdFile,

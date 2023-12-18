@@ -6,7 +6,7 @@ from functools import lru_cache
 from ._cffi_zstd import ffi, lib as m
 
 PYZSTD_CONFIG = (64 if sys.maxsize > 2**32 else 32,
-                 'cffi', bool(m.pyzstd_static_link), False)
+                 'cffi', bool(m.pyzstd_static_link), False, False)
 
 _ZSTD_CStreamSizes = (m.ZSTD_CStreamInSize(), m.ZSTD_CStreamOutSize())
 _ZSTD_DStreamSizes = (m.ZSTD_DStreamInSize(), m.ZSTD_DStreamOutSize())
