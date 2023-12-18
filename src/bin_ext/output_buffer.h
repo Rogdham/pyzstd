@@ -134,12 +134,13 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
         new_size = old_size + 128*KB;
     } else {
         new_size = old_size + (old_size >> 6);
-    }
 
-    /* Check overflow */
-    if (new_size < 0) {
-        PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-        return -1;
+        /* Check overflow.
+           In 32-bit build, at most 32MiB (~2GiB >> 6) may be wasted. */
+        if (new_size < 0) {
+            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            return -1;
+        }
     }
 
     /* Check max_length */
