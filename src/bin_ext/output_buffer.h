@@ -11,14 +11,16 @@
 /* Only use mremap output buffer on Linux.
    On macOS, mremap can only be used for shrinking, can't be used for expanding. */
 #if defined(__linux__) && defined(_GNU_SOURCE) && !defined(PYZSTD_NO_MREMAP)
-#  define PYZSTD_MREMAP_OUTPUT_BUFFER
+#  define MREMAP_OUTPUT_BUFFER
+#else
+#  define BLOCKS_OUTPUT_BUFFER
 #endif
 
 #define KB (1024)
 #define MB (1024*KB)
 static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 
-#ifdef PYZSTD_MREMAP_OUTPUT_BUFFER
+#if defined(MREMAP_OUTPUT_BUFFER)
 /* -----------------------------
      mremap output buffer code
    ----------------------------- */
@@ -219,7 +221,7 @@ OutputBuffer_OnError(MremapBuffer *buffer)
     Py_CLEAR(buffer->obj);
 }
 
-#else
+#elif defined(BLOCKS_OUTPUT_BUFFER)
 /* -----------------------------
      Blocks output buffer code
    ----------------------------- */
@@ -501,4 +503,6 @@ OutputBuffer_OnError(BlocksBuffer *buffer)
     Py_CLEAR(buffer->list);
 }
 
+#else
+#error "no output buffer code chosen"
 #endif

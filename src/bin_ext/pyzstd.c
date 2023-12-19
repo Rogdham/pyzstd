@@ -329,9 +329,9 @@ add_vars_to_module(PyObject *module)
                         Py_False,
 #endif
 /* User mremap output buffer */
-#ifdef PYZSTD_MREMAP_OUTPUT_BUFFER
+#if defined(MREMAP_OUTPUT_BUFFER)
                         Py_True
-#else
+#elif defined(BLOCKS_OUTPUT_BUFFER)
                         Py_False
 #endif
                         );

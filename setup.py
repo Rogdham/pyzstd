@@ -175,7 +175,7 @@ def do_setup():
         kwargs['name'] = 'pyzstd.c._zstd'
         kwargs['sources'].append('src/bin_ext/pyzstd.c')
         if MULTI_PHASE_INIT:
-            # use multi-phase initialization (PEP-489) on CPython 3.11
+            # use multi-phase initialization (PEP-489) on CPython 3.11.
             # on CPython 3.12+, it's always enabled.
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
         if NO_MREMAP:
