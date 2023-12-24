@@ -9,8 +9,14 @@
       provide decent performance on systems without mremap. */
 
 /* Only use mremap output buffer on Linux.
-   On macOS, mremap can only be used for shrinking, can't be used for expanding. */
-#if defined(__linux__) && defined(_GNU_SOURCE) && !defined(PYZSTD_NO_MREMAP)
+   On macOS, mremap can only be used for shrinking, can't be used for expanding.
+   CPython 3.13+ use mimalloc, currently it doesn't support mremap.
+   0x030D0000 is Python 3.13. This condition can be removed when:
+   1, CPython no longer uses mimalloc.
+   2, CPython's mimalloc supports mremap.
+   3, _PyBytes_FromSize() uses PyMem_RawMalloc(), rather than PyObject_Malloc(). */
+#if defined(__linux__) && defined(_GNU_SOURCE) && \
+    PY_VERSION_HEX < 0x030D0000 && !defined(PYZSTD_NO_MREMAP)
 #  define MREMAP_OUTPUT_BUFFER
 #else
 #  define BLOCKS_OUTPUT_BUFFER
@@ -125,7 +131,7 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
     assert(ob->pos == ob->size);
 
     /* Get new size, note that it can't be 0.
-       This growth works well on 64-bit Ubuntu 22.04. */
+       This growth works well on 64-bit Ubuntu 22.04 (glibc 2.35). */
     if (old_size == 0) {
         new_size = PYZSTD_OB_INIT_SIZE;
     } else if (old_size <= 16*KB) {

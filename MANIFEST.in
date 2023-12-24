@@ -1,6 +1,6 @@
 include pyproject.toml
 include LICENSE
-include *.rst
+include README.rst
 
 recursive-include zstd/lib *
 recursive-include src *

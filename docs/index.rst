@@ -1682,4 +1682,4 @@ Build pyzstd module with options
 
     3️⃣ Disable mremap output buffer on CPython+Linux.
 
-    On CPython+Linux, pyzstd uses another output buffer code that can utilize the ``mremap`` mechanism, which brings some performance improvements. If this causes problems, you may use ``--no-mremap`` option to disable this code.
+    On CPython(3.5~3.12)+Linux, pyzstd uses another output buffer code that can utilize the ``mremap`` mechanism, which brings some performance improvements. If this causes problems, you may use ``--no-mremap`` option to disable this code.
