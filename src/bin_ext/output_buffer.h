@@ -26,6 +26,40 @@
 #define MB (1024*KB)
 static const char unable_allocate_msg[] = "Unable to allocate output buffer.";
 
+/* Resize a bytes object.
+   Return 0 on success.
+   Return -1 on failure, and *obj is set to NULL. */
+FORCE_INLINE int
+resize_bytes(PyObject **obj,
+             const Py_ssize_t old_size,
+             const Py_ssize_t new_size,
+             const int RESIZE_FOR_0_SIZE)
+{
+    assert(Py_SIZE(*obj) == old_size);
+
+    if (old_size == 0 && PY_VERSION_HEX < 0x030800B1) {
+        /* In CPython 3.7-, 0-length bytes object can't be resized,
+           see bpo-33817. 0x030800B1 is 3.8 Beta 1. */
+        if (RESIZE_FOR_0_SIZE) {
+            Py_DECREF(*obj);
+            *obj = PyBytes_FromStringAndSize(NULL, new_size);
+            if (*obj == NULL) {
+                return -1;
+            }
+        } else {
+            assert(new_size == 0);
+        }
+    } else {
+        /* Resize */
+        if (_PyBytes_Resize(obj, new_size) < 0) {
+            /* *obj is set to NULL */
+            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
+            return -1;
+        }
+    }
+    return 0;
+}
+
 #if defined(MREMAP_OUTPUT_BUFFER)
 /* -----------------------------
      mremap output buffer code
@@ -157,21 +191,9 @@ OutputBuffer_Grow(MremapBuffer *buffer, ZSTD_outBuffer *ob)
         assert(new_size > old_size);
     }
 
-    if (old_size == 0 && PY_VERSION_HEX < 0x030800B1) {
-        /* In CPython 3.7-, 0-length bytes object can't be resized.
-           0x030800B1 is 3.8 Beta 1. */
-        Py_DECREF(buffer->obj);
-        buffer->obj = PyBytes_FromStringAndSize(NULL, new_size);
-        if (buffer->obj == NULL) {
-            return -1;
-        }
-    } else {
-        /* Resize */
-        if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
-            /* buffer->obj is set to NULL */
-            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-            return -1;
-        }
+    /* Resize */
+    if (resize_bytes(&buffer->obj, old_size, new_size, 1) < 0) {
+        return -1;
     }
 
     /* Set variables */
@@ -203,16 +225,8 @@ OutputBuffer_Finish(MremapBuffer *buffer, ZSTD_outBuffer *ob)
     const Py_ssize_t new_size = old_size - (ob->size - ob->pos);
 
     /* Resize */
-    if (old_size == 0 && PY_VERSION_HEX < 0x030800B1) {
-        /* In CPython 3.7-, 0-length bytes object can't be resized.
-           0x030800B1 is 3.8 Beta 1. */
-        assert(new_size == 0);
-    } else {
-        if (_PyBytes_Resize(&buffer->obj, new_size) < 0) {
-            /* buffer->obj is NULL */
-            PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-            return NULL;
-        }
+    if (resize_bytes(&buffer->obj, old_size, new_size, 0) < 0) {
+        return NULL;
     }
 
     ret = buffer->obj;
@@ -463,10 +477,8 @@ OutputBuffer_Finish(BlocksBuffer *buffer, ZSTD_outBuffer *ob)
 
         /* Resize */
         if (list_len == 1) {
-            if (_PyBytes_Resize(&block, ob->pos) < 0) {
-                /* block is set to NULL */
-                PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
-            }
+            /* Resize. On failure, block is set to NULL. */
+            resize_bytes(&block, Py_SIZE(block), ob->pos, 0);
         }
         return block;
     }

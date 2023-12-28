@@ -13,8 +13,6 @@
 #include "zstd.h"
 #include "zdict.h"
 
-#include "output_buffer.h"
-
 #if ZSTD_VERSION_NUMBER < 10400
     #error "pyzstd module requires zstd v1.4.0+"
 #endif
@@ -34,6 +32,26 @@
        confusion. 0x030C00B1 is 3.12 Beta 1. */
     #define USE_MULTI_PHASE_INIT
 #endif
+
+/* Force inlining. Same as zstd library. */
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_INLINE static inline __attribute__((always_inline))
+#elif defined(_MSC_VER)
+#  define FORCE_INLINE static inline __forceinline
+#else
+#  define FORCE_INLINE static inline
+#endif
+
+/* Force no inlining. Same as zstd library. */
+#if defined(__GNUC__) || defined(__ICCARM__)
+#  define FORCE_NO_INLINE static __attribute__((__noinline__))
+#elif defined(_MSC_VER)
+#  define FORCE_NO_INLINE static __declspec(noinline)
+#else
+#  define FORCE_NO_INLINE static
+#endif
+
+#include "output_buffer.h"
 
 /* Forward declaration */
 typedef struct _zstd_state _zstd_state;
@@ -205,7 +223,7 @@ struct _zstd_state {
 #endif
 
 /* ------------------
-     Global macros
+     Global macro
    ------------------ */
 #define ACQUIRE_LOCK(obj) do {                    \
     if (!PyThread_acquire_lock((obj)->lock, 0)) { \
@@ -214,24 +232,6 @@ struct _zstd_state {
         Py_END_ALLOW_THREADS                      \
     } } while (0)
 #define RELEASE_LOCK(obj) PyThread_release_lock((obj)->lock)
-
-/* Force inlining. Same as zstd library. */
-#if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_INLINE static inline __attribute__((always_inline))
-#elif defined(_MSC_VER)
-#  define FORCE_INLINE static inline __forceinline
-#else
-#  define FORCE_INLINE static inline
-#endif
-
-/* Force no inlining. Same as zstd library. */
-#if defined(__GNUC__) || defined(__ICCARM__)
-#  define FORCE_NO_INLINE static __attribute__((__noinline__))
-#elif defined(_MSC_VER)
-#  define FORCE_NO_INLINE static __declspec(noinline)
-#else
-#  define FORCE_NO_INLINE static
-#endif
 
 /* -------------------------
      Parameters from zstd
