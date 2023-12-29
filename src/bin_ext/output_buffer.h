@@ -84,20 +84,20 @@ OutputBuffer_InitAndGrow(MremapBuffer *buffer, ZSTD_outBuffer *ob,
                          const Py_ssize_t max_length)
 {
     PyObject *b;
-    Py_ssize_t block_size;
+    Py_ssize_t b_size;
 
     /* Ensure .obj was set to NULL */
     assert(buffer->obj == NULL);
 
-    /* Get block size */
+    /* Initial size */
     if (0 <= max_length && max_length < PYZSTD_OB_INIT_SIZE) {
-        block_size = max_length;
+        b_size = max_length;
     } else {
-        block_size = PYZSTD_OB_INIT_SIZE;
+        b_size = PYZSTD_OB_INIT_SIZE;
     }
 
-    /* The initial bytes object */
-    b = PyBytes_FromStringAndSize(NULL, block_size);
+    /* bytes object */
+    b = PyBytes_FromStringAndSize(NULL, b_size);
     if (b == NULL) {
         return -1;
     }
@@ -107,7 +107,7 @@ OutputBuffer_InitAndGrow(MremapBuffer *buffer, ZSTD_outBuffer *ob,
     buffer->max_length = max_length;
 
     ob->dst = PyBytes_AS_STRING(b);
-    ob->size = (size_t) block_size;
+    ob->size = (size_t) b_size;
     ob->pos = 0;
     return 0;
 }
@@ -122,20 +122,20 @@ OutputBuffer_InitWithSize(MremapBuffer *buffer, ZSTD_outBuffer *ob,
                           const Py_ssize_t init_size)
 {
     PyObject *b;
-    Py_ssize_t block_size;
+    Py_ssize_t b_size;
 
     /* Ensure .obj was set to NULL */
     assert(buffer->obj == NULL);
 
-    /* Get block size */
+    /* Initial size */
     if (0 <= max_length && max_length < init_size) {
-        block_size = max_length;
+        b_size = max_length;
     } else {
-        block_size = init_size;
+        b_size = init_size;
     }
 
-    /* The initial block */
-    b = PyBytes_FromStringAndSize(NULL, block_size);
+    /* bytes object */
+    b = PyBytes_FromStringAndSize(NULL, b_size);
     if (b == NULL) {
         PyErr_SetString(PyExc_MemoryError, unable_allocate_msg);
         return -1;
@@ -146,7 +146,7 @@ OutputBuffer_InitWithSize(MremapBuffer *buffer, ZSTD_outBuffer *ob,
     buffer->max_length = max_length;
 
     ob->dst = PyBytes_AS_STRING(b);
-    ob->size = (size_t) block_size;
+    ob->size = (size_t) b_size;
     ob->pos = 0;
     return 0;
 }
