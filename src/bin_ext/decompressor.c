@@ -415,6 +415,9 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto error;
     }
 
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
+
     assert(self->dict == NULL);
     assert(self->input_buffer == NULL);
     assert(self->input_buffer_size == 0);
@@ -429,9 +432,6 @@ ZstdDecompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
 
     /* at_frame_edge flag */
     self->at_frame_edge = 1;
-
-    /* Keep this first. Set module state to self. */
-    SET_STATE_TO_OBJ(type, self);
 
     /* Decompression context */
     self->dctx = ZSTD_createDCtx();

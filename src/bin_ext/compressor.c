@@ -12,13 +12,13 @@ ZstdCompressor_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto error;
     }
 
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
+
     assert(self->dict == NULL);
     assert(self->use_multithread == 0);
     assert(self->compression_level == 0);
     assert(self->inited == 0);
-
-    /* Keep this first. Set module state to self. */
-    SET_STATE_TO_OBJ(type, self);
 
     /* Compression context */
     self->cctx = ZSTD_createCCtx();

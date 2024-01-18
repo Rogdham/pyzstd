@@ -10,12 +10,12 @@ from setuptools.command.build_ext import build_ext
 def read_stuff():
     ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 
-    # read README.rst
+    # Read README.rst
     README_PATH = os.path.join(ROOT_PATH, 'README.rst')
     with open(README_PATH, 'r', encoding='utf-8') as file:
         long_description = file.read()
 
-    # read module version
+    # Read module version
     INIT_PATH = os.path.join(ROOT_PATH, 'src', '__init__.py')
     with open(INIT_PATH, 'r', encoding='utf-8') as file:
         file_content = file.read()
@@ -98,10 +98,10 @@ class pyzstd_build_ext(build_ext):
         super().build_extensions()
 
 def do_setup():
-    # read stuff
+    # Read stuff
     long_description, module_version = read_stuff()
 
-    # parse options
+    # Parse options
     pyzstd_build_ext.PYZSTD_AVX2 = has_option('--avx2')
     pyzstd_build_ext.PYZSTD_DEBUG = has_option('--debug')
     pyzstd_build_ext.PYZSTD_WARNING_AS_ERROR = has_option('--warning-as-error')
@@ -111,7 +111,7 @@ def do_setup():
     MULTI_PHASE_INIT = has_option('--multi-phase-init')
     NO_MREMAP = has_option('--no-mremap')
 
-    # build config message
+    # Build config message
     pyzstd_build_ext.PYZSTD_CONFIG_MSG = \
                ('+--------------------------------------------+\n'
                 '|             Pyzstd build config            |\n'
@@ -143,43 +143,43 @@ def do_setup():
             'sources': [],
             'define_macros': []
         }
-    else:  # statically link to zstd lib
+    else:  # Statically link to zstd lib
         kwargs = {
             'include_dirs': ['zstd/lib',
-                             # for zstd 1.4.x:
+                             # For zstd 1.4.x:
                              'zstd/lib/common',
                              'zstd/lib/dictBuilder'],
             'library_dirs': [],
             'libraries': [],
             'sources': get_zstd_files_list(),
             'define_macros': [('PYZSTD_STATIC_LINK', None),
-                              # enable multi-threaded compression
+                              # Enable multi-threaded compression
                               ('ZSTD_MULTITHREAD', None)]
         }
 
     if CFFI:
-        # packages
+        # Packages
         packages = ['pyzstd', 'pyzstd.cffi']
 
-        # binary extension
+        # Binary extension
         kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
 
         sys.path.append('build_script')
         import pyzstd_build_cffi
         binary_extension = pyzstd_build_cffi.get_extension(**kwargs)
     else:  # C implementation
-        # packages
+        # Packages
         packages = ['pyzstd', 'pyzstd.c']
 
-        # binary extension
+        # Binary extension
         kwargs['name'] = 'pyzstd.c._zstd'
         kwargs['sources'].append('src/bin_ext/pyzstd.c')
         if MULTI_PHASE_INIT:
-            # use multi-phase initialization (PEP-489) on CPython 3.11.
-            # on CPython 3.12+, it's always enabled.
+            # Use multi-phase initialization (PEP-489) on CPython 3.11.
+            # On CPython 3.12+, it's always enabled.
             kwargs['define_macros'].append(('USE_MULTI_PHASE_INIT', None))
         if NO_MREMAP:
-            # disable mremap output buffer on Linux
+            # Disable mremap output buffer on Linux
             kwargs['define_macros'].append(('PYZSTD_NO_MREMAP', None))
 
         binary_extension = Extension(**kwargs)

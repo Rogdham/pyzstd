@@ -12,13 +12,13 @@ ZstdDict_new(PyTypeObject *type, PyObject *args, PyObject *kwds)
         goto error;
     }
 
+    /* Keep this first. Set module state to self. */
+    SET_STATE_TO_OBJ(type, self);
+
     assert(self->dict_content == NULL);
     assert(self->dict_id == 0);
     assert(self->d_dict == NULL);
     assert(self->inited == 0);
-
-    /* Keep this first. Set module state to self. */
-    SET_STATE_TO_OBJ(type, self);
 
     /* ZSTD_CDict dict */
     self->c_dicts = PyDict_New();
