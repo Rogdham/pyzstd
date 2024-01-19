@@ -436,7 +436,7 @@ static PyMethodDef ZstdCompressor_methods[] = {
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
      METH_NOARGS, reduce_cannot_pickle_doc},
 
-    {NULL, NULL, 0, NULL}
+    {0}
 };
 
 PyDoc_STRVAR(ZstdCompressor_last_mode_doc,
@@ -448,7 +448,7 @@ PyDoc_STRVAR(ZstdCompressor_last_mode_doc,
 static PyMemberDef ZstdCompressor_members[] = {
     {"last_mode", T_INT, offsetof(ZstdCompressor, last_mode),
       READONLY, ZstdCompressor_last_mode_doc},
-    {NULL}
+    {0}
 };
 
 static PyType_Slot zstdcompressor_slots[] = {
@@ -458,7 +458,7 @@ static PyType_Slot zstdcompressor_slots[] = {
     {Py_tp_methods, ZstdCompressor_methods},
     {Py_tp_members, ZstdCompressor_members},
     {Py_tp_doc, (char*)ZstdCompressor_doc},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec zstdcompressor_type_spec = {
@@ -567,7 +567,7 @@ static PyMethodDef RichMem_ZstdCompressor_methods[] = {
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
      METH_NOARGS, reduce_cannot_pickle_doc},
 
-    {NULL, NULL, 0, NULL}
+    {0}
 };
 
 PyDoc_STRVAR(RichMemZstdCompressor_doc,
@@ -588,7 +588,7 @@ static PyType_Slot richmem_zstdcompressor_slots[] = {
     {Py_tp_init, RichMemZstdCompressor_init},
     {Py_tp_methods, RichMem_ZstdCompressor_methods},
     {Py_tp_doc, (char*)RichMemZstdCompressor_doc},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec richmem_zstdcompressor_type_spec = {

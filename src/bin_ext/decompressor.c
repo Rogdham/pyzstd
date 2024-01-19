@@ -606,7 +606,7 @@ static PyMethodDef ZstdDecompressor_methods[] = {
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
      METH_NOARGS, reduce_cannot_pickle_doc},
 
-    {NULL, NULL, 0, NULL}
+    {0}
 };
 
 PyDoc_STRVAR(ZstdDecompressor_eof_doc,
@@ -629,14 +629,14 @@ static PyMemberDef ZstdDecompressor_members[] = {
     {"needs_input", T_BOOL, offsetof(ZstdDecompressor, needs_input),
      READONLY, ZstdDecompressor_needs_input_doc},
 
-    {NULL}
+    {0}
 };
 
 static PyGetSetDef ZstdDecompressor_getset[] = {
     {"unused_data", (getter)unused_data_get, NULL,
      ZstdDecompressor_unused_data_doc},
 
-    {NULL},
+    {0}
 };
 
 static PyType_Slot ZstdDecompressor_slots[] = {
@@ -647,7 +647,7 @@ static PyType_Slot ZstdDecompressor_slots[] = {
     {Py_tp_members, ZstdDecompressor_members},
     {Py_tp_getset, ZstdDecompressor_getset},
     {Py_tp_doc, (char*)ZstdDecompressor_doc},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec ZstdDecompressor_type_spec = {
@@ -708,7 +708,7 @@ static PyMethodDef EndlessZstdDecompressor_methods[] = {
     {"__reduce__", (PyCFunction)reduce_cannot_pickle,
      METH_NOARGS, reduce_cannot_pickle_doc},
 
-    {NULL, NULL, 0, NULL}
+    {0}
 };
 
 PyDoc_STRVAR(EndlessZstdDecompressor_at_frame_edge_doc,
@@ -723,7 +723,7 @@ static PyMemberDef EndlessZstdDecompressor_members[] = {
     {"needs_input", T_BOOL, offsetof(ZstdDecompressor, needs_input),
      READONLY, ZstdDecompressor_needs_input_doc},
 
-    {NULL}
+    {0}
 };
 
 static PyType_Slot EndlessZstdDecompressor_slots[] = {
@@ -733,7 +733,7 @@ static PyType_Slot EndlessZstdDecompressor_slots[] = {
     {Py_tp_methods, EndlessZstdDecompressor_methods},
     {Py_tp_members, EndlessZstdDecompressor_members},
     {Py_tp_doc, (char*)EndlessZstdDecompressor_doc},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec EndlessZstdDecompressor_type_spec = {

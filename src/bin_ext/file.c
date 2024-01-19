@@ -438,14 +438,14 @@ static PyMethodDef ZstdFileReader_methods[] = {
     {"readall",  (PyCFunction)ZstdFileReader_readall,  METH_NOARGS},
     {"forward",  (PyCFunction)ZstdFileReader_forward,  METH_O},
     {"reset_session", (PyCFunction)ZstdFileReader_reset_session, METH_NOARGS},
-    {NULL, NULL, 0}
+    {0}
 };
 
 static PyMemberDef ZstdFileReader_members[] = {
     {"eof",  T_INT,      offsetof(ZstdFileReader, eof),  0},
     {"pos",  T_LONGLONG, offsetof(ZstdFileReader, pos),  0},
     {"size", T_LONGLONG, offsetof(ZstdFileReader, size), 0},
-    {NULL}
+    {0}
 };
 
 static PyType_Slot ZstdFileReader_slots[] = {
@@ -453,7 +453,7 @@ static PyType_Slot ZstdFileReader_slots[] = {
     {Py_tp_dealloc, ZstdFileReader_dealloc},
     {Py_tp_methods, ZstdFileReader_methods},
     {Py_tp_members, ZstdFileReader_members},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec ZstdFileReader_type_spec = {
@@ -742,14 +742,14 @@ error:
 static PyMethodDef ZstdFileWriter_methods[] = {
     {"write", (PyCFunction)ZstdFileWriter_write, METH_O},
     {"flush", (PyCFunction)ZstdFileWriter_flush, METH_O},
-    {NULL, NULL, 0}
+    {0}
 };
 
 static PyType_Slot ZstdFileWriter_slots[] = {
     {Py_tp_init,    ZstdFileWriter_init},
     {Py_tp_dealloc, ZstdFileWriter_dealloc},
     {Py_tp_methods, ZstdFileWriter_methods},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec ZstdFileWriter_type_spec = {

@@ -184,7 +184,7 @@ static PyMethodDef _zstd_methods[] = {
     {"compress_stream", (PyCFunction)compress_stream, METH_VARARGS|METH_KEYWORDS, compress_stream_doc},
     {"decompress_stream", (PyCFunction)decompress_stream, METH_VARARGS|METH_KEYWORDS, decompress_stream_doc},
     {"_set_parameter_types", (PyCFunction)_set_parameter_types, METH_VARARGS, _set_parameter_types_doc},
-    {NULL}
+    {0}
 };
 
 /* --------------------
@@ -576,7 +576,7 @@ _zstd_free(void *module)
 #ifdef USE_MULTI_PHASE_INIT
 static PyModuleDef_Slot _zstd_slots[] = {
     {Py_mod_exec, _zstd_exec},
-    {0, NULL}
+    {0}
 };
 #endif
 

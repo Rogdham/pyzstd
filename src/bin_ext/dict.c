@@ -135,7 +135,7 @@ static PyMethodDef ZstdDict_methods[] = {
     {"__reduce__", (PyCFunction)ZstdDict_reduce,
      METH_NOARGS, reduce_cannot_pickle_doc},
 
-    {NULL, NULL, 0, NULL}
+    {0}
 };
 
 PyDoc_STRVAR(ZstdDict_dict_doc,
@@ -176,7 +176,7 @@ ZstdDict_str(ZstdDict *dict)
 static PyMemberDef ZstdDict_members[] = {
     {"dict_id", T_UINT, offsetof(ZstdDict, dict_id), READONLY, ZstdDict_dictid_doc},
     {"dict_content", T_OBJECT_EX, offsetof(ZstdDict, dict_content), READONLY, ZstdDict_dictcontent_doc},
-    {NULL}
+    {0}
 };
 
 PyDoc_STRVAR(ZstdDict_as_digested_dict_doc,
@@ -233,7 +233,7 @@ static PyGetSetDef ZstdDict_getset[] = {
     {"as_prefix", (getter)ZstdDict_as_prefix_get,
      NULL, ZstdDict_as_prefix_doc},
 
-    {NULL},
+    {0}
 };
 
 static Py_ssize_t
@@ -253,7 +253,7 @@ static PyType_Slot zstddict_slots[] = {
     {Py_tp_str, ZstdDict_str},
     {Py_tp_doc, (char*)ZstdDict_dict_doc},
     {Py_sq_length, ZstdDict_length},
-    {0, 0}
+    {0}
 };
 
 static PyType_Spec zstddict_type_spec = {
