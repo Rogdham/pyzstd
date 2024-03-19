@@ -18,18 +18,20 @@ Links
 
 Documentation: https://pyzstd.readthedocs.io/en/latest
 
-GitHub: https://github.com/animalize/pyzstd
+GitHub: https://github.com/Rogdham/pyzstd
 
 
 Release note
 ------------
-**0.15.10  (Dec 30, 2023)**
+**0.15.10  (Unreleased)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
 
 #. Support sub-interpreter on CPython 3.12+, can utilize `per-interpreter GIL <https://docs.python.org/3.12/whatsnew/3.12.html#pep-684-a-per-interpreter-gil>`_.
 
 #. On CPython(3.5~3.12)+Linux, use another output buffer code that can utilize the ``mremap`` mechanism.
+
+#. Change repository URL and maintainer following the deletion of the GitHub account of the original author, Ma Lin (animalize) <https://github.com/Rogdham/pyzstd/issues/1>.
 
 **0.15.9  (Jun 24, 2023)**
 
@@ -79,7 +81,7 @@ Upgrade zstd source code from v1.5.1 to `v1.5.2 <https://github.com/facebook/zst
 
 #. Upgrade zstd source code from v1.5.0 to `v1.5.1 <https://github.com/facebook/zstd/releases/tag/v1.5.1>`_.
 
-#. Fix ``ZstdFile.write()`` / ``train_dict()`` / ``finalize_dict()`` may use wrong length for some buffer protocol objects, see `this issue <https://github.com/animalize/pyzstd/issues/4>`_.
+#. Fix ``ZstdFile.write()`` / ``train_dict()`` / ``finalize_dict()`` may use wrong length for some buffer protocol objects.
 
 #. Two behavior changes:
 

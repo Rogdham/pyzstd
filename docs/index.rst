@@ -15,7 +15,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 * Has a command line interface, ``python -m pyzstd --help``.
 
-Links: `GitHub page <https://github.com/animalize/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
+Links: `GitHub page <https://github.com/Rogdham/pyzstd>`_, `PyPI page <https://pypi.org/project/pyzstd>`_.
 
 Features of zstd:
 
@@ -924,7 +924,7 @@ SeekableZstdFile class
 
     Subclass of :py:class:`ZstdFile`. This class can **only** create/write/read `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`_ file, or read 0-size file. It provides relatively fast seeking ability in read mode.
 
-    Note that it doesn't verify/write the XXH64 checksum fields. Using :py:attr:`~CParameter.checksumFlag` is faster and more flexible, see `this code <https://github.com/animalize/pyzstd_ext#2-verifyxxh64_seekablezstdfile-class>`_.
+    Note that it doesn't verify/write the XXH64 checksum fields. Using :py:attr:`~CParameter.checksumFlag` is faster and more flexible.
 
     :py:class:`ZstdFile` class can also read "Zstandard Seekable Format" file, but no fast seeking ability.
 
@@ -1432,7 +1432,7 @@ Rich memory mode
     * The output buffer is larger than input data a little.
     * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
 
-    When not using this mode, the output buffer grows `gradually <https://github.com/animalize/pyzstd/blob/0.15.7/src/bin_ext/_zstdmodule.c#L218-L243>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
+    When not using this mode, the output buffer grows `gradually <https://github.com/Rogdham/pyzstd/blob/0.15.7/src/bin_ext/_zstdmodule.c#L218-L243>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
 
     When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
 

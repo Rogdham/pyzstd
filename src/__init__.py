@@ -26,7 +26,7 @@ similar to Python's bz2/lzma/zlib modules.
 Command line interface of this module: python -m pyzstd --help
 
 Documentation: https://pyzstd.readthedocs.io
-GitHub: https://github.com/animalize/pyzstd
+GitHub: https://github.com/Rogdham/pyzstd
 PyPI: https://pypi.org/project/pyzstd'''
 
 __all__ = ('ZstdCompressor', 'RichMemZstdCompressor',

@@ -194,7 +194,9 @@ def do_setup():
         long_description_content_type='text/x-rst',
         author='Ma Lin',
         author_email='malincns@163.com',
-        url='https://github.com/animalize/pyzstd',
+        maintainer="Rogdham",
+        maintainer_email="contact@rogdham.net",
+        url='https://github.com/Rogdham/pyzstd',
         license='The 3-Clause BSD License',
         python_requires='>=3.5',
 
