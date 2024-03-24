@@ -6,7 +6,7 @@ Pyzstd module provides classes and functions for compressing and decompressing d
 The API style is similar to Python's bz2/lzma/zlib modules.
 
 * Includes zstd v1.5.5 source code
-* Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+* Can also dynamically link to zstd library provided by system, see `this note <https://pyzstd.readthedocs.io/#build-pyzstd>`_.
 * Has a CFFI implementation that can work with PyPy
 * Support sub-interpreter on CPython 3.12+
 * ``ZstdFile`` class has C language level performance
@@ -16,7 +16,7 @@ The API style is similar to Python's bz2/lzma/zlib modules.
 Links
 -----------
 
-Documentation: https://pyzstd.readthedocs.io/en/latest
+Documentation: https://pyzstd.readthedocs.io/
 
 GitHub: https://github.com/Rogdham/pyzstd
 
@@ -37,7 +37,7 @@ Release note
 
 ZstdFile class related changes:
 
-#. Add `SeekableZstdFile <https://pyzstd.readthedocs.io/en/latest/#SeekableZstdFile>`_ class, it's a subclass of ``ZstdFile``, supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
+#. Add `SeekableZstdFile <https://pyzstd.readthedocs.io/#SeekableZstdFile>`_ class, it's a subclass of ``ZstdFile``, supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__.
 
 #. Add *mode* argument to ``ZstdFile.flush()`` method, now it can flush a zstd frame.
 
@@ -51,9 +51,9 @@ ZstdDict class changes:
 
 #. Fix these advanced compression parameters may be ignored when loading a dictionary: ``windowLog``, ``hashLog``, ``chainLog``, ``searchLog``, ``minMatch``, ``targetLength``, ``strategy``, ``enableLongDistanceMatching``, ``ldmHashLog``, ``ldmMinMatch``, ``ldmBucketSizeLog``, ``ldmHashRateLog``, and some non-public parameters.
 
-#. When compressing, load undigested dictionary instead of digested dictionary by default. Loading again an undigested is slower, see `differences <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_digested_dict>`_.
+#. When compressing, load undigested dictionary instead of digested dictionary by default. Loading again an undigested is slower, see `differences <https://pyzstd.readthedocs.io/#ZstdDict.as_digested_dict>`_.
 
-#. Add `.as_prefix <https://pyzstd.readthedocs.io/en/latest/#ZstdDict.as_prefix>`_ attribute. Can use zstd as a `patching engine <https://pyzstd.readthedocs.io/en/latest/#patching-engine>`_.
+#. Add `.as_prefix <https://pyzstd.readthedocs.io/#ZstdDict.as_prefix>`_ attribute. Can use zstd as a `patching engine <https://pyzstd.readthedocs.io/#patching-engine>`_.
 
 **0.15.6  (Apr 5, 2023)**
 
@@ -63,7 +63,7 @@ Upgrade zstd source code from v1.5.4 to `v1.5.5 <https://github.com/facebook/zst
 
 #. Upgrade zstd source code from v1.5.2 to `v1.5.4 <https://github.com/facebook/zstd/releases/tag/v1.5.4>`_. v1.5.3 is a non-public release.
 
-#. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `build commands <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+#. Support ``pyproject.toml`` build mechanism (PEP-517). Note that specifying build options in old way may be invalid, see `build commands <https://pyzstd.readthedocs.io/#build-pyzstd>`_.
 
 #. Support "multi-phase initialization" (PEP-489) on CPython 3.11+, can work with CPython sub-interpreters in the future. Currently this build option is disabled by default.
 
@@ -89,9 +89,9 @@ Upgrade zstd source code from v1.5.1 to `v1.5.2 <https://github.com/facebook/zst
 
     * If the underlying zstd library doesn't support multi-threaded compression, no longer automatically fallback to "single-threaded mode", now raise a ``ZstdError`` exception.
 
-#. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/en/latest/#zstd_support_multithread>`_.
+#. Add a module level variable `zstd_support_multithread <https://pyzstd.readthedocs.io/#zstd_support_multithread>`_.
 
-#. Add a setup.py option ``--avx2``, see `build options <https://pyzstd.readthedocs.io/en/latest/#build-pyzstd>`_.
+#. Add a setup.py option ``--avx2``, see `build options <https://pyzstd.readthedocs.io/#build-pyzstd>`_.
 
 **0.15.0  (May 18, 2021)**
 
@@ -111,7 +111,7 @@ Upgrade zstd source code from v1.4.8 to `v1.4.9 <https://github.com/facebook/zst
 
 **0.14.2  (Feb 24, 2021)**
 
-#. Add two convenient functions: `compress_stream() <https://pyzstd.readthedocs.io/en/latest/#compress_stream>`_, `decompress_stream() <https://pyzstd.readthedocs.io/en/latest/#decompress_stream>`_.
+#. Add two convenient functions: `compress_stream() <https://pyzstd.readthedocs.io/#compress_stream>`_, `decompress_stream() <https://pyzstd.readthedocs.io/#decompress_stream>`_.
 
 #. Some improvements.
 

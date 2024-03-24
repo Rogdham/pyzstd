@@ -1,6 +1,6 @@
 project = 'pyzstd module'
-author = 'Ma Lin'
-copyright = '2020-present, Ma Lin'
+author = 'Ma Lin and contributors'
+copyright = '2020-present, Ma Lin and contributors'
 language = 'en'
 
 master_doc = 'index'

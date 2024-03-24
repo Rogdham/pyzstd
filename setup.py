@@ -187,9 +187,7 @@ def do_setup():
     setup(
         name='pyzstd',
         version=module_version,
-        description=("Python bindings to Zstandard (zstd) compression "
-                     "library, the API style is similar to Python's "
-                     "bz2/lzma/zlib modules."),
+        description=("Python bindings to Zstandard (zstd) compression library."),
         long_description=long_description,
         long_description_content_type='text/x-rst',
         author='Ma Lin',
@@ -216,8 +214,7 @@ def do_setup():
             "Programming Language :: Python :: 3.11",
             "Programming Language :: Python :: 3.12",
         ],
-        keywords='zstandard zstd zst tar file seekable format',
-
+        keywords='zstandard zstd zst compress decompress tar file seekable format',
         package_dir={'pyzstd': 'src'},
         packages=packages,
         package_data={'pyzstd': ['__init__.pyi', 'py.typed']},
