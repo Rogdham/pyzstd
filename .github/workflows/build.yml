@@ -13,8 +13,7 @@ env:
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
-  # Run test on Ubuntu/macOS/Windows for every commit
-  run_on_cpython:
+  test_cpython:
     name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} ${{ matrix.build_option }}
     runs-on: ${{ matrix.platform }}
 
@@ -45,6 +44,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ env.PYTHON_VER }}
@@ -56,8 +56,7 @@ jobs:
           python -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
           python -m unittest discover tests
 
-  # Test debug build on Ubuntu for every commit
-  run_on_cpython_debug:
+  test_cpython_debug:
     name: Test debug build on Ubuntu ${{ matrix.build_option }}
     runs-on: ubuntu-latest
 
@@ -80,8 +79,7 @@ jobs:
           python3-dbg -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
           python3-dbg -m unittest discover tests
 
-  # Run test on PyPy for every commit
-  test_on_pypy:
+  test_pypy:
     name: Test on ${{ matrix.py }}
     runs-on: ubuntu-latest
 
@@ -97,6 +95,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: true
+
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.py }}
@@ -107,155 +106,9 @@ jobs:
           python -m pip install --config-settings="--build-option=--dynamic-link-zstd --warning-as-error" -v .
           python -m unittest discover tests
 
-  # Build Linux/macOS/Windows wheels
-  build_wheels:
-    name: Build wheels on ${{ matrix.platform }}
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-    runs-on: ${{ matrix.platform }}
-
-    strategy:
-      matrix:
-        platform:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-
-    env:
-      # macOS archs
-      CIBW_ARCHS_MACOS: "x86_64 arm64"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
-      - name: Install cibuildwheel & build wheels
-        run: |
-          python -m pip install -U cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyzstd-files
-          path: wheelhouse/*.whl
-
-  # Build manylinux1_x86_64 wheels
-  # These two jobs build:
-  #   1, build_wheels (above): manylinux1_i686 / manylinux2014_x86_64
-  #   2, build_in_manylinux2010 (this): manylinux1_x86_64
-  # manylinux2014_x86_64 wheels use a new memcpy() function
-  # (memcpy@GLIBC_2.14), so the wheels are not compatible with
-  # manylinux1_x86_64 environment. In order to be compatible as
-  # much as possible, this job builds manylinux1_x86_64 wheels.
-  build_in_manylinux2010:
-    name: Build in manylinux2010 environment
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-    runs-on: ubuntu-latest
-
-    env:
-      # Generate manylinux1_x86_64 wheels.
-      #     tag         pip      CPython with the pip      glibc
-      # manylinux1     >=8.1.0  3.5.2+, 3.6.0+            2.5  (2006-09-29)
-      # manylinux2010  >=19.0   3.7.3+, 3.8.0+            2.12 (2010-05-03)
-      # manylinux2014  >=19.3   3.7.8+, 3.8.4+, 3.9.0+    2.17 (2012-12-25)
-      # manylinux_x_y  >=20.3   3.8.10+, 3.9.5+, 3.10.0+  x.y
-      # manylinux2010 images EOL on 2022-08-01, it doesn't support cp311/pp39.
-      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
-      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
-      CIBW_ARCHS_LINUX: x86_64
-      CIBW_SKIP: "*musllinux*"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
-      - name: Build wheels
-        run: |
-          python -m pip install -U build cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyzstd-files
-          path: wheelhouse/*.whl
-
-  # Build aarch64/ppc64le/s390x wheels
-  build_arch_wheels:
-    name: Build ${{ matrix.arch }} wheels
-    if: github.event_name == 'push' && startsWith(github.event.ref, 'refs/heads/release')
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        arch:
-          - aarch64
-          - ppc64le
-          - s390x
-        # Building in QEMU is very slow, so parallelize the tasks.
-        skip_image:
-          - "*musllinux*"
-          - "*manylinux*"
-
-    env:
-      CIBW_ARCHS: ${{ matrix.arch }}
-      CIBW_SKIP: ${{ matrix.skip_image }}
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Install cibuildwheel & build wheels
-        run: |
-          python -m pip install -U cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: Upload ${{ matrix.arch }} wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: pyzstd-files
-          path: wheelhouse/*.whl
-
   # If the head commit message contains '<more-tests>', run test on
   # armv6/armv7/aarch64/ppc64le/s390x/riscv64 architectures.
-  test_on_arches:
+  test_arches:
     name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
     if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
     runs-on: ubuntu-latest
@@ -294,20 +147,150 @@ jobs:
             python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
             python3 -m unittest discover tests
 
-  # Upload to PyPI
-  upload_pypi:
-    name: Publish to PyPI
-    needs:
-      - build_wheels
-      - build_in_manylinux2010
-      - build_arch_wheels
+  build_sdist:
+    name: Build sdist
+    if: startsWith(github.ref, 'refs/tags')
     runs-on: ubuntu-latest
-    permissions:
-      # This permission is mandatory for trusted publishing
-      id-token: write
 
     steps:
-      # Build source distribution
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VER }}
+
+      - name: Build sdist
+        run: |
+          python -m pip install -U build
+          python -m build --sdist
+
+      - name: List distributions
+        run: ls -lR dist
+
+      - name: Upload sdist
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-sdist
+          path: dist/*.tar.gz
+
+  build_wheels:
+    name: Build wheels on ${{ matrix.platform }}
+    if: startsWith(github.ref, 'refs/tags')
+    runs-on: ${{ matrix.platform }}
+
+    strategy:
+      matrix:
+        platform:
+          - ubuntu-latest
+          - macos-latest
+          - windows-latest
+
+    env:
+      CIBW_ARCHS_MACOS: "x86_64 arm64"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VER }}
+
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
+
+      - name: Build wheels
+        run: |
+          python -m pip install -U cibuildwheel
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - name: List distributions
+        run: ls -lR wheelhouse
+        shell: bash
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.platform }}
+          path: wheelhouse/*.whl
+
+  build_wheels_manylinux2010:
+    name: Build wheels for manylinux2010
+    if: startsWith(github.ref, 'refs/tags')
+    runs-on: ubuntu-latest
+
+    env:
+      # Generate manylinux1_x86_64 wheels.
+      #     tag         pip      CPython with the pip      glibc
+      # manylinux1     >=8.1.0  3.5.2+, 3.6.0+            2.5  (2006-09-29)
+      # manylinux2010  >=19.0   3.7.3+, 3.8.0+            2.12 (2010-05-03)
+      # manylinux2014  >=19.3   3.7.8+, 3.8.4+, 3.9.0+    2.17 (2012-12-25)
+      # manylinux_x_y  >=20.3   3.8.10+, 3.9.5+, 3.10.0+  x.y
+      # manylinux2010 images EOL on 2022-08-01, it doesn't support cp311/pp39.
+      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
+      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
+      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
+      CIBW_ARCHS_LINUX: x86_64
+      CIBW_SKIP: "*musllinux*"
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: true
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VER }}
+
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
+
+      - name: Build wheels
+        run: |
+          python -m pip install -U build cibuildwheel
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - name: List distributions
+        run: ls -lR wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-manylinux2010
+          path: wheelhouse/*.whl
+
+  build_arch_wheels:
+    name: Build wheels for ${{ matrix.arch }} (skip ${{ matrix.skip_image }})
+    if: startsWith(github.ref, 'refs/tags')
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        arch:
+          - aarch64
+          - ppc64le
+          - s390x
+        # Building in QEMU is very slow, so parallelize the tasks.
+        skip_image:
+          - musllinux
+          - manylinux
+
+    env:
+      CIBW_ARCHS: ${{ matrix.arch }}
+      CIBW_SKIP: "*${{ matrix.skip_image }}*"
+
+    steps:
       - uses: actions/checkout@v4
         with:
           submodules: true
@@ -315,19 +298,54 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VER }}
 
-      - name: Build source distribution
-        run: |
-          python -m pip install -U build
-          python -m build --sdist
+      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
+      # be removed after cibuildwheel doesn't support CPython 3.6.
+      - name: Remove pyproject.toml
+        uses: JesseTG/rm@v1.0.3
+        with:
+          path: pyproject.toml
 
-      # Download wheels
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Build wheels
+        run: |
+          python -m pip install -U cibuildwheel
+          python -m cibuildwheel --output-dir wheelhouse
+
+      - name: List distributions
+        run: ls -lR wheelhouse
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.arch }}-${{ matrix.skip_image }}
+          path: wheelhouse/*.whl
+
+  upload_pypi:
+    name: Publish to PyPI
+    if: startsWith(github.ref, 'refs/tags')
+    needs:
+      - build_sdist
+      - build_wheels
+      - build_wheels_manylinux2010
+      - build_arch_wheels
+    runs-on: ubuntu-latest
+    environment: publish
+    permissions:
+      id-token: write # This permission is mandatory for trusted publishing
+
+    steps:
       - name: Download wheels
         uses: actions/download-artifact@v4
         with:
-          name: pyzstd-files
+          pattern: cibw-*
           path: dist
+          merge-multiple: true
 
-      # Publish
+      - name: List distributions
+        run: ls -lR dist
+
       - name: Upload to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
