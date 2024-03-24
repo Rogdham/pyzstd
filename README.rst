@@ -23,7 +23,7 @@ GitHub: https://github.com/Rogdham/pyzstd
 
 Release note
 ------------
-**0.15.10  (Unreleased)**
+**0.15.10  (Mar 24, 2024)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
 
