@@ -90,7 +90,7 @@ success:
 }
 
 PyDoc_STRVAR(_get_frame_info_doc,
-"Internal function, get zstd frame infomation from a frame header.");
+"Internal function, get zstd frame information from a frame header.");
 
 static PyObject *
 _get_frame_info(PyObject *module, PyObject *args)
