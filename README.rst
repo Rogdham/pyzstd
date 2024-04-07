@@ -23,6 +23,11 @@ GitHub: https://github.com/Rogdham/pyzstd
 
 Release note
 ------------
+
+**Next version  (Unreleased)**
+
+#. Fix pyzstd_pep517 parameter name in ``get_requires_for_build_wheel``
+
 **0.15.10  (Mar 24, 2024)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
