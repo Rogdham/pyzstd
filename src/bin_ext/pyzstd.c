@@ -211,6 +211,9 @@ add_parameters(PyObject *module)
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_minMatch);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_targetLength);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_strategy);
+#if ZSTD_VERSION_NUMBER >= 10506
+    ADD_INT_PREFIX_MACRO(module, ZSTD_c_targetCBlockSize);
+#endif
 
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_enableLongDistanceMatching);
     ADD_INT_PREFIX_MACRO(module, ZSTD_c_ldmHashLog);

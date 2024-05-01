@@ -44,6 +44,19 @@ def _get_param_bounds(is_compress, key):
 
     return (bounds.lowerBound, bounds.upperBound)
 
+
+class _UnsupportedCParameter:
+    def __set_name__(self, _, name):
+        self.name = name
+
+    def __get__(self, *_, **__):
+        msg = ("%s CParameter only available when the underlying "
+               "zstd library's version is greater than or equal to v1.5.6. "
+               "At pyzstd module's run-time, zstd version is %s.") % \
+               (self.name, zstd_version)
+        raise NotImplementedError(msg)
+
+
 class CParameter(IntEnum):
     """Compression parameters"""
 
@@ -55,6 +68,10 @@ class CParameter(IntEnum):
     minMatch                   = m.ZSTD_c_minMatch
     targetLength               = m.ZSTD_c_targetLength
     strategy                   = m.ZSTD_c_strategy
+    if zstd_version_info >= (1, 5, 6):
+        targetCBlockSize       = m.ZSTD_c_targetCBlockSize
+    else:
+        targetCBlockSize       = _UnsupportedCParameter()
 
     enableLongDistanceMatching = m.ZSTD_c_enableLongDistanceMatching
     ldmHashLog                 = m.ZSTD_c_ldmHashLog
@@ -166,6 +183,8 @@ def _set_parameter_error(is_compress, key, value):
      m.ZSTD_c_nbWorkers:        "nbWorkers",
      m.ZSTD_c_jobSize:          "jobSize",
      m.ZSTD_c_overlapLog:       "overlapLog"}
+    if zstd_version_info >= (1, 5, 6):
+        COMPRESS_PARAMETERS[m.ZSTD_c_targetCBlockSize] = "targetCBlockSize"
 
     DECOMPRESS_PARAMETERS = {m.ZSTD_d_windowLogMax: "windowLogMax"}
 

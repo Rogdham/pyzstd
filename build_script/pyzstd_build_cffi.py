@@ -57,6 +57,7 @@ typedef enum {
     ZSTD_c_minMatch,
     ZSTD_c_targetLength,
     ZSTD_c_strategy,
+    ZSTD_c_targetCBlockSize,
 
     /* LDM mode parameters */
     ZSTD_c_enableLongDistanceMatching,
@@ -201,6 +202,12 @@ int ZSTD_defaultCLevel(void)
 {
     return ZSTD_CLEVEL_DEFAULT;
 }
+#endif
+
+#if ZSTD_VERSION_NUMBER < 10506
+typedef enum {
+    ZSTD_c_targetCBlockSize=130
+} PYZSTD_compat_c_targetCBlockSize;
 #endif
 
 #ifdef PYZSTD_STATIC_LINK

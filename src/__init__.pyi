@@ -37,6 +37,7 @@ class CParameter(IntEnum):
     minMatch: int
     targetLength: int
     strategy: int
+    targetCBlockSize: int
 
     enableLongDistanceMatching: int
     ldmHashLog: int

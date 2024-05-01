@@ -251,6 +251,10 @@ static const ParameterInfo cp_list[] =
     {ZSTD_c_targetLength,     "targetLength"},
     {ZSTD_c_strategy,         "strategy"},
 
+#if ZSTD_VERSION_NUMBER >= 10506
+    {ZSTD_c_targetCBlockSize, "targetCBlockSize"},
+#endif
+
     {ZSTD_c_enableLongDistanceMatching, "enableLongDistanceMatching"},
     {ZSTD_c_ldmHashLog,       "ldmHashLog"},
     {ZSTD_c_ldmMinMatch,      "ldmMinMatch"},

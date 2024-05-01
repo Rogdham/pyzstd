@@ -55,6 +55,18 @@ def get_frame_info(frame_buffer):
     return _nt_frame_info(*ret_tuple)
 
 
+class _UnsupportedCParameter:
+    def __set_name__(self, _, name):
+        self.name = name
+
+    def __get__(self, *_, **__):
+        msg = ("%s CParameter only available when the underlying "
+               "zstd library's version is greater than or equal to v1.5.6. "
+               "At pyzstd module's run-time, zstd version is %s.") % \
+               (self.name, zstd_version)
+        raise NotImplementedError(msg)
+
+
 class CParameter(IntEnum):
     """Compression parameters"""
 
@@ -66,6 +78,10 @@ class CParameter(IntEnum):
     minMatch                   = _zstd._ZSTD_c_minMatch
     targetLength               = _zstd._ZSTD_c_targetLength
     strategy                   = _zstd._ZSTD_c_strategy
+    if zstd_version_info >= (1, 5, 6):
+        targetCBlockSize       = _zstd._ZSTD_c_targetCBlockSize
+    else:
+        targetCBlockSize       = _UnsupportedCParameter()
 
     enableLongDistanceMatching = _zstd._ZSTD_c_enableLongDistanceMatching
     ldmHashLog                 = _zstd._ZSTD_c_ldmHashLog

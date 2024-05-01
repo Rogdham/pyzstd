@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Next version (Unreleased)
 
+- Upgrade zstd source code from v1.5.5 to [v1.5.6](https://github.com/facebook/zstd/releases/tag/v1.5.6)
 - Fix pyzstd_pep517 parameter name in `get_requires_for_build_wheel`
 - Deprecate support for Python version before 3.8 and stop building wheels for them
 - Minor fixes in type hints

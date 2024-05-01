@@ -429,6 +429,11 @@ class ClassShapeTestCase(unittest.TestCase):
         CParameter.minMatch
         CParameter.targetLength
         CParameter.strategy
+        if zstd_version_info >= (1, 5, 6):
+            CParameter.targetCBlockSize
+        else:
+            with self.assertRaises(NotImplementedError):
+                CParameter.targetCBlockSize
 
         CParameter.enableLongDistanceMatching
         CParameter.ldmHashLog
@@ -611,6 +616,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
              CParameter.jobSize : 5*MB if zstd_support_multithread else 0,
              CParameter.overlapLog : 9 if zstd_support_multithread else 0,
              }
+        if zstd_version_info >= (1, 5, 6):
+            d[CParameter.targetCBlockSize] = 150
         ZstdCompressor(level_or_option=d)
 
         # larger than signed int, ValueError

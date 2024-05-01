@@ -983,7 +983,7 @@ Advanced parameters
     Attributes of :py:class:`CParameter` class:
 
         - Compression level (:py:attr:`~CParameter.compressionLevel`)
-        - Compress algorithm parameters (:py:attr:`~CParameter.windowLog`, :py:attr:`~CParameter.hashLog`, :py:attr:`~CParameter.chainLog`, :py:attr:`~CParameter.searchLog`, :py:attr:`~CParameter.minMatch`, :py:attr:`~CParameter.targetLength`, :py:attr:`~CParameter.strategy`)
+        - Compress algorithm parameters (:py:attr:`~CParameter.windowLog`, :py:attr:`~CParameter.hashLog`, :py:attr:`~CParameter.chainLog`, :py:attr:`~CParameter.searchLog`, :py:attr:`~CParameter.minMatch`, :py:attr:`~CParameter.targetLength`, :py:attr:`~CParameter.strategy`, :py:attr:`~CParameter.targetCBlockSize`)
         - Long distance matching (:py:attr:`~CParameter.enableLongDistanceMatching`, :py:attr:`~CParameter.ldmHashLog`, :py:attr:`~CParameter.ldmMinMatch`, :py:attr:`~CParameter.ldmBucketSizeLog`, :py:attr:`~CParameter.ldmHashRateLog`)
         - Misc (:py:attr:`~CParameter.contentSizeFlag`, :py:attr:`~CParameter.checksumFlag`, :py:attr:`~CParameter.dictIDFlag`)
         - Multi-threaded compression (:py:attr:`~CParameter.nbWorkers`, :py:attr:`~CParameter.jobSize`, :py:attr:`~CParameter.overlapLog`)
@@ -1125,6 +1125,18 @@ Advanced parameters
         The higher the value of selected strategy, the more complex it is, resulting in stronger and slower compression.
 
         Special: value ``0`` means "use default strategy", then the value is dynamically set, see "strat" column in `this table <https://github.com/facebook/zstd/blob/release/lib/compress/clevels.h>`_.
+
+     .. py:attribute:: targetCBlockSize
+
+        Attempts to fit compressed block size into approximatively targetCBlockSize (in bytes). Note that it's not a guarantee, just a convergence target.
+
+        This is helpful in low bandwidth streaming environments to improve end-to-end latency, when a client can make use of partial documents.
+
+        Bound by ZSTD_TARGETCBLOCKSIZE_MIN and ZSTD_TARGETCBLOCKSIZE_MAX. No target when targetCBlockSize == 0.
+
+        Default value is ``0``.
+
+        Only available for zstd v1.5.6+.
 
     .. py:attribute:: enableLongDistanceMatching
 
