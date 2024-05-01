@@ -1,9 +1,12 @@
 name: build
 
-# Build on every branch push, tag push, and pull request change.
 on:
-  - push
-  - pull_request
+  push:
+    branches:
+      - "master"
+      - "ci-*"
+    tags:
+  pull_request:
 
 env:
   PYTHON_VER: "3.11" # Python to run test/cibuildwheel
