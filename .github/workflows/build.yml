@@ -11,8 +11,8 @@ on:
 env:
   PYTHON_VER: "3.11" # Python to run test/cibuildwheel
   CIBW_BUILD: >
-    cp312-* cp311-* cp310-* cp39-* cp38-* cp37-* cp36-*
-    pp310-* pp39-* pp38-* pp37-*
+    cp38-* cp39-* cp310-* cp311-* cp312-*
+    pp38-* pp39-* pp310-*
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
@@ -89,7 +89,6 @@ jobs:
     strategy:
       matrix:
         py:
-          - "pypy-3.7"
           - "pypy-3.8"
           - "pypy-3.9"
           - "pypy-3.10"
@@ -202,13 +201,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VER }}
 
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
       - name: Build wheels
         run: |
           python -m pip install -U cibuildwheel
@@ -222,55 +214,6 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: cibw-wheels-${{ matrix.platform }}
-          path: wheelhouse/*.whl
-
-  build_wheels_manylinux2010:
-    name: Build wheels for manylinux2010
-    if: startsWith(github.ref, 'refs/tags')
-    runs-on: ubuntu-latest
-
-    env:
-      # Generate manylinux1_x86_64 wheels.
-      #     tag         pip      CPython with the pip      glibc
-      # manylinux1     >=8.1.0  3.5.2+, 3.6.0+            2.5  (2006-09-29)
-      # manylinux2010  >=19.0   3.7.3+, 3.8.0+            2.12 (2010-05-03)
-      # manylinux2014  >=19.3   3.7.8+, 3.8.4+, 3.9.0+    2.17 (2012-12-25)
-      # manylinux_x_y  >=20.3   3.8.10+, 3.9.5+, 3.10.0+  x.y
-      # manylinux2010 images EOL on 2022-08-01, it doesn't support cp311/pp39.
-      CIBW_BUILD: cp36-* cp37-* cp38-* cp39-* cp310-* pp37-* pp38-*
-      CIBW_MANYLINUX_X86_64_IMAGE: manylinux2010
-      CIBW_MANYLINUX_PYPY_X86_64_IMAGE: manylinux2010
-      CIBW_ARCHS_LINUX: x86_64
-      CIBW_SKIP: "*musllinux*"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
-      - name: Build wheels
-        run: |
-          python -m pip install -U build cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: List distributions
-        run: ls -lR wheelhouse
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-manylinux2010
           path: wheelhouse/*.whl
 
   build_arch_wheels:
@@ -301,13 +244,6 @@ jobs:
         with:
           python-version: ${{ env.PYTHON_VER }}
 
-      # cibuildwheel and PEP-517 don't work on CPython 3.6. This can
-      # be removed after cibuildwheel doesn't support CPython 3.6.
-      - name: Remove pyproject.toml
-        uses: JesseTG/rm@v1.0.3
-        with:
-          path: pyproject.toml
-
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
@@ -331,7 +267,6 @@ jobs:
     needs:
       - build_sdist
       - build_wheels
-      - build_wheels_manylinux2010
       - build_arch_wheels
     runs-on: ubuntu-latest
     environment: publish

@@ -1,5 +1,4 @@
-/* pyzstd module for Python 3.5+
-   https://github.com/Rogdham/pyzstd */
+/* https://github.com/Rogdham/pyzstd */
 
 #ifndef PYZSTD_H_INCLUDED
 #define PYZSTD_H_INCLUDED

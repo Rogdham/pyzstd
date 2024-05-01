@@ -205,9 +205,6 @@ def do_setup():
             "License :: OSI Approved :: BSD License",
             "Programming Language :: Python :: Implementation :: CPython",
             "Programming Language :: Python :: Implementation :: PyPy",
-            "Programming Language :: Python :: 3.5",
-            "Programming Language :: Python :: 3.6",
-            "Programming Language :: Python :: 3.7",
             "Programming Language :: Python :: 3.8",
             "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
@@ -224,6 +221,13 @@ def do_setup():
 
         test_suite='tests'
     )
+
+    if sys.version_info < (3, 8):
+        print()
+        print("WARNING")
+        print("    Python {} has reached end of life.".format(platform.python_version()))
+        print("    This version of Python will not be supported in future versions of pyzstd.")
+        print()
 
 if __name__ == '__main__':
     do_setup()

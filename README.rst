@@ -28,6 +28,8 @@ Release note
 
 #. Fix pyzstd_pep517 parameter name in ``get_requires_for_build_wheel``
 
+#. Deprecate support for Python version before 3.8 and stop building wheels for them
+
 **0.15.10  (Mar 24, 2024)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
