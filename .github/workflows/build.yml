@@ -151,7 +151,7 @@ jobs:
 
   build_sdist:
     name: Build sdist
-    if: startsWith(github.ref, 'refs/tags')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
     runs-on: ubuntu-latest
 
     steps:
@@ -179,7 +179,7 @@ jobs:
 
   build_wheels:
     name: Build wheels on ${{ matrix.platform }}
-    if: startsWith(github.ref, 'refs/tags')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
     runs-on: ${{ matrix.platform }}
 
     strategy:
@@ -218,7 +218,7 @@ jobs:
 
   build_arch_wheels:
     name: Build wheels for ${{ matrix.arch }} (skip ${{ matrix.skip_image }})
-    if: startsWith(github.ref, 'refs/tags')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
     runs-on: ubuntu-latest
 
     strategy:
