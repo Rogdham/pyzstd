@@ -195,7 +195,7 @@ def do_setup():
         maintainer="Rogdham",
         maintainer_email="contact@rogdham.net",
         url='https://github.com/Rogdham/pyzstd',
-        license='The 3-Clause BSD License',
+        license='BSD-3-Clause',
         python_requires='>=3.5',
 
         classifiers=[
