@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Next version (Unreleased)
+## 0.16.0 (May 20, 2024)
 
 - Upgrade zstd source code from v1.5.5 to [v1.5.6](https://github.com/facebook/zstd/releases/tag/v1.5.6)
 - Fix pyzstd_pep517 parameter name in `get_requires_for_build_wheel`
