@@ -10,8 +10,8 @@ from setuptools.command.build_ext import build_ext
 def read_stuff():
     ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 
-    # Read README.rst
-    README_PATH = os.path.join(ROOT_PATH, 'README.rst')
+    # Read README.md
+    README_PATH = os.path.join(ROOT_PATH, 'README.md')
     with open(README_PATH, 'r', encoding='utf-8') as file:
         long_description = file.read()
 
