@@ -6,6 +6,7 @@ on:
       - "master"
       - "ci-*"
     tags:
+      - "**"
   pull_request:
 
 env:
