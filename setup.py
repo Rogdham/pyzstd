@@ -189,7 +189,7 @@ def do_setup():
         version=module_version,
         description=("Python bindings to Zstandard (zstd) compression library."),
         long_description=long_description,
-        long_description_content_type='text/x-rst',
+        long_description_content_type='text/markdown',
         author='Ma Lin',
         author_email='malincns@163.com',
         maintainer="Rogdham",
