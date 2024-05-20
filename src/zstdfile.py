@@ -276,6 +276,8 @@ class ZstdFile(io.BufferedIOBase):
         If size is negative or omitted, read until EOF is reached.
         Returns b"" if the file is already at EOF.
         """
+        if size is None:
+            size = -1
         try:
             return self._buffer.read(size)
         except AttributeError:
@@ -324,6 +326,8 @@ class ZstdFile(io.BufferedIOBase):
         non-negative, no more than size bytes will be read (in which
         case the line may be incomplete). Returns b'' if already at EOF.
         """
+        if size is None:
+            size = -1
         try:
             return self._buffer.readline(size)
         except AttributeError:

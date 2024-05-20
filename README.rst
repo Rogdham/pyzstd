@@ -30,6 +30,8 @@ Release note
 
 #. Deprecate support for Python version before 3.8 and stop building wheels for them
 
+#. Minor fixes in type hints
+
 **0.15.10  (Mar 24, 2024)**
 
 #. Fix ``SeekableZstdFile`` class can't open new file in appending mode.
