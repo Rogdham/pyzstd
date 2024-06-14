@@ -21,6 +21,11 @@
     #define Py_UNREACHABLE() assert(0)
 #endif
 
+/* Added in Python 3.13 */
+#if PY_VERSION_HEX < 0x030D00A1
+    #define PyLong_AsInt _PyLong_AsInt
+#endif
+
 /* Multi-phase init (PEP-489) */
 #if PY_VERSION_HEX < 0x030B00B1 && defined(USE_MULTI_PHASE_INIT)
     /* PyType_GetModuleByDef() function is available on CPython 3.11+.

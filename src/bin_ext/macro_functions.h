@@ -14,7 +14,7 @@ PYZSTD_FUN_PREFIX(set_c_parameters)(PYZSTD_C_CLASS *self, PyObject *level_or_opt
 
     /* Integer compression level */
     if (PyLong_Check(level_or_option)) {
-        const int level = _PyLong_AsInt(level_or_option);
+        const int level = PyLong_AsInt(level_or_option);
         if (level == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Compression level should be 32-bit signed int value.");
@@ -52,14 +52,14 @@ PYZSTD_FUN_PREFIX(set_c_parameters)(PYZSTD_C_CLASS *self, PyObject *level_or_opt
             }
 
             /* Both key & value should be 32-bit signed int */
-            const int key_v = _PyLong_AsInt(key);
+            const int key_v = PyLong_AsInt(key);
             if (key_v == -1 && PyErr_Occurred()) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Key of option dict should be 32-bit signed int value.");
                 return -1;
             }
 
-            const int value_v = _PyLong_AsInt(value);
+            const int value_v = PyLong_AsInt(value);
             if (value_v == -1 && PyErr_Occurred()) {
                 PyErr_SetString(PyExc_ValueError,
                                 "Value of option dict should be 32-bit signed int value.");
@@ -125,7 +125,7 @@ PYZSTD_FUN_PREFIX(load_c_dict)(PYZSTD_C_CLASS *self, PyObject *dict)
             return -1;
         } else if (ret > 0) {
             /* type == -1 may indicate an error. */
-            type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
+            type = PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
             if (type == DICT_TYPE_DIGESTED ||
                 type == DICT_TYPE_UNDIGESTED ||
                 type == DICT_TYPE_PREFIX)
@@ -206,14 +206,14 @@ PYZSTD_FUN_PREFIX(set_d_parameters)(PYZSTD_D_CLASS *self, PyObject *option)
         }
 
         /* Both key & value should be 32-bit signed int */
-        const int key_v = _PyLong_AsInt(key);
+        const int key_v = PyLong_AsInt(key);
         if (key_v == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Key of option dict should be 32-bit signed integer value.");
             return -1;
         }
 
-        const int value_v = _PyLong_AsInt(value);
+        const int value_v = PyLong_AsInt(value);
         if (value_v == -1 && PyErr_Occurred()) {
             PyErr_SetString(PyExc_ValueError,
                             "Value of option dict should be 32-bit signed integer value.");
@@ -261,7 +261,7 @@ PYZSTD_FUN_PREFIX(load_d_dict)(PYZSTD_D_CLASS *self, PyObject *dict)
             return -1;
         } else if (ret > 0) {
             /* type == -1 may indicate an error. */
-            type = _PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
+            type = PyLong_AsInt(PyTuple_GET_ITEM(dict, 1));
             if (type == DICT_TYPE_DIGESTED ||
                 type == DICT_TYPE_UNDIGESTED ||
                 type == DICT_TYPE_PREFIX)

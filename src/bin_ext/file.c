@@ -658,7 +658,7 @@ ZstdFileWriter_flush(ZstdFileWriter *self, PyObject *arg)
     STATE_FROM_OBJ(self);
 
     /* Mode argument */
-    mode = _PyLong_AsInt(arg);
+    mode = PyLong_AsInt(arg);
 
     assert(ZSTD_e_flush == 1 && ZSTD_e_end == 2);
     if (mode != ZSTD_e_flush && mode != ZSTD_e_end) {
