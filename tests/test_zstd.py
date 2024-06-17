@@ -1715,8 +1715,8 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         with self.assertRaises(ZstdError):
             d.decompress(self.FRAME_42 + self.TRAIL)
 
-        self.assertTrue(d.at_frame_edge) # resetted
-        self.assertTrue(d.needs_input)   # resetted
+        self.assertTrue(d.at_frame_edge) # has been reset
+        self.assertTrue(d.needs_input)   # has been reset
 
         # 2 frames, a
         d = EndlessZstdDecompressor()
@@ -2104,7 +2104,7 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
 
-    def test_train_buffer_protocal_samples(self):
+    def test_train_buffer_protocol_samples(self):
         def _nbytes(dat):
             if isinstance(dat, (bytes, bytearray)):
                 return len(dat)
@@ -2379,9 +2379,9 @@ class OutputBufferTestCase(unittest.TestCase):
         # 2 frame, the second frame's decompressed size is unknown
         for extra in [-1, 0, 1]:
             SIZE2 = self.BLOCK_SIZE[1] + self.BLOCK_SIZE[2] + extra
-            unkown_size = self.compress_unknown_size(SIZE2)
+            unknown_size = self.compress_unknown_size(SIZE2)
 
-            dat = decompress(known_size + unkown_size)
+            dat = decompress(known_size + unknown_size)
             self.assertEqual(len(dat), SIZE1 + SIZE2)
 
     # def test_large_output(self):

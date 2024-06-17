@@ -34,7 +34,7 @@ _nt_frame_info = namedtuple('frame_info',
                             ['decompressed_size', 'dictionary_id'])
 
 def get_frame_info(frame_buffer):
-    """Get zstd frame infomation from a frame header.
+    """Get zstd frame information from a frame header.
 
     Parameter
     frame_buffer: A bytes-like object. It should starts from the beginning of

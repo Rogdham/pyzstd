@@ -66,7 +66,7 @@ typedef struct {
     /* Thread lock for generating ZSTD_CDict/ZSTD_DDict */
     PyThread_type_lock lock;
 
-    /* Reuseable compress/decompress dictionary, they are created once and
+    /* Reusable compress/decompress dictionary, they are created once and
        can be shared by multiple threads concurrently, since its usage is
        read-only.
        c_dicts is a dict, int(compressionLevel):PyCapsule(ZSTD_CDict*) */

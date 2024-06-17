@@ -1128,7 +1128,7 @@ Advanced parameters
 
      .. py:attribute:: targetCBlockSize
 
-        Attempts to fit compressed block size into approximatively targetCBlockSize (in bytes). Note that it's not a guarantee, just a convergence target.
+        Attempts to fit compressed block size into approximately targetCBlockSize (in bytes). Note that it's not a guarantee, just a convergence target.
 
         This is helpful in low bandwidth streaming environments to improve end-to-end latency, when a client can make use of partial documents.
 
