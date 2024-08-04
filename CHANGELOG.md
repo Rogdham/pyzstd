@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## 0.16.1 (August 4, 2024)
+
+- Compatibility with Python 3.13
+
 ## 0.16.0 (May 20, 2024)
 
 - Upgrade zstd source code from v1.5.5 to [v1.5.6](https://github.com/facebook/zstd/releases/tag/v1.5.6)

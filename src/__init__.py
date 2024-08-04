@@ -17,7 +17,7 @@ except ImportError:
 from .zstdfile import *
 from .seekable_zstdfile import *
 
-__version__ = '0.16.0'
+__version__ = '0.16.1'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API style is
