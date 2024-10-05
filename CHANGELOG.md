@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Next version (Unreleased)
+
+- Build wheels for Python 3.13
+
 ## 0.16.1 (August 4, 2024)
 
 - Compatibility with Python 3.13

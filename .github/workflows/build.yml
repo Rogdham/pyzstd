@@ -12,7 +12,7 @@ on:
 env:
   PYTHON_VER: "3.11" # Python to run test/cibuildwheel
   CIBW_BUILD: >
-    cp38-* cp39-* cp310-* cp311-* cp312-*
+    cp38-* cp39-* cp310-* cp311-* cp312-* cp313-*
     pp38-* pp39-* pp310-*
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
