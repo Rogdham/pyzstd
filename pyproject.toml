@@ -1,5 +1,6 @@
 [build-system]
-# setuptools 64.0+ support --build-option
-requires = ["setuptools>=64.0"]
+# setuptools 64+ support --build-option
+# setuptools 74+ drops distutils.msvc9compiler required for Python 3.9 under Windows
+requires = ["setuptools>=64,<74"]
 backend-path = ["build_script"]
 build-backend = "pyzstd_pep517"
