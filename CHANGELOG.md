@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Next version (Unreleased)
+## 0.16.2 (October 10, 2024)
 
 - Build wheels for Python 3.13
 - Deprecate support for Python version before 3.9 and stop building wheels for them
