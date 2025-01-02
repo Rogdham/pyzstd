@@ -1470,42 +1470,65 @@ Use with tarfile module
 
     Python's `tarfile <https://docs.python.org/3/library/tarfile.html>`_ module supports arbitrary compression algorithms by providing a file object.
 
-    This code encapsulates a ``ZstdTarFile`` class using :py:class:`ZstdFile`, it can be used like `tarfile.TarFile <https://docs.python.org/3/library/tarfile.html#tarfile.TarFile>`_ class:
-
     .. sourcecode:: python
 
         import tarfile
 
-        # when using read mode (decompression), the level_or_option parameter
-        # can only be a dict object, that represents decompression option. It
-        # doesn't support int type compression level in this case.
+        # compression
+        with ZstdFile('archive.tar.zst', mode='w') as _fileobj, tarfile.open(fileobj=_fileobj, mode='w') as tar:
+            # do something
 
-        class ZstdTarFile(tarfile.TarFile):
-            def __init__(self, name, mode='r', *, level_or_option=None, zstd_dict=None, **kwargs):
-                self.zstd_file = ZstdFile(name, mode,
-                                          level_or_option=level_or_option,
-                                          zstd_dict=zstd_dict)
+        # decompression
+        with ZstdFile('archive.tar.zst', mode='r') as _fileobj, tarfile.open(fileobj=_fileobj) as tar:
+            # do something
+
+    Alternatively, it is possible to extend the ``Tarfile`` class, so that it supports decompressing ``.tar.zst`` file automatically, as well as adding the following modes: ``r:zst``, ``w:zst`` and ``x:zst``.
+
+    .. sourcecode:: python
+
+        from tarfile import TarFile, CompressionError, ReadError
+        from pyzstd import ZstdFile, ZstdError
+
+        class CustomTarFile(TarFile):
+
+            OPEN_METH = {
+                **TarFile.OPEN_METH,
+                'zst': 'zstopen'
+            }
+
+            @classmethod
+            def zstopen(cls, name, mode='r', fileobj=None, level_or_option=None, zstd_dict=None, **kwargs):
+                """Open zstd compressed tar archive name for reading or writing.
+                    Appending is not allowed.
+                """
+                if mode not in ('r', 'w', 'x'):
+                    raise ValueError("mode must be 'r', 'w' or 'x'")
+
+                fileobj = ZstdFile(fileobj or name, mode, level_or_option=level_or_option, zstd_dict=zstd_dict)
+
                 try:
-                    super().__init__(fileobj=self.zstd_file, mode=mode, **kwargs)
+                    tar = cls.taropen(name, mode, fileobj, **kwargs)
+                except (ZstdError, EOFError) as exception:
+                    fileobj.close()
+                    if mode == 'r':
+                        raise ReadError('not a zstd file') from exception
+                    raise
                 except:
-                    self.zstd_file.close()
+                    fileobj.close()
                     raise
 
-            def close(self):
-                try:
-                    super().close()
-                finally:
-                    self.zstd_file.close()
+                tar._extfileobj = False
+                return tar
 
-        # write .tar.zst file (compression)
-        with ZstdTarFile('archive.tar.zst', mode='w', level_or_option=5) as tar:
+        # compression
+        with CustomTarFile.open('archive.tar.zst', mode='w:zst') as tar:
             # do something
 
-        # read .tar.zst file (decompression)
-        with ZstdTarFile('archive.tar.zst', mode='r') as tar:
+        # decompression
+        with CustomTarFile.open('archive.tar.zst') as tar:
             # do something
 
-    When the above code is in read mode (decompression), and selectively read files multiple times, it may seek to a position before the current position, then the decompression has to be restarted from zero. If this slows down the operations, you can:
+    In both implementations, when selectively reading files multiple times, it may seek to a position before the current position; then the decompression has to be restarted from zero. If this slows down the operations, you can:
 
         #. Use :py:class:`SeekableZstdFile` class to create/read .tar.zst file.
         #. Decompress the archive to a temporary file, and read from it. This code encapsulates the process:
