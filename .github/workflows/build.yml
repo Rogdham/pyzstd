@@ -80,7 +80,6 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install python3-dbg
-          sudo python3-dbg -m pip install -U pip
           python3-dbg -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
           python3-dbg -m unittest discover tests
 
