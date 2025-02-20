@@ -60,6 +60,13 @@ class pyzstd_build_ext(build_ext):
         # Build debug build
         self.debug = self.PYZSTD_DEBUG
 
+        if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
+            # Remove -Wunreachable-code default args based on how Python was build
+            # see distutils.sysconfig.get_config_var("CFLAGS")
+            # see https://github.com/facebook/zstd/issues/4308
+            self.compiler.compiler = [part for part in self.compiler.compiler if part != '-Wunreachable-code']
+            self.compiler.compiler_so = [part for part in self.compiler.compiler_so if part != '-Wunreachable-code']
+
         for extension in self.extensions:
             if self.compiler.compiler_type in ('unix', 'mingw32', 'cygwin'):
                 # -g0:
