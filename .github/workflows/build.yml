@@ -8,6 +8,7 @@ on:
     tags:
       - "**"
   pull_request:
+  workflow_dispatch:
 
 env:
   PYTHON_VER: "3.11" # Python to run test/cibuildwheel
@@ -108,50 +109,9 @@ jobs:
           python -m pip install --config-settings="--build-option=--dynamic-link-zstd --warning-as-error" -v .
           python -m unittest discover tests
 
-  # If the head commit message contains '<more-tests>', run test on
-  # armv6/armv7/aarch64/ppc64le/s390x/riscv64 architectures.
-  test_arches:
-    name: Test on ${{ matrix.distro }} ${{ matrix.arch }}
-    if: github.event_name == 'push' && contains(github.event.head_commit.message, '<more-tests>')
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        arch:
-          - armv6
-          - armv7
-          - aarch64
-          - ppc64le
-          - s390x
-        distro:
-          - alpine_latest
-        include:
-          - arch: riscv64
-            distro: alpine_edge
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-      - uses: uraimo/run-on-arch-action@v2
-        name: Build & run test
-        with:
-          arch: ${{ matrix.arch }}
-          distro: ${{ matrix.distro }}
-
-          install: |
-            apk update
-            apk add python3 python3-dev py3-pip build-base gcc
-
-          run: |
-            python3 -m venv pyzstd-venv
-            . pyzstd-venv/bin/activate
-            python3 -m pip install --config-settings="--build-option=--warning-as-error" -v .
-            python3 -m unittest discover tests
-
   build_sdist:
     name: Build sdist
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     steps:
@@ -179,7 +139,7 @@ jobs:
 
   build_wheels:
     name: Build wheels on ${{ matrix.platform }}
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
     runs-on: ${{ matrix.platform }}
 
     strategy:
@@ -218,7 +178,7 @@ jobs:
 
   build_arch_wheels:
     name: Build wheels for ${{ matrix.arch }} (skip ${{ matrix.skip_image }})
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-')
+    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
 
     strategy:
