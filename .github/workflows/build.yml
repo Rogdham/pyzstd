@@ -14,7 +14,7 @@ env:
   PYTHON_VER: "3.11" # Python to run test/cibuildwheel
   CIBW_BUILD: >
     cp39-* cp310-* cp311-* cp312-* cp313-*
-    pp39-* pp310-*
+    pp39-* pp310-* pp311-*
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
@@ -92,6 +92,7 @@ jobs:
         py:
           - "pypy-3.9"
           - "pypy-3.10"
+          - "pypy-3.11"
 
     steps:
       - uses: actions/checkout@v4

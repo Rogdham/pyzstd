@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Support for PyPy 3.11
+
 ## 0.16.2 (October 10, 2024)
 
 - Build wheels for Python 3.13
