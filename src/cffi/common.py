@@ -31,6 +31,7 @@ class ZstdError(Exception):
     "Call to the underlying zstd library failed."
     pass
 
+@lru_cache(maxsize=None)
 def _get_param_bounds(is_compress, key):
     # Get parameter bounds
     if is_compress:
@@ -87,7 +88,6 @@ class CParameter(IntEnum):
     jobSize                    = m.ZSTD_c_jobSize
     overlapLog                 = m.ZSTD_c_overlapLog
 
-    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
@@ -98,7 +98,6 @@ class DParameter(IntEnum):
 
     windowLogMax = m.ZSTD_d_windowLogMax
 
-    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter

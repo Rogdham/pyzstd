@@ -54,6 +54,9 @@ def get_frame_info(frame_buffer):
     ret_tuple = _zstd._get_frame_info(frame_buffer)
     return _nt_frame_info(*ret_tuple)
 
+@lru_cache(maxsize=None)
+def _get_param_bounds(zstd_param, zstd_param_val):
+    return _zstd._get_param_bounds(zstd_param, zstd_param_val)
 
 class _UnsupportedCParameter:
     def __set_name__(self, _, name):
@@ -97,11 +100,10 @@ class CParameter(IntEnum):
     jobSize                    = _zstd._ZSTD_c_jobSize
     overlapLog                 = _zstd._ZSTD_c_overlapLog
 
-    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
-        return _zstd._get_param_bounds(1, self.value)
+        return _get_param_bounds(1, self.value)
 
 
 class DParameter(IntEnum):
@@ -109,11 +111,10 @@ class DParameter(IntEnum):
 
     windowLogMax = _zstd._ZSTD_d_windowLogMax
 
-    @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter
-        return _zstd._get_param_bounds(0, self.value)
+        return _get_param_bounds(0, self.value)
 
 
 class Strategy(IntEnum):
