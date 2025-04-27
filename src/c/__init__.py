@@ -2,8 +2,61 @@ from collections import namedtuple
 from enum import IntEnum
 from functools import lru_cache
 
-from ._zstd import *
-from . import _zstd
+from ._zstd import (
+    EndlessZstdDecompressor,
+    PYZSTD_CONFIG,
+    RichMemZstdCompressor,
+    ZstdCompressor,
+    ZstdDecompressor,
+    ZstdDict,
+    ZstdError,
+    ZstdFileReader,
+    ZstdFileWriter,
+    _ZSTD_CStreamSizes,
+    _ZSTD_DStreamSizes,
+    _ZSTD_btlazy2,
+    _ZSTD_btopt,
+    _ZSTD_btultra,
+    _ZSTD_btultra2,
+    _ZSTD_c_chainLog,
+    _ZSTD_c_checksumFlag,
+    _ZSTD_c_compressionLevel,
+    _ZSTD_c_contentSizeFlag,
+    _ZSTD_c_dictIDFlag,
+    _ZSTD_c_enableLongDistanceMatching,
+    _ZSTD_c_hashLog,
+    _ZSTD_c_jobSize,
+    _ZSTD_c_ldmBucketSizeLog,
+    _ZSTD_c_ldmHashLog,
+    _ZSTD_c_ldmHashRateLog,
+    _ZSTD_c_ldmMinMatch,
+    _ZSTD_c_minMatch,
+    _ZSTD_c_nbWorkers,
+    _ZSTD_c_overlapLog,
+    _ZSTD_c_searchLog,
+    _ZSTD_c_strategy,
+    _ZSTD_c_targetCBlockSize,
+    _ZSTD_c_targetLength,
+    _ZSTD_c_windowLog,
+    _ZSTD_d_windowLogMax,
+    _ZSTD_dfast,
+    _ZSTD_fast,
+    _ZSTD_greedy,
+    _ZSTD_lazy,
+    _ZSTD_lazy2,
+    _compressionLevel_values,
+    _finalize_dict,
+    _get_frame_info,
+    _get_param_bounds,
+    _set_parameter_types,
+    _train_dict,
+    compress_stream,
+    decompress,
+    decompress_stream,
+    get_frame_size,
+    zstd_version,
+    zstd_version_info
+)
 
 __all__ = (# From this file
            'compressionLevel_values', 'get_frame_info',
@@ -19,15 +72,10 @@ __all__ = (# From this file
            '_ZSTD_CStreamSizes', '_ZSTD_DStreamSizes',
            'PYZSTD_CONFIG')
 
-_ZSTD_CStreamSizes = _zstd._ZSTD_CStreamSizes
-_ZSTD_DStreamSizes = _zstd._ZSTD_DStreamSizes
-_train_dict = _zstd._train_dict
-_finalize_dict = _zstd._finalize_dict
-
 
 # compressionLevel_values
 _nt_values = namedtuple('values', ['default', 'min', 'max'])
-compressionLevel_values = _nt_values(*_zstd._compressionLevel_values)
+compressionLevel_values = _nt_values(*_compressionLevel_values)
 
 
 _nt_frame_info = namedtuple('frame_info',
@@ -51,7 +99,7 @@ def get_frame_info(frame_buffer):
 
     It's possible to append more items to the namedtuple in the future."""
 
-    ret_tuple = _zstd._get_frame_info(frame_buffer)
+    ret_tuple = _get_frame_info(frame_buffer)
     return _nt_frame_info(*ret_tuple)
 
 
@@ -70,50 +118,50 @@ class _UnsupportedCParameter:
 class CParameter(IntEnum):
     """Compression parameters"""
 
-    compressionLevel           = _zstd._ZSTD_c_compressionLevel
-    windowLog                  = _zstd._ZSTD_c_windowLog
-    hashLog                    = _zstd._ZSTD_c_hashLog
-    chainLog                   = _zstd._ZSTD_c_chainLog
-    searchLog                  = _zstd._ZSTD_c_searchLog
-    minMatch                   = _zstd._ZSTD_c_minMatch
-    targetLength               = _zstd._ZSTD_c_targetLength
-    strategy                   = _zstd._ZSTD_c_strategy
+    compressionLevel           = _ZSTD_c_compressionLevel
+    windowLog                  = _ZSTD_c_windowLog
+    hashLog                    = _ZSTD_c_hashLog
+    chainLog                   = _ZSTD_c_chainLog
+    searchLog                  = _ZSTD_c_searchLog
+    minMatch                   = _ZSTD_c_minMatch
+    targetLength               = _ZSTD_c_targetLength
+    strategy                   = _ZSTD_c_strategy
     if zstd_version_info >= (1, 5, 6):
-        targetCBlockSize       = _zstd._ZSTD_c_targetCBlockSize
+        targetCBlockSize       = _ZSTD_c_targetCBlockSize
     else:
         targetCBlockSize       = _UnsupportedCParameter()
 
-    enableLongDistanceMatching = _zstd._ZSTD_c_enableLongDistanceMatching
-    ldmHashLog                 = _zstd._ZSTD_c_ldmHashLog
-    ldmMinMatch                = _zstd._ZSTD_c_ldmMinMatch
-    ldmBucketSizeLog           = _zstd._ZSTD_c_ldmBucketSizeLog
-    ldmHashRateLog             = _zstd._ZSTD_c_ldmHashRateLog
+    enableLongDistanceMatching = _ZSTD_c_enableLongDistanceMatching
+    ldmHashLog                 = _ZSTD_c_ldmHashLog
+    ldmMinMatch                = _ZSTD_c_ldmMinMatch
+    ldmBucketSizeLog           = _ZSTD_c_ldmBucketSizeLog
+    ldmHashRateLog             = _ZSTD_c_ldmHashRateLog
 
-    contentSizeFlag            = _zstd._ZSTD_c_contentSizeFlag
-    checksumFlag               = _zstd._ZSTD_c_checksumFlag
-    dictIDFlag                 = _zstd._ZSTD_c_dictIDFlag
+    contentSizeFlag            = _ZSTD_c_contentSizeFlag
+    checksumFlag               = _ZSTD_c_checksumFlag
+    dictIDFlag                 = _ZSTD_c_dictIDFlag
 
-    nbWorkers                  = _zstd._ZSTD_c_nbWorkers
-    jobSize                    = _zstd._ZSTD_c_jobSize
-    overlapLog                 = _zstd._ZSTD_c_overlapLog
+    nbWorkers                  = _ZSTD_c_nbWorkers
+    jobSize                    = _ZSTD_c_jobSize
+    overlapLog                 = _ZSTD_c_overlapLog
 
     @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
         # 1 means compression parameter
-        return _zstd._get_param_bounds(1, self.value)
+        return _get_param_bounds(1, self.value)
 
 
 class DParameter(IntEnum):
     """Decompression parameters"""
 
-    windowLogMax = _zstd._ZSTD_d_windowLogMax
+    windowLogMax = _ZSTD_d_windowLogMax
 
     @lru_cache(maxsize=None)
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
         # 0 means decompression parameter
-        return _zstd._get_param_bounds(0, self.value)
+        return _get_param_bounds(0, self.value)
 
 
 class Strategy(IntEnum):
@@ -122,16 +170,16 @@ class Strategy(IntEnum):
     Note : new strategies _might_ be added in the future, only the order
     (from fast to strong) is guaranteed.
     """
-    fast     = _zstd._ZSTD_fast
-    dfast    = _zstd._ZSTD_dfast
-    greedy   = _zstd._ZSTD_greedy
-    lazy     = _zstd._ZSTD_lazy
-    lazy2    = _zstd._ZSTD_lazy2
-    btlazy2  = _zstd._ZSTD_btlazy2
-    btopt    = _zstd._ZSTD_btopt
-    btultra  = _zstd._ZSTD_btultra
-    btultra2 = _zstd._ZSTD_btultra2
+    fast     = _ZSTD_fast
+    dfast    = _ZSTD_dfast
+    greedy   = _ZSTD_greedy
+    lazy     = _ZSTD_lazy
+    lazy2    = _ZSTD_lazy2
+    btlazy2  = _ZSTD_btlazy2
+    btopt    = _ZSTD_btopt
+    btultra  = _ZSTD_btultra
+    btultra2 = _ZSTD_btultra2
 
 
 # Set CParameter/DParameter types for validity check
-_zstd._set_parameter_types(CParameter, DParameter)
+_set_parameter_types(CParameter, DParameter)

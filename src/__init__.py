@@ -1,10 +1,60 @@
 try:
     # Import C implementation
-    from .c import *
+    from .c import (
+        CParameter,
+        DParameter,
+        EndlessZstdDecompressor,
+        PYZSTD_CONFIG,
+        RichMemZstdCompressor,
+        Strategy,
+        ZstdCompressor,
+        ZstdDecompressor,
+        ZstdDict,
+        ZstdError,
+        ZstdFileReader,
+        ZstdFileWriter,
+        _ZSTD_CStreamSizes,
+        _ZSTD_DStreamSizes,
+        _finalize_dict,
+        _train_dict,
+        compress_stream,
+        compressionLevel_values,
+        decompress,
+        decompress_stream,
+        get_frame_info,
+        get_frame_size,
+        zstd_version,
+        zstd_version_info
+    )
 except ImportError:
     try:
         # Import CFFI implementation
-        from .cffi import *
+        from .cffi import (
+            CParameter,
+            DParameter,
+            EndlessZstdDecompressor,
+            PYZSTD_CONFIG,
+            RichMemZstdCompressor,
+            Strategy,
+            ZstdCompressor,
+            ZstdDecompressor,
+            ZstdDict,
+            ZstdError,
+            ZstdFileReader,
+            ZstdFileWriter,
+            _ZSTD_CStreamSizes,
+            _ZSTD_DStreamSizes,
+            _finalize_dict,
+            _train_dict,
+            compress_stream,
+            compressionLevel_values,
+            decompress,
+            decompress_stream,
+            get_frame_info,
+            get_frame_size,
+            zstd_version,
+            zstd_version_info
+        )
     except ImportError:
         raise ImportError(
             "\n\npyzstd module: Can't import compiled .so/.pyd file.\n"
@@ -14,8 +64,8 @@ except ImportError:
             "   that has libzstd.dll should be added by os.add_dll_directory() function.\n"
             "2, Please install pyzstd module through pip, to ensure that compiled\n"
             "   .so/.pyd file matches the architecture/OS/Python.\n")
-from .zstdfile import *
-from .seekable_zstdfile import *
+from .zstdfile import ZstdFile, open
+from .seekable_zstdfile import SeekableFormatError, SeekableZstdFile
 
 __version__ = '0.16.2'
 

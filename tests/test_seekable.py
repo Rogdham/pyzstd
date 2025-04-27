@@ -12,7 +12,19 @@ from io import BytesIO
 from math import ceil
 from unittest.mock import patch
 
-from pyzstd import *
+from pyzstd import (
+    compress,
+    CParameter,
+    decompress,
+    DParameter,
+    get_frame_size,
+    SeekableZstdFile,
+    SeekableFormatError,
+    ZstdCompressor,
+    ZstdDict,
+    ZstdError,
+    ZstdFile
+)
 from pyzstd import PYZSTD_CONFIG # type: ignore
 from pyzstd.seekable_zstdfile import SeekTable
 
