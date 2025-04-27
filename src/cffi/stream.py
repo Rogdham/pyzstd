@@ -33,6 +33,12 @@ def compress_stream(input_stream, output_stream, *,
     """Compresses input_stream and writes the compressed data to output_stream, it
     doesn't close the streams.
 
+    ----
+    DEPRECATION NOTICE
+    The (de)compress_stream are deprecated and will be removed in a future version.
+    See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives
+    ----
+
     If input stream is b'', nothing will be written to output stream.
 
     Return a tuple, (total_input, total_output), the items are int objects.
@@ -203,6 +209,12 @@ def decompress_stream(input_stream, output_stream, *,
                       callback = None):
     """Decompresses input_stream and writes the decompressed data to output_stream,
     it doesn't close the streams.
+
+    ----
+    DEPRECATION NOTICE
+    The (de)compress_stream are deprecated and will be removed in a future version.
+    See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives
+    ----
 
     Supports multiple concatenated frames.
 

@@ -204,6 +204,7 @@ def do_setup():
         url='https://github.com/Rogdham/pyzstd',
         license='BSD-3-Clause',
         python_requires='>=3.5',
+        install_requires=["typing-extensions>=4.13.2 ; python_version<'3.13'"],
 
         classifiers=[
             "Development Status :: 5 - Production/Stable",
@@ -229,7 +230,7 @@ def do_setup():
         test_suite='tests'
     )
 
-    if sys.version_info < (3, 8):
+    if sys.version_info < (3, 9):
         print()
         print("WARNING")
         print("    Python {} has reached end of life.".format(platform.python_version()))

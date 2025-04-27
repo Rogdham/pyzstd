@@ -17,10 +17,10 @@ try:
         _ZSTD_DStreamSizes,
         _finalize_dict,
         _train_dict,
-        compress_stream,
+        compress_stream as _compress_stream,
         compressionLevel_values,
         decompress,
-        decompress_stream,
+        decompress_stream as _decompress_stream,
         get_frame_info,
         get_frame_size,
         zstd_version,
@@ -46,10 +46,10 @@ except ImportError:
             _ZSTD_DStreamSizes,
             _finalize_dict,
             _train_dict,
-            compress_stream,
+            compress_stream as _compress_stream,
             compressionLevel_values,
             decompress,
-            decompress_stream,
+            decompress_stream as _decompress_stream,
             get_frame_info,
             get_frame_size,
             zstd_version,
@@ -66,6 +66,14 @@ except ImportError:
             "   .so/.pyd file matches the architecture/OS/Python.\n")
 from .zstdfile import ZstdFile, open
 from .seekable_zstdfile import SeekableFormatError, SeekableZstdFile
+
+from functools import wraps
+
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
+
 
 __version__ = '0.16.2'
 
@@ -223,3 +231,14 @@ def finalize_dict(zstd_dict, samples, dict_size, level):
                                   dict_size, level)
 
     return ZstdDict(dict_content)
+
+
+@wraps(_compress_stream)
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.compress_stream")
+def compress_stream(*args, **kwargs):
+    return _compress_stream(*args, **kwargs)
+
+@wraps(_decompress_stream)
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream")
+def decompress_stream(*args, **kwargs):
+    return _decompress_stream(*args, **kwargs)

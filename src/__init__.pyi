@@ -5,6 +5,11 @@ from typing import overload, Dict, ByteString, Optional, Union, Callable, \
                    Iterable, Literal, ClassVar, Tuple, NamedTuple, BinaryIO, \
                    TextIO
 
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
+
 __version__: str
 zstd_version: str
 zstd_version_info: Tuple[int, int, int]
@@ -146,6 +151,7 @@ def decompress(data: ByteString,
                zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                option: Optional[Dict[DParameter, int]] = None) -> bytes: ...
 
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.compress_stream")
 def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
                     level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                     zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
@@ -153,6 +159,7 @@ def compress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None]
                     read_size: int = 131_072, write_size: int = 131_591,
                     callback: Optional[Callable[[int, int, memoryview, memoryview], None]] = None) -> Tuple[int, int]: ...
 
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream")
 def decompress_stream(input_stream: BinaryIO, output_stream: Union[BinaryIO, None], *,
                       zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None,
                       option: Optional[Dict[DParameter, int]] = None,

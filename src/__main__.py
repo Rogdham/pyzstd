@@ -2,9 +2,10 @@
 # CLI of pyzstd module: python -m pyzstd --help
 import argparse
 import os
+from shutil import copyfileobj
 from time import time
 
-from pyzstd import compress_stream, decompress_stream, \
+from pyzstd import \
                    CParameter, DParameter, \
                    train_dict, ZstdDict, ZstdFile, \
                    compressionLevel_values, zstd_version, \
@@ -13,14 +14,6 @@ from pyzstd import compress_stream, decompress_stream, \
 # buffer sizes recommended by zstd
 C_READ_BUFFER = 131072
 D_READ_BUFFER = 131075
-
-def progress_bar(progress, total, width=50):
-    # documented behavior: if input stream is empty, the callback
-    # function will not be called. so no ZeroDivisionError here.
-    percent = (progress + 1) / total
-    now = int(width * percent)
-    bar = "+" * now + "-" * (width - now)
-    print("|%s| %.2f%%" % (bar, 100*percent), end="\r", flush=True)
 
 # open output file and assign to args.output
 def open_output(args, path):
@@ -78,9 +71,6 @@ def compress_option(args):
     return option
 
 def compress(args):
-    # input file size
-    input_file_size = os.path.getsize(args.input.name)
-
     # output file
     if args.output is None:
         open_output(args, args.input.name + '.zst')
@@ -97,47 +87,43 @@ def compress(args):
     option = compress_option(args)
 
     # compress
-    def cb(total_input, total_output, read_data, write_data):
-        progress_bar(total_input, input_file_size)
     t1 = time()
-    ret = compress_stream(args.input, args.output,
-                          level_or_option=option,
-                          zstd_dict=args.zd,
-                          pledged_input_size=input_file_size,
-                          callback=cb)
+    with ZstdFile(args.output, 'w', level_or_option=option, zstd_dict=args.zd) as fout:
+        copyfileobj(args.input, fout)
     t2 = time()
+    in_size = args.input.tell()
+    out_size = args.output.tell()
     close_files(args)
 
     # post-compress message
-    if ret[0] != 0:
-        ratio = 100 * ret[1] / ret[0]
+    if in_size != 0:
+        ratio = 100 * out_size / in_size
     else:
         ratio = 100.0
     msg = ('\nCompression succeeded, {:.2f} seconds.\n'
            'Input {:,} bytes, output {:,} bytes, ratio {:.2f}%.\n').format(
-            t2-t1, *ret, ratio)
+            t2-t1, in_size, out_size, ratio)
     print(msg)
 
 def decompress(args):
-    # input file size
-    input_file_size = os.path.getsize(args.input.name)
-
     # output file
-    if args.output is None and args.test is None:
-        from re import subn
+    if args.output is None:
+        if args.test is None:
+            from re import subn
 
-        out_path, replaced = subn(r'(?i)^(.*)\.zst$', r'\1', args.input.name)
-        if not replaced:
-            out_path = args.input.name + '.decompressed'
+            out_path, replaced = subn(r'(?i)^(.*)\.zst$', r'\1', args.input.name)
+            if not replaced:
+                out_path = args.input.name + '.decompressed'
+        else:
+            out_path = os.devnull
         open_output(args, out_path)
 
     # option
     option = {DParameter.windowLogMax: args.windowLogMax}
 
     # pre-decompress message
-    if args.output is not None:
-        output_name = args.output.name
-    else:
+    output_name = args.output.name
+    if output_name == os.devnull:
         output_name = 'None'
     print(('Decompress file:\n'
            ' - input file : {}\n'
@@ -146,23 +132,22 @@ def decompress(args):
             args.input.name, output_name, args.zd))
 
     # decompress
-    def cb(total_input, total_output, read_data, write_data):
-        progress_bar(total_input, input_file_size)
     t1 = time()
-    ret = decompress_stream(args.input, args.output,
-                            zstd_dict=args.zd, option=option,
-                            callback=cb)
+    with ZstdFile(args.input, level_or_option=option, zstd_dict=args.zd) as fin:
+        copyfileobj(fin, args.output)
     t2 = time()
+    in_size = args.input.tell()
+    out_size = args.output.tell()
     close_files(args)
 
     # post-decompress message
-    if ret[1] != 0:
-        ratio = 100 * ret[0] / ret[1]
+    if out_size != 0:
+        ratio = 100 * in_size / out_size
     else:
         ratio = 100.0
     msg = ('\nDecompression succeeded, {:.2f} seconds.\n'
            'Input {:,} bytes, output {:,} bytes, ratio {:.2f}%.\n').format(
-            t2-t1, *ret, ratio)
+            t2-t1, in_size, out_size, ratio)
     print(msg)
 
 def train(args):

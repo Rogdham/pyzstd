@@ -1,4 +1,5 @@
 from io import BytesIO, UnsupportedOperation
+from contextlib import contextmanager
 import builtins
 import gc
 import itertools
@@ -14,6 +15,7 @@ import random
 import subprocess
 import tempfile
 import unittest
+import warnings
 
 import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
@@ -86,6 +88,21 @@ TRAINED_DICT = None
 
 KB = 1024
 MB = 1024*1024
+
+@contextmanager
+def _check_deprecated(testcase):
+    with warnings.catch_warnings(record=True) as warns:
+        yield
+    testcase.assertEqual(len(warns), 1)
+    warn = warns[0]
+    testcase.assertEqual(warn.category, DeprecationWarning)
+    testcase.assertIn(
+        str(warn.message),
+        [
+            "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.compress_stream",
+            "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream",
+        ]
+    )
 
 def setUpModule():
     # uncompressed size 130KB, more than a zstd block.
@@ -1222,7 +1239,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         # output b''
         bi = BytesIO(b'')
         bo = BytesIO()
-        ret = compress_stream(bi, bo)
+        with _check_deprecated(self):
+            ret = compress_stream(bi, bo)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
@@ -1242,7 +1260,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         bi = BytesIO(b'')
         bo = BytesIO()
-        ret = decompress_stream(bi, bo)
+        with _check_deprecated(self):
+            ret = decompress_stream(bi, bo)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
@@ -3710,10 +3729,11 @@ class StreamFunctionsTestCase(unittest.TestCase):
     def test_compress_stream(self):
         bi = BytesIO(THIS_FILE_BYTES)
         bo = BytesIO()
-        ret = compress_stream(bi, bo,
-                              level_or_option=1, zstd_dict=TRAINED_DICT,
-                              pledged_input_size=2**64-1, # backward compatible
-                              read_size=200*KB, write_size=200*KB)
+        with _check_deprecated(self):
+            ret = compress_stream(bi, bo,
+                                level_or_option=1, zstd_dict=TRAINED_DICT,
+                                pledged_input_size=2**64-1, # backward compatible
+                                read_size=200*KB, write_size=200*KB)
         output = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(output)))
         self.assertEqual(decompress(output, TRAINED_DICT), THIS_FILE_BYTES)
@@ -3723,7 +3743,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # empty input
         bi = BytesIO()
         bo = BytesIO()
-        ret = compress_stream(bi, bo, pledged_input_size=None)
+        with _check_deprecated(self):
+            ret = compress_stream(bi, bo, pledged_input_size=None)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
@@ -3733,14 +3754,16 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bi = BytesIO(THIS_FILE_BYTES)
         bo = BytesIO()
         with self.assertRaises(ZstdError):
-            compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)-1)
+            with _check_deprecated(self):
+                compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)-1)
         bi.close()
         bo.close()
 
         bi = BytesIO(THIS_FILE_BYTES)
         bo = BytesIO()
         with self.assertRaises(ZstdError):
-            compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)+1)
+            with _check_deprecated(self):
+                compress_stream(bi, bo, pledged_input_size=len(THIS_FILE_BYTES)+1)
         bi.close()
         bo.close()
 
@@ -3748,25 +3771,35 @@ class StreamFunctionsTestCase(unittest.TestCase):
         b1 = BytesIO()
         b2 = BytesIO()
         with self.assertRaisesRegex(TypeError, r'input_stream'):
-            compress_stream(123, b1)
+            with _check_deprecated(self):
+                compress_stream(123, b1)
         with self.assertRaisesRegex(TypeError, r'output_stream'):
-            compress_stream(b1, 123)
+            with _check_deprecated(self):
+                compress_stream(b1, 123)
         with self.assertRaisesRegex(TypeError, r'level_or_option'):
-            compress_stream(b1, b2, level_or_option='3')
+            with _check_deprecated(self):
+                compress_stream(b1, b2, level_or_option='3')
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
-            compress_stream(b1, b2, zstd_dict={})
+            with _check_deprecated(self):
+                compress_stream(b1, b2, zstd_dict={})
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
-            compress_stream(b1, b2, zstd_dict=b'1234567890')
+            with _check_deprecated(self):
+                compress_stream(b1, b2, zstd_dict=b'1234567890')
         with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
-            compress_stream(b1, b2, pledged_input_size=-1)
+            with _check_deprecated(self):
+                compress_stream(b1, b2, pledged_input_size=-1)
         with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
-            compress_stream(b1, b2, pledged_input_size=2**64+1)
+            with _check_deprecated(self):
+                compress_stream(b1, b2, pledged_input_size=2**64+1)
         with self.assertRaisesRegex(ValueError, r'read_size'):
-            compress_stream(b1, b2, read_size=-1)
+            with _check_deprecated(self):
+                compress_stream(b1, b2, read_size=-1)
         with self.assertRaises(OverflowError):
-            compress_stream(b1, b2, write_size=2**64+1)
+            with _check_deprecated(self):
+                compress_stream(b1, b2, write_size=2**64+1)
         with self.assertRaisesRegex(TypeError, r'callback'):
-            compress_stream(b1, None, callback=None)
+            with _check_deprecated(self):
+                compress_stream(b1, None, callback=None)
         b1.close()
         b2.close()
 
@@ -3782,9 +3815,10 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         option = {CParameter.compressionLevel : 1,
                   CParameter.checksumFlag : 1}
-        ret = compress_stream(bi, bo, level_or_option=option,
-                              read_size=701, write_size=101,
-                              callback=func)
+        with _check_deprecated(self):
+            ret = compress_stream(bi, bo, level_or_option=option,
+                                read_size=701, write_size=101,
+                                callback=func)
         bi.close()
         bo.close()
 
@@ -3806,8 +3840,9 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         bi = BytesIO(b)
         bo = BytesIO()
-        ret = compress_stream(bi, bo, level_or_option=option,
-                              pledged_input_size=len(b))
+        with _check_deprecated(self):
+            ret = compress_stream(bi, bo, level_or_option=option,
+                                pledged_input_size=len(b))
         output = bo.getvalue()
         self.assertEqual(ret, (len(b), len(output)))
         self.assertEqual(decompress(output), b)
@@ -3817,9 +3852,10 @@ class StreamFunctionsTestCase(unittest.TestCase):
     def test_decompress_stream(self):
         bi = BytesIO(COMPRESSED_THIS_FILE)
         bo = BytesIO()
-        ret = decompress_stream(bi, bo,
-                                option={DParameter.windowLogMax:26},
-                                read_size=200*KB, write_size=200*KB)
+        with _check_deprecated(self):
+            ret = decompress_stream(bi, bo,
+                                    option={DParameter.windowLogMax:26},
+                                    read_size=200*KB, write_size=200*KB)
         self.assertEqual(ret, (len(COMPRESSED_THIS_FILE), len(THIS_FILE_BYTES)))
         self.assertEqual(bo.getvalue(), THIS_FILE_BYTES)
         bi.close()
@@ -3828,7 +3864,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         # empty input
         bi = BytesIO()
         bo = BytesIO()
-        ret = decompress_stream(bi, bo)
+        with _check_deprecated(self):
+            ret = decompress_stream(bi, bo)
         self.assertEqual(ret, (0, 0))
         self.assertEqual(bo.getvalue(), b'')
         bi.close()
@@ -3838,21 +3875,29 @@ class StreamFunctionsTestCase(unittest.TestCase):
         b1 = BytesIO()
         b2 = BytesIO()
         with self.assertRaisesRegex(TypeError, r'input_stream'):
-            decompress_stream(123, b1)
+            with _check_deprecated(self):
+                decompress_stream(123, b1)
         with self.assertRaisesRegex(TypeError, r'output_stream'):
-            decompress_stream(b1, 123)
+            with _check_deprecated(self):
+                decompress_stream(b1, 123)
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
-            decompress_stream(b1, b2, zstd_dict={})
+            with _check_deprecated(self):
+                decompress_stream(b1, b2, zstd_dict={})
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
-            decompress_stream(b1, b2, zstd_dict=b'1234567890')
+            with _check_deprecated(self):
+                decompress_stream(b1, b2, zstd_dict=b'1234567890')
         with self.assertRaisesRegex(TypeError, r'option'):
-            decompress_stream(b1, b2, option=3)
+            with _check_deprecated(self):
+                decompress_stream(b1, b2, option=3)
         with self.assertRaisesRegex(ValueError, r'read_size'):
-            decompress_stream(b1, b2, read_size=-1)
+            with _check_deprecated(self):
+                decompress_stream(b1, b2, read_size=-1)
         with self.assertRaises(OverflowError):
-            decompress_stream(b1, b2, write_size=2**64+1)
+            with _check_deprecated(self):
+                decompress_stream(b1, b2, write_size=2**64+1)
         with self.assertRaisesRegex(TypeError, r'callback'):
-            decompress_stream(b1, None, callback=None)
+            with _check_deprecated(self):
+                decompress_stream(b1, None, callback=None)
         b1.close()
         b2.close()
 
@@ -3867,9 +3912,10 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bo = BytesIO()
 
         option = {DParameter.windowLogMax : 26}
-        ret = decompress_stream(bi, bo, option=option,
-                                read_size=701, write_size=401,
-                                callback=func)
+        with _check_deprecated(self):
+            ret = decompress_stream(bi, bo, option=option,
+                                    read_size=701, write_size=401,
+                                    callback=func)
         bi.close()
         bo.close()
 
@@ -3884,7 +3930,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         dat = (COMPRESSED_100_PLUS_32KB + SKIPPABLE_FRAME) * 2
         bi = BytesIO(dat)
         bo = BytesIO()
-        ret = decompress_stream(bi, bo, read_size=200*KB, write_size=50*KB)
+        with _check_deprecated(self):
+            ret = decompress_stream(bi, bo, read_size=200*KB, write_size=50*KB)
         output = bo.getvalue()
         self.assertEqual(ret, (len(dat), len(output)))
         self.assertEqual(output, DECOMPRESSED_100_PLUS_32KB + DECOMPRESSED_100_PLUS_32KB)
@@ -3895,7 +3942,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         bi = BytesIO(dat[:-1])
         bo = BytesIO()
         with self.assertRaisesRegex(ZstdError, 'incomplete'):
-            decompress_stream(bi, bo)
+            with _check_deprecated(self):
+                decompress_stream(bi, bo)
         bi.close()
         bo.close()
 
@@ -3908,13 +3956,17 @@ class StreamFunctionsTestCase(unittest.TestCase):
                 return 'a'
 
         with self.assertRaises(TypeError):
-            compress_stream(M(), BytesIO())
+            with _check_deprecated(self):
+                compress_stream(M(), BytesIO())
         with self.assertRaises(TypeError):
-            decompress_stream(M(), BytesIO())
+            with _check_deprecated(self):
+                decompress_stream(M(), BytesIO())
         with self.assertRaises(TypeError):
-            compress_stream(BytesIO(THIS_FILE_BYTES), M())
+            with _check_deprecated(self):
+                compress_stream(BytesIO(THIS_FILE_BYTES), M())
         with self.assertRaises(TypeError):
-            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), M())
+            with _check_deprecated(self):
+                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), M())
 
         # wrong value
         class N:
@@ -3927,55 +3979,69 @@ class StreamFunctionsTestCase(unittest.TestCase):
 
         # < 0
         with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
-            compress_stream(N(-1), BytesIO())
+            with _check_deprecated(self):
+                compress_stream(N(-1), BytesIO())
         with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
-            decompress_stream(N(-2), BytesIO())
+            with _check_deprecated(self):
+                decompress_stream(N(-2), BytesIO())
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            compress_stream(BytesIO(THIS_FILE_BYTES), N(-2))
+            with _check_deprecated(self):
+                compress_stream(BytesIO(THIS_FILE_BYTES), N(-2))
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(-1))
+            with _check_deprecated(self):
+                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(-1))
 
         # should > upper bound (~128 KiB)
         with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
-            compress_stream(N(10000000), BytesIO())
+            with _check_deprecated(self):
+                compress_stream(N(10000000), BytesIO())
         with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
-            decompress_stream(N(10000000), BytesIO())
+            with _check_deprecated(self):
+                decompress_stream(N(10000000), BytesIO())
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            compress_stream(BytesIO(THIS_FILE_BYTES), N(10000000))
+            with _check_deprecated(self):
+                compress_stream(BytesIO(THIS_FILE_BYTES), N(10000000))
         with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
+            with _check_deprecated(self):
+                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
     def test_empty_input_no_callback(self):
         def cb(a,b,c,d):
             self.fail('callback function should not be called')
         # callback function will not be called for empty input,
         # it's a promised behavior.
-        compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
-        decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+        with _check_deprecated(self):
+            compress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
+        with _check_deprecated(self):
+            decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
 
     def test_stream_dict(self):
         zd = ZstdDict(THIS_FILE_BYTES, True)
 
         # default
         with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
-            ret = compress_stream(bi, bo, zstd_dict=zd)
+            with _check_deprecated(self):
+                ret = compress_stream(bi, bo, zstd_dict=zd)
             compressed = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
 
         with BytesIO(compressed) as bi, BytesIO() as bo:
-            ret = decompress_stream(bi, bo, zstd_dict=zd)
+            with _check_deprecated(self):
+                ret = decompress_stream(bi, bo, zstd_dict=zd)
             decompressed = bo.getvalue()
         self.assertEqual(ret, (len(compressed), len(decompressed)))
         self.assertEqual(decompressed, THIS_FILE_BYTES)
 
         # .as_(un)digested_dict
         with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
-            ret = compress_stream(bi, bo, zstd_dict=zd.as_undigested_dict)
+            with _check_deprecated(self):
+                ret = compress_stream(bi, bo, zstd_dict=zd.as_undigested_dict)
             compressed = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
 
         with BytesIO(compressed) as bi, BytesIO() as bo:
-            ret = decompress_stream(bi, bo, zstd_dict=zd.as_digested_dict)
+            with _check_deprecated(self):
+                ret = decompress_stream(bi, bo, zstd_dict=zd.as_digested_dict)
             decompressed = bo.getvalue()
         self.assertEqual(ret, (len(compressed), len(decompressed)))
         self.assertEqual(decompressed, THIS_FILE_BYTES)
@@ -3984,12 +4050,14 @@ class StreamFunctionsTestCase(unittest.TestCase):
         zd = ZstdDict(THIS_FILE_BYTES, True)
 
         with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
-            ret = compress_stream(bi, bo, zstd_dict=zd.as_prefix)
+            with _check_deprecated(self):
+                ret = compress_stream(bi, bo, zstd_dict=zd.as_prefix)
             compressed = bo.getvalue()
         self.assertEqual(ret, (len(THIS_FILE_BYTES), len(compressed)))
 
         with BytesIO(compressed) as bi, BytesIO() as bo:
-            ret = decompress_stream(bi, bo, zstd_dict=zd.as_prefix)
+            with _check_deprecated(self):
+                ret = decompress_stream(bi, bo, zstd_dict=zd.as_prefix)
             decompressed = bo.getvalue()
         self.assertEqual(ret, (len(compressed), len(decompressed)))
         self.assertEqual(decompressed, THIS_FILE_BYTES)
