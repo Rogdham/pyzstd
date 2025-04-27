@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 - Upgrade zstd source code from v1.5.6 to [v1.5.7](https://github.com/facebook/zstd/releases/tag/v1.5.7)
+- Build wheels for Windows ARM64
 - Support for PyPy 3.11
 
 ## 0.16.2 (October 10, 2024)

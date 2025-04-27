@@ -148,6 +148,7 @@ jobs:
           - ubuntu-latest
           - macos-latest
           - windows-latest
+          - windows-11-arm
 
     env:
       CIBW_ARCHS_MACOS: "x86_64 arm64"
