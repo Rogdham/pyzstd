@@ -19,6 +19,7 @@ typedef struct {
     /* File states. On Linux/macOS/Windows, Py_off_t is signed, so
        ZstdFile/SeekableZstdFile use int64_t as file position/size. */
     PyObject *fp;   /* File object */
+    int sof;        /* At SOF, 0 or 1. */
     int eof;        /* At EOF, 0 or 1. */
     int64_t pos;    /* Decompressed position, >= 0. */
     int64_t size;   /* File size, -1 means unknown. */
@@ -109,6 +110,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     assert(self->dict == NULL);
     assert(self->read_size == NULL);
     assert(self->fp == NULL);
+    assert(self->sof == 0);
     assert(self->eof == 0);
     assert(self->pos == 0);
     assert(self->size == 0);
@@ -139,6 +141,7 @@ ZstdFileReader_init(ZstdFileReader *self, PyObject *args, PyObject *kwargs)
     /* File states */
     Py_INCREF(fp);
     self->fp = fp;
+    self->sof = 1;
     self->size = -1;
 
     /* Decompression states */
@@ -239,7 +242,7 @@ decompress_into(ZstdFileReader *self,
 
             /* EOF */
             if (read_len == 0) {
-                if (self->at_frame_edge) {
+                if (self->at_frame_edge && !self->sof) {
                     self->eof = 1;
                     self->pos += out->pos - orig_pos;
                     self->size = self->pos;
@@ -254,6 +257,7 @@ decompress_into(ZstdFileReader *self,
             self->in.src = read_buf;
             self->in.size = read_len;
             self->in.pos = 0;
+            self->sof = 0;
         }
 
         /* Decompress */
@@ -423,6 +427,7 @@ ZstdFileReader_reset_session(ZstdFileReader *self)
 {
     /* Reset decompression states */
     self->needs_input = 1;
+    self->sof = 1;
     self->at_frame_edge = 1;
     self->in.size = 0;
     self->in.pos = 0;

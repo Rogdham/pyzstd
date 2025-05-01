@@ -825,7 +825,7 @@ decompress(PyObject *module, PyObject *args, PyObject *kwargs)
 
     /* Check data integrity. at_frame_edge flag is 1 when both the input and
        output streams are at a frame edge. */
-    if (self.at_frame_edge == 0) {
+    if (self.at_frame_edge == 0 || in.pos == 0) {
         char *extra_msg = (Py_SIZE(ret) == 0) ? "." :
                           ", if want to output these decompressed data, use "
                           "decompress_stream function or "

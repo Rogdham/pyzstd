@@ -15,6 +15,7 @@ class ZstdFileReader:
 
         # File states, the last three are public attributes.
         self._fp = fp
+        self._sof = True  # start of file
         self.eof = False
         self.pos = 0     # Decompressed position
         self.size = -1   # File size, -1 means unknown.
@@ -68,7 +69,7 @@ class ZstdFileReader:
                 self._in_dat = self._fp.read(self._read_size)
                 # EOF
                 if not self._in_dat:
-                    if self._at_frame_edge:
+                    if self._at_frame_edge and not self._sof:
                         self.eof = True
                         self.pos += out_b.pos - orig_pos
                         self.size = self.pos
@@ -79,6 +80,7 @@ class ZstdFileReader:
                 in_b.src = ffi.from_buffer(self._in_dat)
                 in_b.size = _nbytes(self._in_dat)
                 in_b.pos = 0
+                self._sof = False
 
             # Decompress
             zstd_ret = m.ZSTD_decompressStream(self._dctx, out_b, in_b)
@@ -171,6 +173,7 @@ class ZstdFileReader:
     def reset_session(self):
         # Reset decompression states
         self._needs_input = True
+        self._sof = True
         self._at_frame_edge = True
         self._in_buf.size = 0
         self._in_buf.pos = 0

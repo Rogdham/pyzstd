@@ -401,7 +401,7 @@ def decompress(data, zstd_dict=None, option=None):
 
     # Check data integrity. at_frame_edge flag is True when the both the input
     # and output streams are at a frame edge.
-    if not decomp._at_frame_edge:
+    if not decomp._at_frame_edge or not in_buf.pos:
         extra_msg = "." if (len(ret) == 0) \
                         else (", if want to output these decompressed data, use "
                               "decompress_stream function or "

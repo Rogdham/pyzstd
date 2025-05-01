@@ -1229,7 +1229,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         bo.close()
 
     def test_decompress_empty(self):
-        self.assertEqual(decompress(b''), b'')
+        with self.assertRaises(ZstdError):
+            decompress(b'')
 
         d = ZstdDecompressor()
         self.assertEqual(d.decompress(b''), b'')
@@ -1325,7 +1326,8 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         cls.TRAIL = b'12345678abcdefg!@#$%^&*()_+|'
 
     def test_function_decompress(self):
-        self.assertEqual(decompress(b''), b'')
+        with self.assertRaises(ZstdError):
+            decompress(b'')
 
         self.assertEqual(len(decompress(COMPRESSED_100_PLUS_32KB)), 100+32*1024)
 
@@ -2234,8 +2236,8 @@ class OutputBufferTestCase(unittest.TestCase):
         dat1 = b''
 
         # decompress() function
-        dat2 = decompress(dat1)
-        self.assertEqual(len(dat2), 0)
+        with self.assertRaises(ZstdError):
+            decompress(dat1)
 
         # ZstdDecompressor class
         d = ZstdDecompressor()
@@ -2880,10 +2882,12 @@ class FileTestCase(unittest.TestCase):
         # empty file
         with ZstdFile(BytesIO(b'')) as f:
             self.assertEqual(f.read(0), b"")
-            self.assertEqual(f.read(10), b"")
+            with self.assertRaises(EOFError):
+                f.read(10)
 
         with ZstdFile(BytesIO(b'')) as f:
-            self.assertEqual(f.read(10), b"")
+            with self.assertRaises(EOFError):
+                f.read(10)
 
     def test_read_10(self):
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
@@ -3517,8 +3521,9 @@ class OpenTestCase(unittest.TestCase):
     def test_text_modes(self):
         # empty input
         with open(BytesIO(b''), "rt", encoding="utf-8", newline='\n') as reader:
-            for _ in reader:
-                pass
+            with self.assertRaises(EOFError):
+                for _ in reader:
+                    pass
 
         # read
         uncompressed = THIS_FILE_STR.replace(os.linesep, "\n")

@@ -845,7 +845,8 @@ class SeekableZstdFileCase(unittest.TestCase):
         # empty
         b = BytesIO()
         with SeekableZstdFile(b, 'r') as f:
-            self.assertEqual(f.read(10), b'')
+            with self.assertRaises(EOFError):
+                f.read(10)
 
         # not a seekable format
         b = BytesIO(COMPRESSED*10)
@@ -882,15 +883,8 @@ class SeekableZstdFileCase(unittest.TestCase):
 
     def test_read_empty(self):
         with SeekableZstdFile(BytesIO(b''), 'r') as f:
-            self.assertEqual(f.read(), b'')
-            self.assertEqual(f.tell(), 0)
-
-            self.assertEqual(f.seek(2), 0)
-            self.assertEqual(f.read(), b'')
-            self.assertEqual(f.tell(), 0)
-
-            self.assertEqual(f.seek(-2), 0)
-            self.assertEqual(f.read(), b'')
+            with self.assertRaises(EOFError):
+                f.read()
             self.assertEqual(f.tell(), 0)
 
     def test_seek(self):
