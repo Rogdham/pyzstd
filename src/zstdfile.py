@@ -399,6 +399,14 @@ class ZstdFile(io.BufferedIOBase):
             self._check_mode()
 
     @property
+    def name(self):
+        """Return the file name for the underlying file."""
+        try:
+            return self._fp.name
+        except AttributeError:
+            self._check_mode()
+
+    @property
     def closed(self):
         """True if this file is closed."""
         return self._mode == _MODE_CLOSED

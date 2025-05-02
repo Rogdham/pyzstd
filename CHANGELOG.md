@@ -6,6 +6,7 @@ All notable changes to this project will be documented in this file.
 
 - Upgrade zstd source code from v1.5.6 to [v1.5.7](https://github.com/facebook/zstd/releases/tag/v1.5.7)
 - Raise an exception when attempting to decompress empty data
+- Add `ZstdFile.name` property
 - Build wheels for Windows ARM64
 - Support for PyPy 3.11
 
