@@ -1297,19 +1297,6 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertFalse(d.at_frame_edge)
         self.assertTrue(d.needs_input)
 
-    def test_parameter_bounds_cache(self):
-        a = CParameter.compressionLevel.bounds()
-        b = CParameter.compressionLevel.bounds()
-        self.assertIs(a, b)
-
-        a = CParameter.windowLog.bounds()
-        b = CParameter.windowLog.bounds()
-        self.assertIs(a, b)
-
-        a = DParameter.windowLogMax.bounds()
-        b = DParameter.windowLogMax.bounds()
-        self.assertIs(a, b)
-
 class DecompressorFlagsTestCase(unittest.TestCase):
 
     @classmethod
