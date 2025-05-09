@@ -6,17 +6,17 @@ except ImportError:
     class PathLike:
         pass
 
-from pyzstd import ZstdCompressor, ZstdFileReader, \
-                   ZstdFileWriter, _ZSTD_DStreamSizes
+from pyzstd import ZstdCompressor, _ZstdFileReader, \
+                   _ZstdFileWriter, _ZSTD_DStreamSizes
 
 __all__ = ('ZstdFile', 'open')
 
-class ZstdDecompressReader(io.RawIOBase):
+class _ZstdDecompressReader(io.RawIOBase):
     """Adapt decompressor to RawIOBase reader API"""
 
     def __init__(self, fp, zstd_dict, option, read_size):
         self._fp = fp
-        self._decomp = ZstdFileReader(fp, zstd_dict, option, read_size)
+        self._decomp = _ZstdFileReader(fp, zstd_dict, option, read_size)
 
     def close(self):
         self._decomp = None
@@ -87,7 +87,7 @@ class ZstdFile(io.BufferedIOBase):
     FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
     FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
 
-    _READER_CLASS = ZstdDecompressReader
+    _READER_CLASS = _ZstdDecompressReader
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
@@ -172,7 +172,7 @@ class ZstdFile(io.BufferedIOBase):
             self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
         elif mode_code == _MODE_WRITE:
             self._pos = 0
-            self._writer = ZstdFileWriter(
+            self._writer = _ZstdFileWriter(
                             self._fp,
                             level_or_option=level_or_option,
                             zstd_dict=zstd_dict,

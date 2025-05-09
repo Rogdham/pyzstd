@@ -8,6 +8,7 @@ All notable changes to this project will be documented in this file.
 - Raise an exception when attempting to decompress empty data
 - Add `ZstdFile.name` property
 - Deprecate `(de)compress_stream` functions
+- Use a leading `_` for private objects
 - Build wheels for Windows ARM64
 - Support for PyPy 3.11
 

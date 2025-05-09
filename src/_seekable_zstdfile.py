@@ -4,7 +4,7 @@ from os.path import isfile
 from struct import Struct
 from warnings import warn
 
-from pyzstd.zstdfile import ZstdDecompressReader, ZstdFile, \
+from pyzstd._zstdfile import _ZstdDecompressReader, ZstdFile, \
                             _MODE_CLOSED, _MODE_READ, _MODE_WRITE, \
                             PathLike, io
 
@@ -38,7 +38,7 @@ D. Seek_Table_Descriptor:
      1-0         Unused_Bits    (should not interpret these bits)'''
 __format_version__ = '0.1.0'
 
-class SeekTable:
+class _SeekTable:
     _s_2uint32 = Struct('<II')
     _s_3uint32 = Struct('<III')
     _s_footer  = Struct('<IBI')
@@ -293,7 +293,7 @@ class SeekTable:
                 self._full_c_size,
                 self._full_d_size)
 
-class SeekableDecompressReader(ZstdDecompressReader):
+class _SeekableDecompressReader(_ZstdDecompressReader):
     def __init__(self, fp, zstd_dict, option, read_size):
         # Check fp readable/seekable
         if not hasattr(fp, 'readable') or not hasattr(fp, "seekable"):
@@ -311,7 +311,7 @@ class SeekableDecompressReader(ZstdDecompressReader):
                  "read sequentially using ZstdFile class."))
 
         # Load seek table
-        self._seek_table = SeekTable(read_mode=True)
+        self._seek_table = _SeekTable(read_mode=True)
         self._seek_table.load_seek_table(fp, seek_to_0=True)
 
         # Initialize super()
@@ -393,7 +393,7 @@ class SeekableZstdFile(ZstdFile):
     # Zstd seekable format's example code also use 1GiB as max content size.
     FRAME_MAX_D_SIZE = 1*1024*1024*1024
 
-    _READER_CLASS = SeekableDecompressReader
+    _READER_CLASS = _SeekableDecompressReader
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
@@ -457,7 +457,7 @@ class SeekableZstdFile(ZstdFile):
             # For seekable format
             self._max_frame_content_size = max_frame_content_size
             self._reset_frame_sizes()
-            self._seek_table = SeekTable(read_mode=False)
+            self._seek_table = _SeekTable(read_mode=False)
 
             # Load seek table in append mode
             if mode in ("a", "ab"):
@@ -667,7 +667,7 @@ class SeekableZstdFile(ZstdFile):
                  'or a file object that is readable and seekable.'))
 
         # Write mode uses less RAM
-        table = SeekTable(read_mode=False)
+        table = _SeekTable(read_mode=False)
         try:
             # Read/Parse the seek table
             table.load_seek_table(fp, seek_to_0=False)

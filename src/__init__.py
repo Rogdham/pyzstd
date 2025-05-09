@@ -1,6 +1,6 @@
 try:
     # Import C implementation
-    from .c import (
+    from ._c import (
         CParameter,
         DParameter,
         EndlessZstdDecompressor,
@@ -11,8 +11,8 @@ try:
         ZstdDecompressor,
         ZstdDict,
         ZstdError,
-        ZstdFileReader,
-        ZstdFileWriter,
+        ZstdFileReader as _ZstdFileReader,
+        ZstdFileWriter as _ZstdFileWriter,
         _ZSTD_CStreamSizes,
         _ZSTD_DStreamSizes,
         _finalize_dict,
@@ -29,7 +29,7 @@ try:
 except ImportError:
     try:
         # Import CFFI implementation
-        from .cffi import (
+        from ._cffi import (
             CParameter,
             DParameter,
             EndlessZstdDecompressor,
@@ -40,8 +40,8 @@ except ImportError:
             ZstdDecompressor,
             ZstdDict,
             ZstdError,
-            ZstdFileReader,
-            ZstdFileWriter,
+            ZstdFileReader as _ZstdFileReader,
+            ZstdFileWriter as _ZstdFileWriter,
             _ZSTD_CStreamSizes,
             _ZSTD_DStreamSizes,
             _finalize_dict,
@@ -64,8 +64,8 @@ except ImportError:
             "   that has libzstd.dll should be added by os.add_dll_directory() function.\n"
             "2, Please install pyzstd module through pip, to ensure that compiled\n"
             "   .so/.pyd file matches the architecture/OS/Python.\n")
-from .zstdfile import ZstdFile, open
-from .seekable_zstdfile import SeekableFormatError, SeekableZstdFile
+from ._zstdfile import ZstdFile, open
+from ._seekable_zstdfile import SeekableFormatError, SeekableZstdFile
 
 from functools import wraps
 

@@ -166,20 +166,20 @@ def do_setup():
 
     if CFFI:
         # Packages
-        packages = ['pyzstd', 'pyzstd.cffi']
+        packages = ['pyzstd', 'pyzstd._cffi']
 
         # Binary extension
-        kwargs['module_name'] = 'pyzstd.cffi._cffi_zstd'
+        kwargs['module_name'] = 'pyzstd._cffi._cffi_zstd'
 
         sys.path.append('build_script')
         import pyzstd_build_cffi
         binary_extension = pyzstd_build_cffi.get_extension(**kwargs)
     else:  # C implementation
         # Packages
-        packages = ['pyzstd', 'pyzstd.c']
+        packages = ['pyzstd', 'pyzstd._c']
 
         # Binary extension
-        kwargs['name'] = 'pyzstd.c._zstd'
+        kwargs['name'] = 'pyzstd._c._zstd'
         kwargs['sources'].append('src/bin_ext/pyzstd.c')
         if MULTI_PHASE_INIT:
             # Use multi-phase initialization (PEP-489) on CPython 3.11.

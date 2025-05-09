@@ -26,7 +26,7 @@ from pyzstd import (
     ZstdFile
 )
 from pyzstd import PYZSTD_CONFIG # type: ignore
-from pyzstd.seekable_zstdfile import SeekTable
+from pyzstd._seekable_zstdfile import _SeekTable
 
 BIT_BUILD = PYZSTD_CONFIG[0]
 DECOMPRESSED = b'1234567890'
@@ -36,14 +36,14 @@ DICT = ZstdDict(b'a'*1024, is_raw=True)
 
 class SeekTableCase(unittest.TestCase):
     def create_table(self, sizes_lst, read_mode=True):
-        table = SeekTable(read_mode)
+        table = _SeekTable(read_mode)
         for item in sizes_lst:
             table.append_entry(*item)
         return table
 
     def test_array_append(self):
         # test array('I')
-        t = SeekTable(read_mode=False)
+        t = _SeekTable(read_mode=False)
         t.append_entry(0xFFFFFFFF, 0)
         with self.assertRaises(ValueError):
             # impossible frame
@@ -59,7 +59,7 @@ class SeekTableCase(unittest.TestCase):
             t.append_entry(123, -1)
 
         # test array('q')
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         t.append_entry(-2**63, 2**63-1)
         self.assertEqual(t._cumulated_c_size[1], -2**63)
         self.assertEqual(t._cumulated_d_size[1], 2**63-1)
@@ -358,7 +358,7 @@ class SeekTableCase(unittest.TestCase):
     def test_load_empty(self):
         # empty
         b = BytesIO()
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         t.load_seek_table(b, seek_to_0=True)
         self.assertEqual(len(t), 0)
         self.assertEqual(b.tell(), 0)
@@ -376,7 +376,7 @@ class SeekTableCase(unittest.TestCase):
         b.seek(0)
 
         # load, seek_to_0=True
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         t.load_seek_table(b, seek_to_0=True)
         self.assertEqual(b.tell(), 0)
 
@@ -392,7 +392,7 @@ class SeekTableCase(unittest.TestCase):
         self.assertEqual(t.get_frame_sizes(3), (2*CSIZE, 2*DSIZE))
 
         # load, seek_to_0=False
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         t.load_seek_table(b, seek_to_0=False)
         self.assertEqual(b.tell(), len(b.getvalue()))
 
@@ -400,12 +400,12 @@ class SeekTableCase(unittest.TestCase):
         b = BytesIO()
         b.write(COMPRESSED)
         b.write(COMPRESSED)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*(4+4+4)))
-        b.write(SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 123))
-        b.write(SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 456))
-        b.write(SeekTable._s_footer.pack(2, 0b10000000, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*(4+4+4)))
+        b.write(_SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 123))
+        b.write(_SeekTable._s_3uint32.pack(len(COMPRESSED), len(DECOMPRESSED), 456))
+        b.write(_SeekTable._s_footer.pack(2, 0b10000000, 0x8F92EAB1))
 
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         t.load_seek_table(b, seek_to_0=False)
         self.assertTrue(t._has_checksum)
         self.assertEqual(len(t), 2)
@@ -413,7 +413,7 @@ class SeekTableCase(unittest.TestCase):
     def test_load_bad1(self):
         # 0 < length < 17
         b = BytesIO(b'len<17')
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     (r'^Zstandard Seekable Format error: '
                                      r'File size is less than')):
@@ -422,9 +422,9 @@ class SeekTableCase(unittest.TestCase):
         # wrong Seekable_Magic_Number
         b = BytesIO()
         b.write(b'a'*18)
-        b.write(SeekTable._s_3uint32.pack(1, 0, 0x8F92EAB2))
+        b.write(_SeekTable._s_3uint32.pack(1, 0, 0x8F92EAB2))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Format Magic Number'):
             t.load_seek_table(b, seek_to_0=True)
@@ -432,9 +432,9 @@ class SeekTableCase(unittest.TestCase):
         # wrong Seek_Table_Descriptor
         b = BytesIO()
         b.write(b'a'*18)
-        b.write(SeekTable._s_footer.pack(1, 0b00010000, 0x8F92EAB1))
+        b.write(_SeekTable._s_footer.pack(1, 0b00010000, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Reserved_Bits'):
             t.load_seek_table(b, seek_to_0=True)
@@ -442,9 +442,9 @@ class SeekTableCase(unittest.TestCase):
         # wrong expected size
         b = BytesIO()
         b.write(b'a'*18)
-        b.write(SeekTable._s_footer.pack(100, 0b10000000, 0x8F92EAB1))
+        b.write(_SeekTable._s_footer.pack(100, 0b10000000, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'less than expected size'):
             t.load_seek_table(b, seek_to_0=True)
@@ -452,10 +452,10 @@ class SeekTableCase(unittest.TestCase):
         # wrong Magic_Number
         b = BytesIO()
         b.write(b'a'*18)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5F, 9))
-        b.write(SeekTable._s_footer.pack(0, 0b10000000, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5F, 9))
+        b.write(_SeekTable._s_footer.pack(0, 0b10000000, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Magic_Number'):
             t.load_seek_table(b, seek_to_0=True)
@@ -463,10 +463,10 @@ class SeekTableCase(unittest.TestCase):
         # wrong Frame_Size
         b = BytesIO()
         b.write(b'a'*18)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 10))
-        b.write(SeekTable._s_footer.pack(0, 0b10000000, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 10))
+        b.write(_SeekTable._s_footer.pack(0, 0b10000000, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'Frame_Size'):
             t.load_seek_table(b, seek_to_0=True)
@@ -475,11 +475,11 @@ class SeekTableCase(unittest.TestCase):
         # wrong Frame_Size
         b = BytesIO()
         b.write(COMPRESSED)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+8))
-        b.write(SeekTable._s_2uint32.pack(0, len(DECOMPRESSED)))
-        b.write(SeekTable._s_footer.pack(1, 0, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 9+8))
+        b.write(_SeekTable._s_2uint32.pack(0, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_footer.pack(1, 0, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'impossible'):
             t.load_seek_table(b, seek_to_0=True)
@@ -487,11 +487,11 @@ class SeekTableCase(unittest.TestCase):
         # cumulated compressed size 1
         b = BytesIO()
         b.write(COMPRESSED)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+8))
-        b.write(SeekTable._s_2uint32.pack(200, len(DECOMPRESSED)))
-        b.write(SeekTable._s_footer.pack(1, 0, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 9+8))
+        b.write(_SeekTable._s_2uint32.pack(200, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_footer.pack(1, 0, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
             t.load_seek_table(b, seek_to_0=True)
@@ -500,12 +500,12 @@ class SeekTableCase(unittest.TestCase):
         b = BytesIO()
         b.write(COMPRESSED)
         b.write(COMPRESSED)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*8))
-        b.write(SeekTable._s_2uint32.pack(len(COMPRESSED)+1, len(DECOMPRESSED)))
-        b.write(SeekTable._s_2uint32.pack(len(COMPRESSED)+1, len(DECOMPRESSED)))
-        b.write(SeekTable._s_footer.pack(2, 0, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*8))
+        b.write(_SeekTable._s_2uint32.pack(len(COMPRESSED)+1, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_2uint32.pack(len(COMPRESSED)+1, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_footer.pack(2, 0, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
             t.load_seek_table(b, seek_to_0=True)
@@ -514,12 +514,12 @@ class SeekTableCase(unittest.TestCase):
         b = BytesIO()
         b.write(COMPRESSED)
         b.write(COMPRESSED)
-        b.write(SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*8))
-        b.write(SeekTable._s_2uint32.pack(len(COMPRESSED)-1, len(DECOMPRESSED)))
-        b.write(SeekTable._s_2uint32.pack(len(COMPRESSED)-1, len(DECOMPRESSED)))
-        b.write(SeekTable._s_footer.pack(2, 0, 0x8F92EAB1))
+        b.write(_SeekTable._s_2uint32.pack(0x184D2A5E, 9+2*8))
+        b.write(_SeekTable._s_2uint32.pack(len(COMPRESSED)-1, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_2uint32.pack(len(COMPRESSED)-1, len(DECOMPRESSED)))
+        b.write(_SeekTable._s_footer.pack(2, 0, 0x8F92EAB1))
         b.seek(0)
-        t = SeekTable(read_mode=True)
+        t = _SeekTable(read_mode=True)
         with self.assertRaisesRegex(SeekableFormatError,
                                     'cumulated compressed size'):
             t.load_seek_table(b, seek_to_0=True)
@@ -1558,7 +1558,7 @@ class SeekableZstdFileCase(unittest.TestCase):
         sf = (0x184D2A50).to_bytes(4, byteorder='little') + \
                 (_10MiB).to_bytes(4, byteorder='little') + \
                 b'a' * _10MiB
-        t = SeekTable(read_mode=False)
+        t = _SeekTable(read_mode=False)
         t.append_entry(CSIZE, DSIZE)
         t.append_entry(len(sf), 0)
         t.append_entry(CSIZE, DSIZE)

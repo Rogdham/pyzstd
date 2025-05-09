@@ -17,7 +17,6 @@ import tempfile
 import unittest
 import warnings
 
-import pyzstd
 from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDecompressor, EndlessZstdDecompressor, ZstdError, \
                    CParameter, DParameter, Strategy, \
@@ -26,11 +25,12 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDict, train_dict, finalize_dict, \
                    zstd_version, zstd_version_info, zstd_support_multithread, \
                    compressionLevel_values, get_frame_info, get_frame_size, \
-                   ZstdFile, open, __version__ as pyzstd_version
+                   ZstdFile, open, __version__ as pyzstd_version, PYZSTD_CONFIG, \
+                   _train_dict, _finalize_dict, \
+                   _ZstdFileReader, _ZstdFileWriter
 
-PYZSTD_CONFIG = pyzstd.PYZSTD_CONFIG # type: ignore
 if PYZSTD_CONFIG[1] == 'c':
-    from pyzstd.c import _zstd       # type: ignore
+    from pyzstd._c import _zstd       # type: ignore
 
 build_info = ('Pyzstd build information:\n'
               ' - Environment:\n'
@@ -504,15 +504,6 @@ class ClassShapeTestCase(unittest.TestCase):
         # These classes and variables can be used to extend ZstdFile,
         # such as SeekableZstdFile(ZstdFile), so pin them down.
         self.assertTrue(issubclass(ZstdFile, io.BufferedIOBase))
-        self.assertTrue(issubclass(pyzstd.zstdfile.ZstdDecompressReader,
-                                   io.RawIOBase))
-        self.assertIs(ZstdFile._READER_CLASS,
-                      pyzstd.zstdfile.ZstdDecompressReader)
-
-        # mode
-        self.assertEqual(pyzstd.zstdfile._MODE_CLOSED, 0)
-        self.assertEqual(pyzstd.zstdfile._MODE_READ, 1)
-        self.assertEqual(pyzstd.zstdfile._MODE_WRITE, 2)
 
         # file object
         bio = BytesIO()
@@ -1987,7 +1978,7 @@ class ZstdDictTestCase(unittest.TestCase):
         DICT_SIZE1 = 3*1024
 
         global TRAINED_DICT
-        TRAINED_DICT = pyzstd.train_dict(SAMPLES, DICT_SIZE1)
+        TRAINED_DICT = train_dict(SAMPLES, DICT_SIZE1)
         ZstdDict(TRAINED_DICT.dict_content, False)
 
         self.assertNotEqual(TRAINED_DICT.dict_id, 0)
@@ -2145,10 +2136,10 @@ class ZstdDictTestCase(unittest.TestCase):
         # wrong size list
         with self.assertRaisesRegex(ValueError,
                 "The samples size list doesn't match the concatenation's size"):
-            pyzstd._train_dict(concatenation, wrong_size_lst, 100*1024)
+            _train_dict(concatenation, wrong_size_lst, 100*1024)
 
         # correct size list
-        pyzstd._train_dict(concatenation, correct_size_lst, 3*1024)
+        _train_dict(concatenation, correct_size_lst, 3*1024)
 
         # test _finalize_dict
         if zstd_version_info < (1, 4, 5):
@@ -2157,11 +2148,11 @@ class ZstdDictTestCase(unittest.TestCase):
         # wrong size list
         with self.assertRaisesRegex(ValueError,
                 "The samples size list doesn't match the concatenation's size"):
-            pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+            _finalize_dict(TRAINED_DICT.dict_content,
                                   concatenation, wrong_size_lst, 300*1024, 5)
 
         # correct size list
-        pyzstd._finalize_dict(TRAINED_DICT.dict_content,
+        _finalize_dict(TRAINED_DICT.dict_content,
                               concatenation, correct_size_lst, 300*1024, 5)
 
     def test_as_prefix(self):
@@ -2825,25 +2816,25 @@ class FileTestCase(unittest.TestCase):
 
         # wrong arg
         with self.assertRaisesRegex(TypeError, 'level_or_option'):
-            pyzstd.zstdfile.ZstdFileWriter(
+            _ZstdFileWriter(
                                 fp=bo,
                                 level_or_option=TRAINED_DICT,
                                 zstd_dict=None,
                                 write_size=131591)
         with self.assertRaisesRegex(TypeError, 'zstd_dict'):
-            pyzstd.zstdfile.ZstdFileWriter(
+            _ZstdFileWriter(
                                 fp=bo,
                                 level_or_option=3,
                                 zstd_dict={1:2},
                                 write_size=131591)
         with self.assertRaisesRegex(ValueError, 'write_size'):
-            pyzstd.zstdfile.ZstdFileWriter(
+            _ZstdFileWriter(
                                 fp=bo,
                                 level_or_option=3,
                                 zstd_dict=TRAINED_DICT,
                                 write_size=0)
 
-        w = pyzstd.zstdfile.ZstdFileWriter(
+        w = _ZstdFileWriter(
                             fp=bo,
                             level_or_option=None,
                             zstd_dict=None,
@@ -2870,22 +2861,22 @@ class FileTestCase(unittest.TestCase):
     def test_ZstdFileReader(self):
         # wrong arg
         with self.assertRaisesRegex(TypeError, 'zstd_dict'):
-            pyzstd.zstdfile.ZstdFileReader(
+            _ZstdFileReader(
                                 fp=BytesIO(self.FRAME_42),
                                 zstd_dict={1:2}, option=None,
                                 read_size=131075)
         with self.assertRaisesRegex(TypeError, 'option'):
-            pyzstd.zstdfile.ZstdFileReader(
+            _ZstdFileReader(
                                 fp=BytesIO(self.FRAME_42),
                                 zstd_dict=TRAINED_DICT, option=3,
                                 read_size=131075)
         with self.assertRaisesRegex(ValueError, 'read_size'):
-            pyzstd.zstdfile.ZstdFileReader(
+            _ZstdFileReader(
                                 fp=BytesIO(self.FRAME_42),
                                 zstd_dict=TRAINED_DICT, option=3,
                                 read_size=0)
 
-        r = pyzstd.zstdfile.ZstdFileReader(
+        r = _ZstdFileReader(
                             fp=BytesIO(self.FRAME_42),
                             zstd_dict=None, option=None,
                             read_size=131075)
