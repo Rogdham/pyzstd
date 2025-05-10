@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.17.0 (May 10, 2025)
 
 - Upgrade zstd source code from v1.5.6 to [v1.5.7](https://github.com/facebook/zstd/releases/tag/v1.5.7)
 - Raise an exception when attempting to decompress empty data
