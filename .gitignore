@@ -4,3 +4,4 @@ __pycache__/
 /build
 /.vscode
 /*.pdb
+/LICENSE_zstd

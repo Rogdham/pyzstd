@@ -3,6 +3,7 @@ include CHANGELOG.md
 include LICENSE
 include README.md
 
+include zstd/LICENSE
 recursive-include zstd/lib *
 recursive-include src *
 recursive-include tests *
