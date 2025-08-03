@@ -1,7 +1,11 @@
-__pycache__/
-/pyzstd.egg-info
-/dist
-/build
 /.vscode
-/*.pdb
+/build
+/dist
+
+__pycache__
+*.o
+*.pdb
+*.so
+*.egg-info
+
 /LICENSE_zstd
