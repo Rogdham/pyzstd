@@ -1,9 +1,11 @@
-.. title:: pyzstd module
+=======================
+pyzstd module reference
+=======================
 
 Introduction
 ------------
 
-Pyzstd module provides classes and functions for compressing and decompressing data using Facebook's `Zstandard <http://www.zstd.net>`_ (or zstd as short name) algorithm.
+The pyzstd module provides classes and functions for compressing and decompressing data using `Zstandard <http://www.zstd.net>`_ (or zstd for short) algorithm.
 
 The API style is similar to Python's bz2/lzma/zlib modules.
 
@@ -26,8 +28,10 @@ Features of zstd:
 * Can be used as a :ref:`patching engine<patching_engine>`.
 
 .. note::
-    Two other zstd modules on PyPI:
+    Other zstd implementations for Python:
 
+    * `compression.zstd <https://docs.python.org/3.14/library/compression.zstd.html>`_, in the standard library since Python 3.14.
+    * `backports.zstd <https://github.com/Rogdham/backports.zstd>`_, the backport of the stdlib implementation for Python versions before 3.14.
     * `zstd <https://pypi.org/project/zstd/>`_, a very simple module.
     * `zstandard <https://pypi.org/project/zstandard/>`_, provides rich API.
 
@@ -1592,4 +1596,4 @@ Deprecations
 
 See `list of deprecations with alternatives <./deprecated.html>`_.
 
-Also, note that `unsupported Python versions <https://devguide.python.org/versions/#supported-versions>` are not tested against and have no wheels uploaded on PyPI.
+Also, note that `unsupported Python versions <https://devguide.python.org/versions/#supported-versions>`_ are not tested against and have no wheels uploaded on PyPI.

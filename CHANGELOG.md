@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Rework documentation to suggest using `compression.zstd` from Python stdlib, and provide a migration guide
 - Include the `zstd` library license in package distributions
 
 ## 0.17.0 (May 10, 2025)
