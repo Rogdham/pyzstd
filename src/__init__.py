@@ -5,7 +5,7 @@ try:
         DParameter,
         EndlessZstdDecompressor,
         PYZSTD_CONFIG,
-        RichMemZstdCompressor,
+        RichMemZstdCompressor as _RichMemZstdCompressor,
         Strategy,
         ZstdCompressor,
         ZstdDecompressor,
@@ -34,7 +34,7 @@ except ImportError:
             DParameter,
             EndlessZstdDecompressor,
             PYZSTD_CONFIG,
-            RichMemZstdCompressor,
+            RichMemZstdCompressor as _RichMemZstdCompressor,
             Strategy,
             ZstdCompressor,
             ZstdDecompressor,
@@ -118,6 +118,7 @@ def compress(data, level_or_option=None, zstd_dict=None):
     return comp.compress(data, ZstdCompressor.FLUSH_FRAME)
 
 
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.richmem_compress")
 def richmem_compress(data, level_or_option=None, zstd_dict=None):
     """Compress a block of data, return a bytes object.
 
@@ -133,7 +134,7 @@ def richmem_compress(data, level_or_option=None, zstd_dict=None):
                      parameters.
     zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
     """
-    comp = RichMemZstdCompressor(level_or_option, zstd_dict)
+    comp = _RichMemZstdCompressor(level_or_option, zstd_dict)
     return comp.compress(data)
 
 
@@ -242,3 +243,9 @@ def compress_stream(*args, **kwargs):
 @deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream")
 def decompress_stream(*args, **kwargs):
     return _decompress_stream(*args, **kwargs)
+
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.RichMemZstdCompressor")
+class RichMemZstdCompressor(_RichMemZstdCompressor):
+    pass
+
+RichMemZstdCompressor.__doc__ = _RichMemZstdCompressor.__doc__

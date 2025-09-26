@@ -99,8 +99,12 @@ def _check_deprecated(testcase):
     testcase.assertIn(
         str(warn.message),
         [
+            "pyzstd.ZstdFile()'s read_size parameter is deprecated",
+            "pyzstd.ZstdFile()'s write_size parameter is deprecated",
             "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.compress_stream",
             "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream",
+            "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.richmem_compress",
+            "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.RichMemZstdCompressor",
         ]
     )
 
@@ -111,7 +115,7 @@ def setUpModule():
     DAT_130K_D = bytes([random.randint(0, 127) for _ in range(130*1024)])
 
     global DAT_130K_C
-    DAT_130K_C = richmem_compress(DAT_130K_D, {CParameter.checksumFlag:1})
+    DAT_130K_C = compress(DAT_130K_D, {CParameter.checksumFlag:1})
 
     global DECOMPRESSED_DAT
     DECOMPRESSED_DAT = b'abcdefg123456' * 1000
@@ -266,9 +270,12 @@ class ClassShapeTestCase(unittest.TestCase):
             RichMemZstdCompressor.FLUSH_FRAME
 
         # method & member
-        RichMemZstdCompressor()
-        RichMemZstdCompressor(12, TRAINED_DICT)
-        c = RichMemZstdCompressor(level_or_option=4, zstd_dict=TRAINED_DICT)
+        with _check_deprecated(self):
+            RichMemZstdCompressor()
+        with _check_deprecated(self):
+            RichMemZstdCompressor(12, TRAINED_DICT)
+        with _check_deprecated(self):
+            c = RichMemZstdCompressor(level_or_option=4, zstd_dict=TRAINED_DICT)
 
         c.compress(b'123456')
         c.compress(data=b'123456')
@@ -299,8 +306,9 @@ class ClassShapeTestCase(unittest.TestCase):
             pickle.dumps(c)
 
         # supports subclass
-        class SubClass(RichMemZstdCompressor):
-            pass
+        with _check_deprecated(self):
+            class SubClass(RichMemZstdCompressor):
+                pass
 
     def test_Decompressor(self):
         # method & member
@@ -728,7 +736,8 @@ class CompressorDecompressorTestCase(unittest.TestCase):
     def test_rich_mem_compress(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
-        dat1 = richmem_compress(b)
+        with _check_deprecated(self):
+            dat1 = richmem_compress(b)
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
 
@@ -1219,12 +1228,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
     def test_compress_empty(self):
         # output empty content frame
         self.assertNotEqual(compress(b''), b'')
-        self.assertNotEqual(richmem_compress(b''), b'')
+        with _check_deprecated(self):
+            self.assertNotEqual(richmem_compress(b''), b'')
 
         c = ZstdCompressor()
         self.assertNotEqual(c.compress(b'', c.FLUSH_FRAME), b'')
 
-        c = RichMemZstdCompressor()
+        with _check_deprecated(self):
+            c = RichMemZstdCompressor()
         self.assertNotEqual(c.compress(b''), b'')
 
         # output b''
@@ -2154,7 +2165,8 @@ class ZstdDictTestCase(unittest.TestCase):
              V1[mid+1:]
 
         # compress
-        dat = richmem_compress(V2, zstd_dict=zd.as_prefix)
+        with _check_deprecated(self):
+            dat = richmem_compress(V2, zstd_dict=zd.as_prefix)
         self.assertEqual(get_frame_info(dat).dictionary_id, 0)
 
         # decompress
@@ -2177,13 +2189,15 @@ class ZstdDictTestCase(unittest.TestCase):
         zd = TRAINED_DICT
 
         # test .as_digested_dict
-        dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_digested_dict)
+        with _check_deprecated(self):
+            dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_digested_dict)
         self.assertEqual(decompress(dat, zd.as_digested_dict), SAMPLES[0])
         with self.assertRaises(AttributeError):
             zd.as_digested_dict = b'1234'
 
         # test .as_undigested_dict
-        dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_undigested_dict)
+        with _check_deprecated(self):
+            dat = richmem_compress(SAMPLES[0], zstd_dict=zd.as_undigested_dict)
         self.assertEqual(decompress(dat, zd.as_undigested_dict), SAMPLES[0])
         with self.assertRaises(AttributeError):
             zd.as_undigested_dict = b'1234'
@@ -2194,11 +2208,13 @@ class ZstdDictTestCase(unittest.TestCase):
                   CParameter.enableLongDistanceMatching: 1}
 
         # automatically select
-        dat = richmem_compress(SAMPLES[0], option, TRAINED_DICT)
+        with _check_deprecated(self):
+            dat = richmem_compress(SAMPLES[0], option, TRAINED_DICT)
         self.assertEqual(decompress(dat, TRAINED_DICT), SAMPLES[0])
 
         # explicitly select
-        dat = richmem_compress(SAMPLES[0], option, TRAINED_DICT.as_digested_dict)
+        with _check_deprecated(self):
+            dat = richmem_compress(SAMPLES[0], option, TRAINED_DICT.as_digested_dict)
         self.assertEqual(decompress(dat, TRAINED_DICT), SAMPLES[0])
 
     def test_len(self):
@@ -2587,27 +2603,37 @@ class FileTestCase(unittest.TestCase):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), zstd_dict=b'dict123456')
 
     def test_init_sizes_arg(self):
-        with ZstdFile(BytesIO(), 'r', read_size=1):
-            pass
-        with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'r', read_size=0)
-        with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'r', read_size=-1)
-        with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(), 'r', read_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'read_size'):
-            ZstdFile(BytesIO(), 'w', read_size=10)
+        with _check_deprecated(self):
+            with ZstdFile(BytesIO(), 'r', read_size=1):
+                pass
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                ZstdFile(BytesIO(), 'r', read_size=0)
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                ZstdFile(BytesIO(), 'r', read_size=-1)
+        with _check_deprecated(self):
+            with self.assertRaises(TypeError):
+                ZstdFile(BytesIO(), 'r', read_size=(10,))
+        with _check_deprecated(self):
+            with self.assertRaisesRegex(ValueError, 'read_size'):
+                ZstdFile(BytesIO(), 'w', read_size=10)
 
-        with ZstdFile(BytesIO(), 'w', write_size=1):
-            pass
+        with _check_deprecated(self):
+            with ZstdFile(BytesIO(), 'w', write_size=1):
+                pass
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'w', write_size=0)
+            with _check_deprecated(self):
+                ZstdFile(BytesIO(), 'w', write_size=0)
         with self.assertRaises(ValueError):
-            ZstdFile(BytesIO(), 'w', write_size=-1)
+            with _check_deprecated(self):
+                ZstdFile(BytesIO(), 'w', write_size=-1)
         with self.assertRaises(TypeError):
-            ZstdFile(BytesIO(), 'w', write_size=(10,))
+            with _check_deprecated(self):
+                ZstdFile(BytesIO(), 'w', write_size=(10,))
         with self.assertRaisesRegex(ValueError, 'write_size'):
-            ZstdFile(BytesIO(), 'r', write_size=10)
+            with _check_deprecated(self):
+                ZstdFile(BytesIO(), 'r', write_size=10)
 
     def test_init_close_fp(self):
         # get a temp file name
@@ -2895,9 +2921,10 @@ class FileTestCase(unittest.TestCase):
             self.assertEqual(f.read(), b"")
             self.assertTrue(f._buffer.raw._decomp.eof)
 
-        with ZstdFile(BytesIO(DAT_130K_C),
-                              read_size=64*1024) as f:
-            self.assertEqual(f.read(), DAT_130K_D)
+        with _check_deprecated(self):
+            with ZstdFile(BytesIO(DAT_130K_C),
+                                read_size=64*1024) as f:
+                self.assertEqual(f.read(), DAT_130K_D)
 
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                               level_or_option={DParameter.windowLogMax:20}) as f:
@@ -3134,10 +3161,11 @@ class FileTestCase(unittest.TestCase):
         with BytesIO() as dst:
             option = {CParameter.compressionLevel:-5,
                       CParameter.checksumFlag:1}
-            with ZstdFile(dst, "w",
-                          level_or_option=option,
-                          write_size=1024) as f:
-                f.write(THIS_FILE_BYTES)
+            with _check_deprecated(self):
+                with ZstdFile(dst, "w",
+                            level_or_option=option,
+                            write_size=1024) as f:
+                    f.write(THIS_FILE_BYTES)
 
             comp = ZstdCompressor(option)
             expected = comp.compress(THIS_FILE_BYTES) + comp.flush()

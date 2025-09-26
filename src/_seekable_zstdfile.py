@@ -6,7 +6,7 @@ from warnings import warn
 
 from pyzstd._zstdfile import _ZstdDecompressReader, ZstdFile, \
                             _MODE_CLOSED, _MODE_READ, _MODE_WRITE, \
-                            PathLike, io
+                            PathLike, io, _DEPRECATED_PLACEHOLDER
 
 __all__ = ('SeekableFormatError', 'SeekableZstdFile')
 
@@ -397,7 +397,7 @@ class SeekableZstdFile(ZstdFile):
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
-                 read_size=131075, write_size=131591,
+                 read_size=_DEPRECATED_PLACEHOLDER, write_size=_DEPRECATED_PLACEHOLDER,
                  max_frame_content_size=1024*1024*1024):
         """Open a Zstandard Seekable Format file in binary mode. In read mode,
         the file can be 0-size file.
@@ -421,13 +421,6 @@ class SeekableZstdFile(ZstdFile):
             support int type compression level in this case.
         zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
             decompression.
-        read_size: In reading mode, this is bytes number that read from the
-            underlying file object each time, default value is zstd's
-            recommended value. If use with Network File System, increasing
-            it may get better performance.
-        write_size: In writing modes, this is output buffer's size, default
-            value is zstd's recommended value. If use with Network File
-            System, increasing it may get better performance.
         max_frame_content_size: In write/append modes (compression), when
             the uncompressed data size reaches max_frame_content_size, a frame
             is generated automatically. If the size is small, it will increase

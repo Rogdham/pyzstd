@@ -100,6 +100,7 @@ class ZstdCompressor:
 
     def _set_pledged_input_size(self, size: Union[int, None]) -> None: ...
 
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.RichMemZstdCompressor")
 class RichMemZstdCompressor:
     def __init__(self,
                  level_or_option: Union[None, int, Dict[CParameter, int]] = None,
@@ -143,6 +144,7 @@ def compress(data,
              level_or_option: Union[None, int, Dict[CParameter, int]] = None,
              zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> bytes: ...
 
+@deprecated("See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.richmem_compress")
 def richmem_compress(data,
                      level_or_option: Union[None, int, Dict[CParameter, int]] = None,
                      zstd_dict: Union[None, ZstdDict, ZstdDictInfo] = None) -> bytes: ...

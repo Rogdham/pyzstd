@@ -55,7 +55,6 @@ Simple compression/decompression
         If there are a big number of same type individual data, reuse these objects may eliminate the small overhead of creating context / setting parameters / loading dictionary.
 
         * :py:class:`ZstdCompressor`
-        * :py:class:`RichMemZstdCompressor`
 
 
 .. py:function:: compress(data, level_or_option=None, zstd_dict=None)
@@ -63,8 +62,6 @@ Simple compression/decompression
     Compress *data*, return the compressed data.
 
     Compressing ``b''`` will get an empty content frame (9 bytes or more).
-
-    :py:func:`richmem_compress` function is faster in some cases.
 
     :param data: Data to be compressed.
     :type data: bytes-like object
@@ -102,55 +99,6 @@ Simple compression/decompression
     :return: Decompressed data
     :rtype: bytes
     :raises ZstdError: If decompression fails.
-
-
-Rich memory compression
------------------------
-
-    Compress data using :ref:`rich memory mode<rich_mem>`. This mode allocates more memory for output buffer, it's faster in some cases.
-
-    This section contains:
-
-        * function :py:func:`richmem_compress`
-        * class :py:class:`RichMemZstdCompressor`, a reusable compressor.
-
-.. py:function:: richmem_compress(data, level_or_option=None, zstd_dict=None)
-
-    Use :ref:`rich memory mode<rich_mem>` to compress *data*. It's faster than :py:func:`compress` in some cases, but allocates more memory.
-
-    The parameters are the same as :py:func:`compress` function.
-
-    Compressing ``b''`` will get an empty content frame (9 bytes or more).
-
-
-.. py:class:: RichMemZstdCompressor
-
-    A reusable compressor using :ref:`rich memory mode<rich_mem>`. It can be reused for big number of same type individual data.
-
-    Since it can only generates individual :ref:`frames<frame_block>`, it's not suitable for streaming compression, otherwise the compression ratio will be reduced, and some programs can't decompress multiple frames data. For streaming compression, see :ref:`this section<stream_compression>`.
-
-    Thread-safe at method level.
-
-    .. py:method:: __init__(self, level_or_option=None, zstd_dict=None)
-
-        The parameters are the same as :py:meth:`ZstdCompressor.__init__` method.
-
-    .. py:method:: compress(self, data)
-
-        Compress *data* using :ref:`rich memory mode<rich_mem>`, return a single zstd :ref:`frame<frame_block>`.
-
-        Compressing ``b''`` will get an empty content frame (9 bytes or more).
-
-        :param data: Data to be compressed.
-        :type data: bytes-like object
-        :return: A single zstd frame.
-        :rtype: bytes
-
-    .. sourcecode:: python
-
-        c = RichMemZstdCompressor()
-        frame1 = c.compress(raw_dat1)
-        frame2 = c.compress(raw_dat2)
 
 
 .. _stream_compression:
@@ -714,18 +662,11 @@ ZstdFile class and open() function
 
     It can be used with Python's ``tarfile`` module, see :ref:`this note<with_tarfile>`.
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_size=131_591)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None)
 
         The *filename* argument can be an existing `file object <https://docs.python.org/3/glossary.html#term-file-object>`_ to wrap, or the name of the file to open (as a ``str``, ``bytes`` or `path-like <https://docs.python.org/3/glossary.html#term-path-like-object>`_ object). When wrapping an existing file object, the wrapped file will not be closed when the ZstdFile is closed.
 
         The *mode* argument can be either "r" for reading (default), "w" for overwriting, "x" for exclusive creation, or "a" for appending. These can equivalently be given as "rb", "wb", "xb" and "ab" respectively.
-
-        In reading mode (decompression), *read_size* argument is bytes number that read from the underlying file object each time, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
-
-        In writing modes (compression), *write_size* argument is output buffer's size, default value is zstd's recommended value. If use with Network File System, increasing it may get better performance.
-
-    .. versionchanged:: 0.15.9
-        Add *read_size* and *write_size* arguments.
 
     In reading mode (decompression), these methods and statement are available:
 
@@ -802,7 +743,7 @@ SeekableZstdFile class
 
     .. versionadded:: 0.15.9
 
-    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, read_size=131_075, write_size=131_591, max_frame_content_size=1024*1024*1024)
+    .. py:method:: __init__(self, filename, mode="r", *, level_or_option=None, zstd_dict=None, max_frame_content_size=1024*1024*1024)
 
         Same as :py:meth:`ZstdFile.__init__`. Except in append mode (a, ab), *filename* argument can't be a file object, please use file path (str/bytes/PathLike form) in this mode.
 
@@ -1079,9 +1020,7 @@ Advanced parameters
         In these compressions, the content size is known:
 
             * :py:func:`compress` function
-            * :py:func:`richmem_compress` function
             * :py:class:`ZstdCompressor` class using a single :py:attr:`~ZstdCompressor.FLUSH_FRAME` mode
-            * :py:class:`RichMemZstdCompressor` class
 
         The field in frame header is 1/2/4/8 bytes, depending on size value. It may help decompression code to allocate output buffer faster.
 
@@ -1295,41 +1234,6 @@ Multi-threaded compression
 
     .. hint::
         Using "CPU physical cores number" as threads number may be the fastest, to get the number need to install third-party module. `os.cpu_count() <https://docs.python.org/3/library/os.html#os.cpu_count>`_ can only get "CPU logical cores number" (hyper-threading capability).
-
-
-Rich memory mode
->>>>>>>>>>>>>>>>
-
-.. _rich_mem:
-
-.. note:: Rich memory mode
-
-    pyzstd module has a "rich memory mode" for compression. It allocates more memory for output buffer, and faster in some cases. Suitable for extremely fast compression scenarios.
-
-    There is a :py:func:`richmem_compress` function, a :py:class:`RichMemZstdCompressor` class.
-
-    Currently it won't be faster when using :ref:`zstd multi-threaded compression <mt_compression>`, it will issue a ``ResourceWarnings`` in this case.
-
-    Effects:
-
-    * The output buffer is larger than input data a little.
-    * If input data is larger than ~31.8KB, up to 22% faster. The lower the compression level, the much faster it is usually.
-
-    When not using this mode, the output buffer grows `gradually <https://github.com/Rogdham/pyzstd/blob/0.15.7/src/bin_ext/_zstdmodule.c#L218-L243>`_, in order not to allocate too much memory. The negative effect is that pyzstd module usually need to call the underlying zstd library's compress function multiple times.
-
-    When using this mode, the size of output buffer is provided by ZSTD_compressBound() function, which is larger than input data a little (maximum compressed size in worst case single-pass scenario). For a 100 MiB input data, the allocated output buffer is (100 MiB + 400 KiB). The underlying zstd library avoids extra memory copy for this output buffer size.
-
-    .. sourcecode:: python
-
-        # use richmem_compress() function
-        compressed_dat = richmem_compress(raw_dat)
-
-        # reuse RichMemZstdCompressor object
-        c = RichMemZstdCompressor()
-        frame1 = c.compress(raw_dat1)
-        frame2 = c.compress(raw_dat2)
-
-    Compressing a 520.58 MiB data, it accelerates from 5.40 seconds to 4.62 seconds.
 
 
 Use with tarfile module

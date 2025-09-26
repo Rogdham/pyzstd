@@ -1,4 +1,5 @@
 import io
+import warnings
 try:
     from os import PathLike
 except ImportError:
@@ -74,6 +75,11 @@ _MODE_CLOSED = 0
 _MODE_READ   = 1
 _MODE_WRITE  = 2
 
+class _DeprecatedPlaceholder:
+    def __repr__(self):
+        return '<DEPRECATED>'
+_DEPRECATED_PLACEHOLDER = _DeprecatedPlaceholder()
+
 class ZstdFile(io.BufferedIOBase):
     """A file object providing transparent zstd (de)compression.
 
@@ -91,7 +97,7 @@ class ZstdFile(io.BufferedIOBase):
 
     def __init__(self, filename, mode="r", *,
                  level_or_option=None, zstd_dict=None,
-                 read_size=131075, write_size=131591):
+                 read_size=_DEPRECATED_PLACEHOLDER, write_size=_DEPRECATED_PLACEHOLDER):
         """Open a zstd compressed file in binary mode.
 
         filename can be either an actual file name (given as a str, bytes, or
@@ -110,14 +116,16 @@ class ZstdFile(io.BufferedIOBase):
             support int type compression level in this case.
         zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
             decompression.
-        read_size: In reading mode, this is bytes number that read from the
-            underlying file object each time, default value is zstd's
-            recommended value. If use with Network File System, increasing
-            it may get better performance.
-        write_size: In writing modes, this is output buffer's size, default
-            value is zstd's recommended value. If use with Network File
-            System, increasing it may get better performance.
         """
+        if read_size == _DEPRECATED_PLACEHOLDER:
+            read_size = 131075
+        else:
+            warnings.warn("pyzstd.ZstdFile()'s read_size parameter is deprecated", DeprecationWarning, stacklevel=2)
+        if write_size == _DEPRECATED_PLACEHOLDER:
+            write_size = 131591
+        else:
+            warnings.warn("pyzstd.ZstdFile()'s write_size parameter is deprecated", DeprecationWarning, stacklevel=2)
+
         self._fp = None
         self._closefp = False
         self._mode = _MODE_CLOSED

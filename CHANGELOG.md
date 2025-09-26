@@ -4,6 +4,8 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Deprecate the `read_size` and `write_size` parameters of `ZstdFile` and `SeekableZstdFile`
+- Deprecate `richmem_compress` and `RichMemZstdCompressor`
 - Rework documentation to suggest using `compression.zstd` from Python stdlib, and provide a migration guide
 - Include the `zstd` library license in package distributions
 
