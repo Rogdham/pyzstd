@@ -76,9 +76,9 @@ Here are possible alternatives:
 
 ## `RichMemZstdCompressor` and `richmem_compress`
 
-The `RichMemZstdCompressor` class and `richmem_compress` function are not available.
+The `RichMemZstdCompressor` class and `richmem_compress` function, which are deprecated in `pyzstd`, are not available.
 
-Use `ZstdCompressor` and `compress` instead.
+Use `compress` instead ([more details](./deprecated.md#richmem-compress)).
 
 ## `compress_stream` and `decompress_stream`
 
@@ -92,6 +92,38 @@ The constant `compressionLevel_values` namedtuple is not available. Use the foll
 
 - `zstd.COMPRESSION_LEVEL_DEFAULT` for the default compression level.
 - `zstd.CompressionParameter.compression_level.bounds()` for the minimum and maximum compression levels.
+
+## Exceptions raised
+
+The messages of raised exceptions are not always the same.
+
+When they are due to an error in the parameters used by the caller, the type of exceptions may change as well.
+
+```python
+# before
+>>> pyzstd.compress(b'', {999:9999})
+pyzstd.ZstdError: Zstd compression parameter "unknown parameter (key 999)" is invalid. (zstd v1.5.7)
+
+# after
+>>> zstd.compress(b'', options={999:9999})
+ValueError: invalid compression parameter 'unknown parameter (key 999)'
+```
+
+## `ZstdFile`
+
+The `read_size` and `write_size` parameters of `ZstdFile` are not available.
+
+## `ZstdDict`
+
+The `is_raw` parameter of `ZstdDict` is no longer positional. Call it by its name instead.
+
+```python
+# before
+pyzstd.ZstdDict(data, True)
+
+# after
+zstd.ZstdDict(data, is_raw=True)
+```
 
 ## `SeekableZstdFile`
 

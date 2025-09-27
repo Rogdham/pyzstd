@@ -1,3 +1,4 @@
+from contextlib import contextmanager
 import array
 import gc
 import io
@@ -7,6 +8,7 @@ import random
 import sys
 import tempfile
 import unittest
+import warnings
 
 from io import BytesIO
 from math import ceil
@@ -27,6 +29,21 @@ from pyzstd import (
 )
 from pyzstd import PYZSTD_CONFIG # type: ignore
 from pyzstd._seekable_zstdfile import _SeekTable
+
+@contextmanager
+def _check_deprecated(testcase):
+    with warnings.catch_warnings(record=True) as warns:
+        yield
+    testcase.assertEqual(len(warns), 1)
+    warn = warns[0]
+    testcase.assertEqual(warn.category, DeprecationWarning)
+    testcase.assertIn(
+        str(warn.message),
+        [
+            "pyzstd.ZstdFile()'s read_size parameter is deprecated",
+            "pyzstd.ZstdFile()'s write_size parameter is deprecated",
+        ]
+    )
 
 BIT_BUILD = PYZSTD_CONFIG[0]
 DECOMPRESSED = b'1234567890'
@@ -787,27 +804,37 @@ class SeekableZstdFileCase(unittest.TestCase):
             SeekableZstdFile(b, 'r', max_frame_content_size=100)
 
     def test_init_sizes_arg(self):
-        with SeekableZstdFile(BytesIO(), 'r', read_size=1):
-            pass
-        with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'r', read_size=0)
-        with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'r', read_size=-1)
-        with self.assertRaises(TypeError):
-            SeekableZstdFile(BytesIO(), 'r', read_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'read_size'):
-            SeekableZstdFile(BytesIO(), 'w', read_size=10)
+        with _check_deprecated(self):
+            with SeekableZstdFile(BytesIO(), 'r', read_size=1):
+                pass
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                SeekableZstdFile(BytesIO(), 'r', read_size=0)
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                SeekableZstdFile(BytesIO(), 'r', read_size=-1)
+        with _check_deprecated(self):
+            with self.assertRaises(TypeError):
+                SeekableZstdFile(BytesIO(), 'r', read_size=(10,))
+        with _check_deprecated(self):
+            with self.assertRaisesRegex(ValueError, 'read_size'):
+                SeekableZstdFile(BytesIO(), 'w', read_size=10)
 
-        with SeekableZstdFile(BytesIO(), 'w', write_size=1):
-            pass
-        with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'w', write_size=0)
-        with self.assertRaises(ValueError):
-            SeekableZstdFile(BytesIO(), 'w', write_size=-1)
-        with self.assertRaises(TypeError):
-            SeekableZstdFile(BytesIO(), 'w', write_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'write_size'):
-            SeekableZstdFile(BytesIO(), 'r', write_size=10)
+        with _check_deprecated(self):
+            with SeekableZstdFile(BytesIO(), 'w', write_size=1):
+                pass
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                SeekableZstdFile(BytesIO(), 'w', write_size=0)
+        with _check_deprecated(self):
+            with self.assertRaises(ValueError):
+                SeekableZstdFile(BytesIO(), 'w', write_size=-1)
+        with _check_deprecated(self):
+            with self.assertRaises(TypeError):
+                SeekableZstdFile(BytesIO(), 'w', write_size=(10,))
+        with _check_deprecated(self):
+            with self.assertRaisesRegex(ValueError, 'write_size'):
+                SeekableZstdFile(BytesIO(), 'r', write_size=10)
 
     def test_init_append_fail(self):
         # get a temp file name
