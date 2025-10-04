@@ -75,7 +75,7 @@ except ImportError:
     from typing_extensions import deprecated
 
 
-__version__ = '0.17.0'
+__version__ = '0.18.0'
 
 __doc__ = '''\
 Python bindings to Zstandard (zstd) compression library, the API style is

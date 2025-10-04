@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.18.0 (October 5, 2025)
 
 - Support for Python 3.14
 - Deprecate the `read_size` and `write_size` parameters of `ZstdFile` and `SeekableZstdFile`
