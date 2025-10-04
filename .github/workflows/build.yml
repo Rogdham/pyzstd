@@ -15,6 +15,7 @@ env:
   CIBW_BUILD: >
     cp39-* cp310-* cp311-* cp312-* cp313-*
     pp39-* pp310-* pp311-*
+  CIBW_ENABLE: pypy pypy-eol
   CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
 
 jobs:
