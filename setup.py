@@ -7,7 +7,7 @@ import sys
 from setuptools import setup, Extension
 from setuptools.command.build_ext import build_ext
 
-def read_stuff():
+def read_stuff(packages_zstd: bool):
     ROOT_PATH = os.path.dirname(os.path.realpath(__file__))
 
     # Read README.md
@@ -23,18 +23,19 @@ def read_stuff():
         module_version = m.group(2)
 
     # Create LICENSE_zstd
-    LICENSE_ZSTD_SRC = os.path.join(ROOT_PATH, 'zstd', 'LICENSE')
-    with open(LICENSE_ZSTD_SRC, 'r', encoding='utf-8') as file:
-        license_zstd = file.read()
-    LICENSE_ZSTD_DST = os.path.join(ROOT_PATH, 'LICENSE_zstd')
-    with open(LICENSE_ZSTD_DST, 'w', encoding='utf-8') as file:
-        file.write(
-            "Depending on how it is built, this package may distribute the zstd library,\n"
-            "partially or in its integrality, in source or binary form.\n\n"
-            "Its license is reproduced below.\n\n"
-            "---\n\n"
-        )
-        file.write(license_zstd)
+    if packages_zstd:
+        LICENSE_ZSTD_SRC = os.path.join(ROOT_PATH, 'zstd', 'LICENSE')
+        with open(LICENSE_ZSTD_SRC, 'r', encoding='utf-8') as file:
+            license_zstd = file.read()
+        LICENSE_ZSTD_DST = os.path.join(ROOT_PATH, 'LICENSE_zstd')
+        with open(LICENSE_ZSTD_DST, 'w', encoding='utf-8') as file:
+            file.write(
+                "Depending on how it is built, this package may distribute the zstd library,\n"
+                "partially or in its integrality, in source or binary form.\n\n"
+                "Its license is reproduced below.\n\n"
+                "---\n\n"
+            )
+            file.write(license_zstd)
 
     return long_description, module_version
 
@@ -119,9 +120,6 @@ class pyzstd_build_ext(build_ext):
         super().build_extensions()
 
 def do_setup():
-    # Read stuff
-    long_description, module_version = read_stuff()
-
     # Parse options
     pyzstd_build_ext.PYZSTD_AVX2 = has_option('--avx2')
     pyzstd_build_ext.PYZSTD_DEBUG = has_option('--debug')
@@ -131,6 +129,11 @@ def do_setup():
     CFFI = has_option('--cffi') or platform.python_implementation() == 'PyPy'
     MULTI_PHASE_INIT = has_option('--multi-phase-init')
     NO_MREMAP = has_option('--no-mremap')
+
+    # Read stuff
+    long_description, module_version = read_stuff(
+        packages_zstd=not DYNAMIC_LINK,
+    )
 
     # Build config message
     pyzstd_build_ext.PYZSTD_CONFIG_MSG = \
