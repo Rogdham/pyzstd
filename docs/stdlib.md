@@ -59,6 +59,22 @@ zstd.DecompressionParameter.window_log_max
 
 Finally, the `CParameter.targetCBlockSize` parameter is not available for now. Assuming a version of libzstd supporting it is used at runtime (1.5.6 or later), the integer `130` can be used as a key in the dictionary passed to the `options` parameter.
 
+## `ZstdFile`'s `filename` parameter
+
+The first parameter of `ZstdFile` (`filename`) is now positional-only.
+
+```python
+# before
+pyzstd.ZstdFile("file.zst")
+pyzstd.ZstdFile(fileobj)
+pyzstd.ZstdFile(filename="file.zst")
+pyzstd.ZstdFile(filename=fileobj)
+
+# after
+zstd.ZstdFile("file.zst")
+zstd.ZstdFile(fileobj)
+```
+
 ## `ZstdCompressor._set_pledged_input_size`
 
 The method `_set_pledged_input_size` of the `ZstdCompressor` class has been renamed to `set_pledged_input_size`.
