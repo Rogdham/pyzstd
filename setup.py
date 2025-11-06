@@ -217,7 +217,7 @@ def do_setup():
         maintainer_email="contact@rogdham.net",
         url='https://github.com/Rogdham/pyzstd',
         license='BSD-3-Clause',
-        python_requires='>=3.5',
+        python_requires='>=3.10',
         install_requires=["typing-extensions>=4.13.2 ; python_version<'3.13'"],
 
         classifiers=[
@@ -227,7 +227,6 @@ def do_setup():
             "License :: OSI Approved :: BSD License",
             "Programming Language :: Python :: Implementation :: CPython",
             "Programming Language :: Python :: Implementation :: PyPy",
-            "Programming Language :: Python :: 3.9",
             "Programming Language :: Python :: 3.10",
             "Programming Language :: Python :: 3.11",
             "Programming Language :: Python :: 3.12",
@@ -244,13 +243,6 @@ def do_setup():
 
         test_suite='tests'
     )
-
-    if sys.version_info < (3, 9):
-        print()
-        print("WARNING")
-        print("    Python {} has reached end of life.".format(platform.python_version()))
-        print("    This version of Python will not be supported in future versions of pyzstd.")
-        print()
 
 if __name__ == '__main__':
     do_setup()

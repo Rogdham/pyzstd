@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Drop support for Python 3.9 and below
+
 ## 0.18.0 (October 5, 2025)
 
 - Support for Python 3.14
