@@ -579,6 +579,8 @@ _zstd_free(void *module)
 #ifdef USE_MULTI_PHASE_INIT
 static PyModuleDef_Slot _zstd_slots[] = {
     {Py_mod_exec, _zstd_exec},
+    // note: we do NOT support multiple interpreters
+    // note: we do NOT support free-threading
     {0}
 };
 #endif
