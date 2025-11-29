@@ -14,6 +14,8 @@ The `pyzstd` library was created by Ma Lin in 2020 to provide Python support for
 
 In 2025, an effort led by [Emma Smith](https://github.com/emmatyping) (now a CPython core developer) resulted in [PEP 784][] and the inclusion of the [`compression.zstd` module][compression.zstd] in the Python 3.14 standard library. The implementation was adapted from `pyzstd`, with its maintainer [Rogdham](https://github.com/rogdham) contributing directly to the effort. Rogdham also developed the [`backports.zstd` library][backports.zstd] which backports the `compression.zstd` APIs to older Python versions.
 
+In version 0.19.0, `pyzstd` became a pure-Python package by using the `compression.zstd` module internally.
+
 Recommendations:
 
 - **New projects**: use the standard library [`compression.zstd` module][compression.zstd], with [`backports.zstd`][backports.zstd] as a fallback for older Python versions.

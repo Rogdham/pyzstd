@@ -10,7 +10,6 @@ import sys
 import array
 import pathlib
 import pickle
-import platform
 import random
 import subprocess
 import tempfile
@@ -25,45 +24,7 @@ from pyzstd import ZstdCompressor, RichMemZstdCompressor, \
                    ZstdDict, train_dict, finalize_dict, \
                    zstd_version, zstd_version_info, zstd_support_multithread, \
                    compressionLevel_values, get_frame_info, get_frame_size, \
-                   ZstdFile, open, __version__ as pyzstd_version, PYZSTD_CONFIG, \
-                   _train_dict, _finalize_dict, \
-                   _ZstdFileReader, _ZstdFileWriter
-
-if PYZSTD_CONFIG[1] == 'c':
-    from pyzstd._c import _zstd       # type: ignore
-
-build_info = ('Pyzstd build information:\n'
-              ' - Environment:\n'
-              '   * Machine type: {}\n'
-              '   * OS: {}\n'
-              '   * Python: {} {}, {}-bit build ({})\n'
-              ' - Pyzstd:\n'
-              '   * Pyzstd version: {}\n'
-              '   * Implementation: {}\n'
-              '   * Enable multi-phase init: {}\n'
-              '   * Use mremap output buffer: {}\n'
-              '   * Link to zstd library: {}\n'
-              ' - Zstd:\n'
-              '   * Zstd version: {}\n'
-              '   * Enable multi-threaded compression: {}\n').format(
-                    platform.machine(), # Environment
-                    platform.system(),
-                    platform.python_implementation(),
-                    platform.python_version(),
-                    PYZSTD_CONFIG[0],
-                    platform.python_compiler(),
-                    pyzstd_version,     # Pyzstd
-                    PYZSTD_CONFIG[1].upper(),
-                    'Not for CFFI implementation' \
-                        if PYZSTD_CONFIG[1] == 'cffi' \
-                        else PYZSTD_CONFIG[3],
-                    'Not for CFFI implementation' \
-                        if PYZSTD_CONFIG[1] == 'cffi' \
-                        else PYZSTD_CONFIG[4],
-                    'Statically link' if PYZSTD_CONFIG[2] else 'Dynamically link',
-                    zstd_version,       # Zstd
-                    zstd_support_multithread)
-print(build_info, flush=True)
+                   ZstdFile, open
 
 DAT_130K_D = None
 DAT_130K_C = None
@@ -409,7 +370,6 @@ class ClassShapeTestCase(unittest.TestCase):
             pass
 
     def test_ZstdDict(self):
-        ZstdDict(b'12345678', True)
         zd = ZstdDict(b'12345678', is_raw=True)
 
         self.assertEqual(type(zd.dict_content), bytes)
@@ -422,16 +382,10 @@ class ClassShapeTestCase(unittest.TestCase):
         self.assertIn('.ZstdDict', str(type(zd)))
 
         # doesn't support pickle
-        with self.assertRaisesRegex(TypeError,
-                                    r'save \.dict_content attribute'):
+        with self.assertRaisesRegex((TypeError, pickle.PicklingError), 'pickle'):
             pickle.dumps(zd)
-        with self.assertRaisesRegex(TypeError,
-                                    r'save \.dict_content attribute'):
+        with self.assertRaisesRegex((TypeError, pickle.PicklingError), 'pickle'):
             pickle.dumps(zd.as_prefix)
-
-        # supports subclass
-        class SubClass(ZstdDict):
-            pass
 
     def test_Strategy(self):
         # class attributes
@@ -454,11 +408,7 @@ class ClassShapeTestCase(unittest.TestCase):
         CParameter.minMatch
         CParameter.targetLength
         CParameter.strategy
-        if zstd_version_info >= (1, 5, 6):
-            CParameter.targetCBlockSize
-        else:
-            with self.assertRaises(NotImplementedError):
-                CParameter.targetCBlockSize
+        CParameter.targetCBlockSize
 
         CParameter.enableLongDistanceMatching
         CParameter.ldmHashLog
@@ -497,46 +447,6 @@ class ClassShapeTestCase(unittest.TestCase):
         else:
             self.assertFalse(True, 'unreachable code path')
 
-    def test_pyzstd_config(self):
-        self.assertEqual(len(PYZSTD_CONFIG), 5)
-        if sys.maxsize > 2**32:
-            self.assertEqual(PYZSTD_CONFIG[0], 64)
-        else:
-            self.assertEqual(PYZSTD_CONFIG[0], 32)
-        self.assertIn(PYZSTD_CONFIG[1], ('c', 'cffi'))
-        self.assertEqual(type(PYZSTD_CONFIG[2]), bool)
-        self.assertEqual(type(PYZSTD_CONFIG[3]), bool)
-        self.assertEqual(type(PYZSTD_CONFIG[4]), bool)
-
-    def test_ZstdFile_extend(self):
-        # These classes and variables can be used to extend ZstdFile,
-        # such as SeekableZstdFile(ZstdFile), so pin them down.
-        self.assertTrue(issubclass(ZstdFile, io.BufferedIOBase))
-
-        # file object
-        bio = BytesIO()
-        with ZstdFile(bio, 'r') as f:
-            self.assertTrue(hasattr(f, '_fp'))
-            self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_buffer'))
-        with ZstdFile(bio, 'w') as f:
-            self.assertTrue(hasattr(f, '_fp'))
-            self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_writer'))
-
-        # file
-        with tempfile.NamedTemporaryFile(delete=False) as tmp_f:
-            PATH = tmp_f.name
-        with ZstdFile(PATH, 'r') as f:
-            self.assertTrue(hasattr(f, '_fp'))
-            self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_buffer'))
-        with ZstdFile(PATH, 'w') as f:
-            self.assertTrue(hasattr(f, '_fp'))
-            self.assertTrue(hasattr(f, '_mode'))
-            self.assertTrue(hasattr(f, '_writer'))
-        os.remove(PATH)
-
 class CompressorDecompressorTestCase(unittest.TestCase):
 
     def test_simple_bad_args(self):
@@ -551,14 +461,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, ZstdCompressor, zstd_dict={1:2, 3:4})
         self.assertRaises(TypeError, ZstdCompressor, rich_mem=True)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             ZstdCompressor(2**31)
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             ZstdCompressor({2**31 : 100})
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             ZstdCompressor({CParameter.windowLog:100})
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             ZstdCompressor({3333 : 100})
 
         # EndlessZstdDecompressor
@@ -572,12 +482,12 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertRaises(TypeError, EndlessZstdDecompressor, option=b'abc')
         self.assertRaises(TypeError, EndlessZstdDecompressor, rich_mem=True)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             EndlessZstdDecompressor(option={2**31 : 100})
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             EndlessZstdDecompressor(option={DParameter.windowLogMax:100})
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             EndlessZstdDecompressor(option={3333 : 100})
 
         # Method bad arguments
@@ -636,17 +546,17 @@ class CompressorDecompressorTestCase(unittest.TestCase):
             d[CParameter.targetCBlockSize] = 150
         ZstdCompressor(level_or_option=d)
 
-        # larger than signed int, ValueError
+        # larger than signed int
         d1 = d.copy()
         d1[CParameter.ldmBucketSizeLog] = 2**31
-        self.assertRaises(ValueError, ZstdCompressor, d1)
+        self.assertRaises(OverflowError, ZstdCompressor, d1)
 
         # clamp compressionLevel
-        compress(b'', compressionLevel_values.max+1)
-        compress(b'', compressionLevel_values.min-1)
+        self.assertRaises(ValueError, compress, b'', compressionLevel_values.max+1)
+        self.assertRaises(ValueError, compress, b'', compressionLevel_values.min-1)
 
-        compress(b'', {CParameter.compressionLevel:compressionLevel_values.max+1})
-        compress(b'', {CParameter.compressionLevel:compressionLevel_values.min-1})
+        self.assertRaises(ValueError, compress, b'', {CParameter.compressionLevel:compressionLevel_values.max+1})
+        self.assertRaises(ValueError, compress, b'', {CParameter.compressionLevel:compressionLevel_values.min-1})
 
         # zstd lib doesn't support MT compression
         if not zstd_support_multithread:
@@ -659,45 +569,43 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         # out of bounds error msg
         option = {CParameter.windowLog:100}
-        with self.assertRaisesRegex(ZstdError,
-                (r'Error when setting zstd compression parameter "windowLog", '
-                 r'it should \d+ <= value <= \d+, provided value is 100\. '
-                 r'\(zstd v\d\.\d\.\d, (?:32|64)-bit build\)')):
+        with self.assertRaisesRegex(ValueError,
+                (r"compression parameter 'window_log' "
+                 r'received an illegal value 100; the valid range is')):
             compress(b'', option)
 
     def test_decompress_parameters(self):
         d = {DParameter.windowLogMax : 15}
         EndlessZstdDecompressor(option=d)
 
-        # larger than signed int, ValueError
+        # larger than signed int
         d1 = d.copy()
         d1[DParameter.windowLogMax] = 2**31
-        self.assertRaises(ValueError, EndlessZstdDecompressor, None, d1)
+        self.assertRaises(OverflowError, EndlessZstdDecompressor, None, d1)
 
         # out of bounds error msg
         option = {DParameter.windowLogMax:100}
-        with self.assertRaisesRegex(ZstdError,
-                (r'Error when setting zstd decompression parameter "windowLogMax", '
-                 r'it should \d+ <= value <= \d+, provided value is 100\. '
-                 r'\(zstd v\d\.\d\.\d, (?:32|64)-bit build\)')):
+        with self.assertRaisesRegex(ValueError,
+                (r"decompression parameter 'window_log_max' "
+                 r'received an illegal value 100; the valid range is')):
             decompress(b'', option=option)
 
     def test_unknown_compression_parameter(self):
         KEY = 100001234
         option = {CParameter.compressionLevel: 10,
                   KEY: 200000000}
-        pattern = r'Zstd compression parameter.*?"unknown parameter \(key %d\)"' \
+        pattern = r"invalid compression parameter 'unknown parameter \(key %d\)'" \
                   % KEY
-        with self.assertRaisesRegex(ZstdError, pattern):
+        with self.assertRaisesRegex(ValueError, pattern):
             ZstdCompressor(option)
 
     def test_unknown_decompression_parameter(self):
         KEY = 100001234
         option = {DParameter.windowLogMax: DParameter.windowLogMax.bounds()[1],
                   KEY: 200000000}
-        pattern = r'Zstd decompression parameter.*?"unknown parameter \(key %d\)"' \
+        pattern = r"invalid decompression parameter 'unknown parameter \(key %d\)'" \
                   % KEY
-        with self.assertRaisesRegex(ZstdError, pattern):
+        with self.assertRaisesRegex(ValueError, pattern):
             ZstdDecompressor(option=option)
 
     @unittest.skipIf(not zstd_support_multithread,
@@ -715,7 +623,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertEqual(dat2, b)
 
         # richmem_compress()
-        with self.assertWarns(ResourceWarning):
+        with _check_deprecated(self):
             dat1 = richmem_compress(b, option)
         dat2 = decompress(dat1)
         self.assertEqual(dat2, b)
@@ -746,8 +654,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
     def test_rich_mem_compress_warn(self):
         b = THIS_FILE_BYTES[:len(THIS_FILE_BYTES)//3]
 
-        # warning when multi-threading compression
-        with self.assertWarns(ResourceWarning):
+        with _check_deprecated(self):
             dat1 = richmem_compress(b, {CParameter.nbWorkers:2})
 
         dat2 = decompress(dat1)
@@ -759,14 +666,14 @@ class CompressorDecompressorTestCase(unittest.TestCase):
 
         # wrong value
         c = ZstdCompressor()
-        with self.assertRaisesRegex(ValueError, r'64-bit unsigned integer'):
+        with self.assertRaisesRegex(ValueError, r'positive int less than'):
             c._set_pledged_input_size(-300)
 
         # wrong mode
         c = ZstdCompressor(1)
         c.compress(b'123456')
         self.assertEqual(c.last_mode, c.CONTINUE)
-        with self.assertRaisesRegex(RuntimeError, r'\.last_mode == \.FLUSH_FRAME'):
+        with self.assertRaisesRegex(ValueError, r'last_mode == FLUSH_FRAME'):
             c._set_pledged_input_size(300)
 
         # None value
@@ -1105,7 +1012,7 @@ class CompressorDecompressorTestCase(unittest.TestCase):
         self.assertEqual(nt.decompressed_size, len(THIS_FILE_BYTES))
 
     def test_decompressor_arg(self):
-        zd = ZstdDict(b'12345678', True)
+        zd = ZstdDict(b'12345678', is_raw=True)
 
         with self.assertRaises(TypeError):
             d = ZstdDecompressor(zstd_dict={})
@@ -1344,13 +1251,13 @@ class DecompressorFlagsTestCase(unittest.TestCase):
 
         self.assertEqual(decompress(self.UNKNOWN_FRAME_42), self.DECOMPRESSED_42)
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(self.FRAME_42[:1])
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(self.FRAME_42[:-4])
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(self.FRAME_42[:-1])
 
         # 2 frames
@@ -1364,19 +1271,19 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         self.assertEqual(decompress(self.UNKNOWN_FRAME_42 + self.FRAME_60),
                          self.DECOMPRESSED_42_60)
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(self.FRAME_42_60[:-4])
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(self.UNKNOWN_FRAME_42_60[:-1])
 
         # 130KB
         self.assertEqual(decompress(DAT_130K_C), DAT_130K_D)
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(DAT_130K_C[:-4])
 
-        with self.assertRaisesRegex(ZstdError, "incomplete frame"):
+        with self.assertRaisesRegex(ZstdError, "Compressed data ended before the end-of-stream marker was reached"):
             decompress(DAT_130K_C[:-1])
 
         # Unknown frame descriptor
@@ -1847,57 +1754,6 @@ class DecompressorFlagsTestCase(unittest.TestCase):
         with self.assertRaises(ZstdError):
             d.decompress(b'123456789')
 
-    def test_reset_session(self):
-        D_DAT = SAMPLES[0]
-        C_DAT = compress(D_DAT, zstd_dict=TRAINED_DICT)
-        C_2DAT = C_DAT * 2
-        TAIL = b'1234'
-
-        # ZstdDecompressor
-        d = ZstdDecompressor(zstd_dict=TRAINED_DICT)
-        # part data
-        dat = d.decompress(C_DAT+TAIL, 10)
-        self.assertEqual(dat, D_DAT[:10])
-        self.assertFalse(d.eof)
-        self.assertFalse(d.needs_input)
-        self.assertEqual(d.unused_data, b'')
-
-        # reset
-        self.assertIsNone(d._reset_session())
-        self.assertFalse(d.eof)
-        self.assertTrue(d.needs_input)
-        self.assertEqual(d.unused_data, b'')
-
-        # full
-        self.assertEqual(d.decompress(C_DAT+TAIL), D_DAT)
-        self.assertTrue(d.eof)
-        self.assertFalse(d.needs_input)
-        self.assertEqual(d.unused_data, TAIL)
-
-        # reset
-        self.assertIsNone(d._reset_session())
-        self.assertFalse(d.eof)
-        self.assertTrue(d.needs_input)
-        self.assertEqual(d.unused_data, b'')
-
-        # full
-        self.assertEqual(d.decompress(C_2DAT), D_DAT)
-        self.assertTrue(d.eof)
-        self.assertFalse(d.needs_input)
-        self.assertEqual(d.unused_data, C_DAT)
-
-        # EndlessZstdDecompressor
-        d = EndlessZstdDecompressor(zstd_dict=TRAINED_DICT)
-        dat = d.decompress(C_2DAT, 10)
-        self.assertEqual(dat, D_DAT[:10])
-        self.assertFalse(d.at_frame_edge)
-        self.assertFalse(d.needs_input)
-
-        self.assertIsNone(d._reset_session()) # reset
-        self.assertTrue(d.at_frame_edge)
-        self.assertTrue(d.needs_input)
-        self.assertEqual(d.decompress(C_2DAT), D_DAT*2)
-
 class ZstdDictTestCase(unittest.TestCase):
 
     def test_is_raw(self):
@@ -1948,28 +1804,28 @@ class ZstdDictTestCase(unittest.TestCase):
 
         # corrupted
         zd = ZstdDict(dict_content, is_raw=False)
-        with self.assertRaisesRegex(ZstdError, r'ZSTD_CDict.*?corrupted'):
+        with self.assertRaisesRegex(ZstdError, r'Failed to create a ZSTD_CDict instance'):
             ZstdCompressor(zstd_dict=zd.as_digested_dict)
-        with self.assertRaisesRegex(ZstdError, r'ZSTD_DDict.*?corrupted'):
+        with self.assertRaisesRegex(ZstdError, r'Failed to create a ZSTD_DDict instance'):
             ZstdDecompressor(zd)
 
         # wrong type
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdCompressor(zstd_dict=(zd, b'123'))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdCompressor(zstd_dict=(zd, 1, 2))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdCompressor(zstd_dict=(zd, -1))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdCompressor(zstd_dict=(zd, 3))
 
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdDecompressor(zstd_dict=(zd, b'123'))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdDecompressor((zd, 1, 2))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdDecompressor((zd, -1))
-        with self.assertRaisesRegex(TypeError, r'should be ZstdDict object'):
+        with self.assertRaisesRegex(TypeError, r'should be a ZstdDict object'):
             ZstdDecompressor((zd, 3))
 
     def test_train_dict(self):
@@ -1977,7 +1833,7 @@ class ZstdDictTestCase(unittest.TestCase):
 
         global TRAINED_DICT
         TRAINED_DICT = train_dict(SAMPLES, DICT_SIZE1)
-        ZstdDict(TRAINED_DICT.dict_content, False)
+        ZstdDict(TRAINED_DICT.dict_content, is_raw=False)
 
         self.assertNotEqual(TRAINED_DICT.dict_id, 0)
         self.assertGreater(len(TRAINED_DICT.dict_content), 0)
@@ -1997,17 +1853,10 @@ class ZstdDictTestCase(unittest.TestCase):
             self.assertEqual(sample, dat2)
 
     def test_finalize_dict(self):
-        if zstd_version_info < (1, 4, 5):
-            return
-
         DICT_SIZE2 = 200*1024
         C_LEVEL = 6
 
-        try:
-            dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, C_LEVEL)
-        except NotImplementedError:
-            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
-            return
+        dic2 = finalize_dict(TRAINED_DICT, SAMPLES, DICT_SIZE2, C_LEVEL)
 
         self.assertNotEqual(dic2.dict_id, 0)
         self.assertGreater(len(dic2.dict_content), 0)
@@ -2043,16 +1892,7 @@ class ZstdDictTestCase(unittest.TestCase):
             train_dict(SAMPLES, 0)
 
     def test_finalize_dict_arguments(self):
-        if zstd_version_info < (1, 4, 5):
-            with self.assertRaises(NotImplementedError):
-                finalize_dict({1:2}, [b'aaa', b'bbb'], 100*KB, 2)
-            return
-
-        try:
-            finalize_dict(TRAINED_DICT, SAMPLES, 1*MB, 2)
-        except NotImplementedError:
-            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
-            return
+        finalize_dict(TRAINED_DICT, SAMPLES, 1*MB, 2)
 
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, [], 100*KB, 2)
@@ -2063,100 +1903,10 @@ class ZstdDictTestCase(unittest.TestCase):
         with self.assertRaises(ValueError):
             finalize_dict(TRAINED_DICT, SAMPLES, 0, 2)
 
-    @unittest.skipIf(PYZSTD_CONFIG[1] == 'cffi', 'cffi implementation')
-    def test_train_dict_c(self):
-        # argument wrong type
-        with self.assertRaises(TypeError):
-            _zstd._train_dict({}, [], 100)
-        with self.assertRaises(TypeError):
-            _zstd._train_dict(b'', 99, 100)
-        with self.assertRaises(TypeError):
-            _zstd._train_dict(b'', [], 100.1)
-
-        # size > size_t
-        with self.assertRaises(ValueError):
-            _zstd._train_dict(b'', [2**64+1], 100)
-
-        # dict_size <= 0
-        with self.assertRaises(ValueError):
-            _zstd._train_dict(b'', [], 0)
-
-    @unittest.skipIf(PYZSTD_CONFIG[1] == 'cffi', 'cffi implementation')
-    def test_finalize_dict_c(self):
-        if zstd_version_info < (1, 4, 5):
-            with self.assertRaises(NotImplementedError):
-                _zstd._finalize_dict(1, 2, 3, 4, 5)
-            return
-
-        try:
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'123', [3,], 1*MB, 5)
-        except NotImplementedError:
-            # < v1.4.5 at compile-time, >= v.1.4.5 at run-time
-            return
-
-        # argument wrong type
-        with self.assertRaises(TypeError):
-            _zstd._finalize_dict({}, b'', [], 100, 5)
-        with self.assertRaises(TypeError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, {}, [], 100, 5)
-        with self.assertRaises(TypeError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', 99, 100, 5)
-        with self.assertRaises(TypeError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 100.1, 5)
-        with self.assertRaises(TypeError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 100, 5.1)
-
-        # size > size_t
-        with self.assertRaises(ValueError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [2**64+1], 100, 5)
-
-        # dict_size <= 0
-        with self.assertRaises(ValueError):
-            _zstd._finalize_dict(TRAINED_DICT.dict_content, b'', [], 0, 5)
-
-    def test_train_buffer_protocol_samples(self):
-        def _nbytes(dat):
-            if isinstance(dat, (bytes, bytearray)):
-                return len(dat)
-            return memoryview(dat).nbytes
-
-        # prepare samples
-        chunk_lst = []
-        wrong_size_lst = []
-        correct_size_lst = []
-        for _ in range(300):
-            arr = array.array('Q', [random.randint(0, 20) for i in range(20)])
-            chunk_lst.append(arr)
-            correct_size_lst.append(_nbytes(arr))
-            wrong_size_lst.append(len(arr))
-        concatenation = b''.join(chunk_lst)
-
-        # wrong size list
-        with self.assertRaisesRegex(ValueError,
-                "The samples size list doesn't match the concatenation's size"):
-            _train_dict(concatenation, wrong_size_lst, 100*1024)
-
-        # correct size list
-        _train_dict(concatenation, correct_size_lst, 3*1024)
-
-        # test _finalize_dict
-        if zstd_version_info < (1, 4, 5):
-            return
-
-        # wrong size list
-        with self.assertRaisesRegex(ValueError,
-                "The samples size list doesn't match the concatenation's size"):
-            _finalize_dict(TRAINED_DICT.dict_content,
-                                  concatenation, wrong_size_lst, 300*1024, 5)
-
-        # correct size list
-        _finalize_dict(TRAINED_DICT.dict_content,
-                              concatenation, correct_size_lst, 300*1024, 5)
-
     def test_as_prefix(self):
         # V1
         V1 = THIS_FILE_BYTES
-        zd = ZstdDict(V1, True)
+        zd = ZstdDict(V1, is_raw=True)
 
         # V2
         mid = len(V1) // 2
@@ -2173,7 +1923,7 @@ class ZstdDictTestCase(unittest.TestCase):
         self.assertEqual(decompress(dat, zd.as_prefix), V2)
 
         # use wrong prefix
-        zd2 = ZstdDict(SAMPLES[0], True)
+        zd2 = ZstdDict(SAMPLES[0], is_raw=True)
         try:
             decompressed = decompress(dat, zd2.as_prefix)
         except ZstdError: # expected
@@ -2580,19 +2330,19 @@ class FileTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(), "w", level_or_option='asd')
         # CHECK_UNKNOWN and anything above CHECK_ID_MAX should be invalid.
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             ZstdFile(BytesIO(), "w", level_or_option={999:9999})
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             ZstdFile(BytesIO(), "w", level_or_option={CParameter.windowLog:99})
 
         with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "r", level_or_option=33)
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(OverflowError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                              level_or_option={DParameter.windowLogMax:2**31})
 
-        with self.assertRaises(ZstdError):
+        with self.assertRaises(ValueError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB),
                              level_or_option={444:333})
 
@@ -2607,33 +2357,25 @@ class FileTestCase(unittest.TestCase):
             with ZstdFile(BytesIO(), 'r', read_size=1):
                 pass
         with _check_deprecated(self):
-            with self.assertRaises(ValueError):
-                ZstdFile(BytesIO(), 'r', read_size=0)
+            ZstdFile(BytesIO(), 'r', read_size=0)
         with _check_deprecated(self):
-            with self.assertRaises(ValueError):
-                ZstdFile(BytesIO(), 'r', read_size=-1)
+            ZstdFile(BytesIO(), 'r', read_size=-1)
         with _check_deprecated(self):
-            with self.assertRaises(TypeError):
-                ZstdFile(BytesIO(), 'r', read_size=(10,))
+            ZstdFile(BytesIO(), 'r', read_size=(10,))
         with _check_deprecated(self):
-            with self.assertRaisesRegex(ValueError, 'read_size'):
-                ZstdFile(BytesIO(), 'w', read_size=10)
+            ZstdFile(BytesIO(), 'w', read_size=10)
 
         with _check_deprecated(self):
             with ZstdFile(BytesIO(), 'w', write_size=1):
                 pass
-        with self.assertRaises(ValueError):
-            with _check_deprecated(self):
-                ZstdFile(BytesIO(), 'w', write_size=0)
-        with self.assertRaises(ValueError):
-            with _check_deprecated(self):
-                ZstdFile(BytesIO(), 'w', write_size=-1)
-        with self.assertRaises(TypeError):
-            with _check_deprecated(self):
-                ZstdFile(BytesIO(), 'w', write_size=(10,))
-        with self.assertRaisesRegex(ValueError, 'write_size'):
-            with _check_deprecated(self):
-                ZstdFile(BytesIO(), 'r', write_size=10)
+        with _check_deprecated(self):
+            ZstdFile(BytesIO(), 'w', write_size=0)
+        with _check_deprecated(self):
+            ZstdFile(BytesIO(), 'w', write_size=-1)
+        with _check_deprecated(self):
+            ZstdFile(BytesIO(), 'w', write_size=(10,))
+        with _check_deprecated(self):
+            ZstdFile(BytesIO(), 'r', write_size=10)
 
     def test_init_close_fp(self):
         # get a temp file name
@@ -2641,7 +2383,7 @@ class FileTestCase(unittest.TestCase):
             tmp_f.write(DAT_130K_C)
             filename = tmp_f.name
 
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             ZstdFile(filename, level_or_option={'a':'b'})
 
         # for PyPy
@@ -2824,102 +2566,14 @@ class FileTestCase(unittest.TestCase):
             f.close()
         self.assertRaises(ValueError, f.writable)
 
-    def test_ZstdFileWriter(self):
-        bo = BytesIO()
-
-        # wrong arg
-        with self.assertRaisesRegex(TypeError, 'level_or_option'):
-            _ZstdFileWriter(
-                                fp=bo,
-                                level_or_option=TRAINED_DICT,
-                                zstd_dict=None,
-                                write_size=131591)
-        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
-            _ZstdFileWriter(
-                                fp=bo,
-                                level_or_option=3,
-                                zstd_dict={1:2},
-                                write_size=131591)
-        with self.assertRaisesRegex(ValueError, 'write_size'):
-            _ZstdFileWriter(
-                                fp=bo,
-                                level_or_option=3,
-                                zstd_dict=TRAINED_DICT,
-                                write_size=0)
-
-        w = _ZstdFileWriter(
-                            fp=bo,
-                            level_or_option=None,
-                            zstd_dict=None,
-                            write_size=131591)
-        # write
-        ret = w.write(DAT_130K_D)
-        self.assertEqual(ret[0], len(DAT_130K_D))
-        self.assertGreater(ret[1], 0)
-        # flush block
-        ret = w.flush(ZstdCompressor.FLUSH_BLOCK)
-        self.assertEqual(ret[0], 0)
-        self.assertGreaterEqual(ret[1], 0)
-        # flush frame
-        ret = w.flush(ZstdCompressor.FLUSH_FRAME)
-        self.assertEqual(ret[0], 0)
-        self.assertGreaterEqual(ret[1], 0)
-        # flush .CONTINUE
-        with self.assertRaisesRegex(ValueError,
-                                    'mode argument wrong value'):
-            w.flush(ZstdCompressor.CONTINUE)
-
-        self.assertEqual(decompress(bo.getvalue()), DAT_130K_D)
-
-    def test_ZstdFileReader(self):
-        # wrong arg
-        with self.assertRaisesRegex(TypeError, 'zstd_dict'):
-            _ZstdFileReader(
-                                fp=BytesIO(self.FRAME_42),
-                                zstd_dict={1:2}, option=None,
-                                read_size=131075)
-        with self.assertRaisesRegex(TypeError, 'option'):
-            _ZstdFileReader(
-                                fp=BytesIO(self.FRAME_42),
-                                zstd_dict=TRAINED_DICT, option=3,
-                                read_size=131075)
-        with self.assertRaisesRegex(ValueError, 'read_size'):
-            _ZstdFileReader(
-                                fp=BytesIO(self.FRAME_42),
-                                zstd_dict=TRAINED_DICT, option=3,
-                                read_size=0)
-
-        r = _ZstdFileReader(
-                            fp=BytesIO(self.FRAME_42),
-                            zstd_dict=None, option=None,
-                            read_size=131075)
-        ba = bytearray(100)
-        mv = memoryview(ba)
-
-        # cffi implementation can't distinguish read-only buffer
-        if PYZSTD_CONFIG[1] != 'cffi':
-            with self.assertRaisesRegex(BufferError, 'not writable'):
-                r.readinto(b'123')
-
-        self.assertEqual(r.readinto(mv[0:0]), 0)
-        self.assertEqual(r.readinto(mv[:42]), 42)
-        self.assertEqual(mv[:42], self.DECOMPRESSED_42)
-        self.assertFalse(r.eof)
-        self.assertEqual(r.readinto(mv[:10]), 0)
-        self.assertTrue(r.eof)
-
     def test_read(self):
         with ZstdFile(BytesIO(self.FRAME_42)) as f:
             self.assertEqual(f.read(), self.DECOMPRESSED_42)
-            self.assertTrue(f._buffer.raw._decomp.eof)
             self.assertEqual(f.read(), b"")
-            self.assertTrue(f._buffer.raw._decomp.eof)
 
         with ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB)) as f:
             self.assertEqual(f.read(), DECOMPRESSED_100_PLUS_32KB)
-            self.assertTrue(f._buffer.raw._decomp.eof)
             self.assertEqual(f.read(), b"")
-            self.assertTrue(f._buffer.raw._decomp.eof)
 
         with _check_deprecated(self):
             with ZstdFile(BytesIO(DAT_130K_C),
@@ -3420,10 +3074,8 @@ class FileTestCase(unittest.TestCase):
             def read(self, size):
                 return b'a' * size
 
-        with self.assertRaises(AttributeError): # on close
-            with ZstdFile(T(), 'w') as f:
-                with self.assertRaises(AttributeError): # on write
-                    f.write(b'1234')
+        with self.assertRaises(TypeError):
+            ZstdFile(T(), 'w')
 
         # 3
         with ZstdFile(BytesIO(), 'w') as f:
@@ -3782,7 +3434,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, r'output_stream'):
             with _check_deprecated(self):
                 compress_stream(b1, 123)
-        with self.assertRaisesRegex(TypeError, r'level_or_option'):
+        with self.assertRaisesRegex(TypeError, r'options'):
             with _check_deprecated(self):
                 compress_stream(b1, b2, level_or_option='3')
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
@@ -3791,18 +3443,17 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(TypeError, r'zstd_dict'):
             with _check_deprecated(self):
                 compress_stream(b1, b2, zstd_dict=b'1234567890')
-        with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
+        with self.assertRaisesRegex(ValueError, r'size argument'):
             with _check_deprecated(self):
                 compress_stream(b1, b2, pledged_input_size=-1)
-        with self.assertRaisesRegex(ValueError, r'pledged_input_size'):
+        with self.assertRaisesRegex(ValueError, r'size argument'):
             with _check_deprecated(self):
                 compress_stream(b1, b2, pledged_input_size=2**64+1)
         with self.assertRaisesRegex(ValueError, r'read_size'):
             with _check_deprecated(self):
                 compress_stream(b1, b2, read_size=-1)
-        with self.assertRaises(OverflowError):
-            with _check_deprecated(self):
-                compress_stream(b1, b2, write_size=2**64+1)
+        with _check_deprecated(self):
+            compress_stream(b1, b2, write_size=2**64+1)
         with self.assertRaisesRegex(TypeError, r'callback'):
             with _check_deprecated(self):
                 compress_stream(b1, None, callback=None)
@@ -3898,9 +3549,8 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, r'read_size'):
             with _check_deprecated(self):
                 decompress_stream(b1, b2, read_size=-1)
-        with self.assertRaises(OverflowError):
-            with _check_deprecated(self):
-                decompress_stream(b1, b2, write_size=2**64+1)
+        with _check_deprecated(self):
+            decompress_stream(b1, b2, write_size=2**64+1)
         with self.assertRaisesRegex(TypeError, r'callback'):
             with _check_deprecated(self):
                 decompress_stream(b1, None, callback=None)
@@ -3967,12 +3617,6 @@ class StreamFunctionsTestCase(unittest.TestCase):
         with self.assertRaises(TypeError):
             with _check_deprecated(self):
                 decompress_stream(M(), BytesIO())
-        with self.assertRaises(TypeError):
-            with _check_deprecated(self):
-                compress_stream(BytesIO(THIS_FILE_BYTES), M())
-        with self.assertRaises(TypeError):
-            with _check_deprecated(self):
-                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), M())
 
         # wrong value
         class N:
@@ -3984,32 +3628,20 @@ class StreamFunctionsTestCase(unittest.TestCase):
                 return self.ret_value
 
         # < 0
-        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+        with self.assertRaises(TypeError):
             with _check_deprecated(self):
                 compress_stream(N(-1), BytesIO())
-        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+        with self.assertRaises(TypeError):
             with _check_deprecated(self):
                 decompress_stream(N(-2), BytesIO())
-        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            with _check_deprecated(self):
-                compress_stream(BytesIO(THIS_FILE_BYTES), N(-2))
-        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            with _check_deprecated(self):
-                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(-1))
 
         # should > upper bound (~128 KiB)
-        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+        with self.assertRaises(TypeError):
             with _check_deprecated(self):
                 compress_stream(N(10000000), BytesIO())
-        with self.assertRaisesRegex(ValueError, r'input_stream.readinto.*?<= \d+'):
+        with self.assertRaises(TypeError):
             with _check_deprecated(self):
                 decompress_stream(N(10000000), BytesIO())
-        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            with _check_deprecated(self):
-                compress_stream(BytesIO(THIS_FILE_BYTES), N(10000000))
-        with self.assertRaisesRegex(ValueError, r'output_stream.write.*?<= \d+'):
-            with _check_deprecated(self):
-                decompress_stream(BytesIO(COMPRESSED_100_PLUS_32KB), N(10000000))
 
     def test_empty_input_no_callback(self):
         def cb(a,b,c,d):
@@ -4022,7 +3654,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
             decompress_stream(io.BytesIO(b''), io.BytesIO(), callback=cb)
 
     def test_stream_dict(self):
-        zd = ZstdDict(THIS_FILE_BYTES, True)
+        zd = ZstdDict(THIS_FILE_BYTES, is_raw=True)
 
         # default
         with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
@@ -4053,7 +3685,7 @@ class StreamFunctionsTestCase(unittest.TestCase):
         self.assertEqual(decompressed, THIS_FILE_BYTES)
 
     def test_stream_prefix(self):
-        zd = ZstdDict(THIS_FILE_BYTES, True)
+        zd = ZstdDict(THIS_FILE_BYTES, is_raw=True)
 
         with BytesIO(THIS_FILE_BYTES) as bi, BytesIO() as bo:
             with _check_deprecated(self):
@@ -4183,7 +3815,7 @@ class CLITestCase(unittest.TestCase):
                                 stdout=subprocess.PIPE,
                                 stderr=subprocess.PIPE)
         self.assertRegex(result.stderr,
-                         rb'(32|64)-bit build, --long value should:')
+                         rb'--long value should:')
 
     def test_dictID_range(self):
         OUTPUT_FILE = os.path.join(self.dir_name, 'dictid_range')

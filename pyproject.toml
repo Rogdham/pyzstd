@@ -1,5 +1,60 @@
+[project]
+dynamic = ["version"]
+name = "pyzstd"
+authors = [
+    { name = "Ma Lin", email = "malincns@163.com" },
+    { name = "Rogdham", email = "contact@rogdham.net" },
+]
+maintainers = [{ name = "Rogdham", email = "contact@rogdham.net" }]
+description = "Support for Zstandard (zstd) compression"
+readme = { file = "README.md", content-type = "text/markdown" }
+keywords = [
+    "zstandard",
+    "zstd",
+    "zst",
+    "compress",
+    "decompress",
+    "tar",
+    "file",
+    "seek",
+    "seekable",
+]
+license = "BSD-3-Clause"
+license-files = ["LICENSE"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Operating System :: OS Independent",
+    "Intended Audience :: Developers",
+    "Topic :: System :: Archiving :: Compression",
+    "License :: OSI Approved :: BSD License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+]
+requires-python = ">=3.10"
+dependencies = [
+    "backports.zstd>=1.0.0 ; python_version<'3.14'",
+    "typing-extensions>=4.13.2 ; python_version<'3.13'",
+]
+
+[project.urls]
+Homepage = "https://github.com/Rogdham/pyzstd"
+Documentation = "https://pyzstd.readthedocs.io/"
+Source = "https://github.com/Rogdham/pyzstd"
+
+#
+# build
+#
+
 [build-system]
-# setuptools 64+ support --build-option
-requires = ["setuptools>=64"]
-backend-path = ["build_script"]
-build-backend = "pyzstd_pep517"
+requires = ["hatchling", "hatch-vcs"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.hooks.vcs]
+template = "__version__ = \"{version}\"\n"
+version-file = "src/pyzstd/_version.py"
+
+[tool.hatch.version]
+source = "vcs"

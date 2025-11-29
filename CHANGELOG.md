@@ -4,9 +4,12 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- The project has been completely refactored to use the Zstandard implementation from the standard library ([PEP-784](https://peps.python.org/pep-0784/))
+- The refactor has some minor impact on public APIs, such as changing the exception raised on invalid input
+- Add `backports.zstd` dependency for Python before 3.14
+- Changes in build dependency: remove `setuptools` and C build toolchain, add `hatchling` and `hatch-vcs`
+- Remove git submodule usage
 - Drop support for Python 3.9 and below
-- Build free-threaded wheels for CPython 3.13 and 3.14, even if the feature is not supported
-- Refactor SeekableZstdFile to make it independent of ZstdFile
 
 ## 0.18.0 (October 5, 2025)
 

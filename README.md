@@ -28,6 +28,8 @@ an API style similar to the `bz2`, `lzma`, and `zlib` modules.
 > We recommend new projects to use the standard library, and existing ones to consider
 > migrating.
 >
+> `pyzstd` internally uses `compression.zstd` since version 0.19.0.
+>
 > See [`pyzstd`'s documentation][doc] for details and a migration guide.
 
 [doc]: https://pyzstd.readthedocs.io/

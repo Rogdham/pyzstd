@@ -1,11 +1,11 @@
-/.vscode
+/env
+__pycache__
+
 /build
 /dist
-
-__pycache__
-*.o
-*.pdb
-*.so
 *.egg-info
+/.eggs
 
-/LICENSE_zstd
+/.vscode
+
+/src/pyzstd/_version.py

@@ -121,8 +121,6 @@ class ZstdDecompressor:
                    data: ByteString,
                    max_length: int = -1) -> bytes: ...
 
-    def _reset_session(self) -> None: ...
-
 class EndlessZstdDecompressor:
     needs_input: bool
     at_frame_edge: bool
@@ -134,8 +132,6 @@ class EndlessZstdDecompressor:
     def decompress(self,
                    data: ByteString,
                    max_length: int = -1) -> bytes: ...
-
-    def _reset_session(self) -> None: ...
 
 class ZstdError(Exception):
     ...

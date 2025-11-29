@@ -11,243 +11,88 @@ on:
   workflow_dispatch:
 
 env:
-  PYTHON_VER: "3.11" # Python to run test/cibuildwheel
-  CIBW_BUILD: >
-    cp310-* cp311-* cp312-* cp313-* cp313t-* cp314-* cp314t-*
-    pp310-* pp311-*
-  CIBW_ENABLE: cpython-freethreading pypy pypy-eol
-  CIBW_TEST_COMMAND: python -m unittest discover {project}/tests
+  PY_COLORS: 1
 
 jobs:
-  test_cpython:
-    name: Test on ${{ matrix.platform }} ${{ matrix.architecture }} ${{ matrix.build_option }}
-    runs-on: ${{ matrix.platform }}
-
-    strategy:
-      matrix:
-        platform:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-        build_option:
-          - "--warning-as-error"
-          - "--warning-as-error --multi-phase-init"
-          - "--warning-as-error --cffi"
-        architecture:
-          - x64
-        include:
-          - platform: windows-latest
-            build_option: "--warning-as-error"
-            architecture: x86
-          - platform: windows-latest
-            build_option: "--warning-as-error --multi-phase-init"
-            architecture: x86
-          - platform: windows-latest
-            build_option: "--warning-as-error --cffi"
-            architecture: x86
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-          architecture: ${{ matrix.architecture }}
-
-      - name: Run test
-        run: |
-          python -m pip install cffi
-          python -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
-          python -m unittest discover tests
-
-  test_cpython_debug:
-    name: Test debug build on Ubuntu ${{ matrix.build_option }}
+  build:
+    name: Build
     runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        build_option:
-          - "--warning-as-error --debug"
-          - "--warning-as-error --debug --multi-phase-init"
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
         with:
-          submodules: true
-
-      - name: Run test
-        run: |
-          sudo apt-get update
-          sudo apt-get install python3-dbg
-          python3-dbg -m pip install --config-settings="--build-option=${{ matrix.build_option }}" -vv .
-          python3-dbg -m unittest discover tests
-
-  test_pypy:
-    name: Test on ${{ matrix.py }}
-    runs-on: ubuntu-latest
-
-    strategy:
-      matrix:
-        py:
-          - "pypy-3.10"
-          - "pypy-3.11"
-
-    steps:
-      - uses: actions/checkout@v4
+          # fetch all commits for version computation
+          fetch-depth: 0
+      - name: Setup Python
+        uses: actions/setup-python@v6
         with:
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ matrix.py }}
-
-      - name: Build & test
-        run: |
-          sudo apt-get install -q -y zstd libzstd1 libzstd-dev
-          python -m pip install --config-settings="--build-option=--dynamic-link-zstd --warning-as-error" -v .
-          python -m unittest discover tests
-
-  build_sdist:
-    name: Build sdist
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      - name: Build sdist
-        run: |
-          python -m pip install -U build
-          python -m build --sdist
-
+          python-version: "3.14"
+      - name: Install dependencies
+        run: python -m pip install -U build
+      - name: Build
+        run: python -m build
       - name: List distributions
         run: ls -lR dist
-
-      - name: Upload sdist
-        uses: actions/upload-artifact@v4
+      - name: Save build artifacts
+        uses: actions/upload-artifact@v5
         with:
-          name: cibw-sdist
-          path: dist/*.tar.gz
+          name: build
+          path: dist
+      - name: Install sdist
+        run: python -m pip install dist/*.tar.gz
+      - name: Test
+        run: python -m unittest discover tests -v
 
-  build_wheels:
-    name: Build wheels on ${{ matrix.platform }}
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ matrix.platform }}
-
-    strategy:
-      matrix:
-        platform:
-          - ubuntu-latest
-          - macos-latest
-          - windows-latest
-          - windows-11-arm
-
-    env:
-      CIBW_ARCHS_MACOS: "x86_64 arm64"
-
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          submodules: true
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: ${{ env.PYTHON_VER }}
-
-      - name: Build wheels
-        run: |
-          python -m pip install -U cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: List distributions
-        run: ls -lR wheelhouse
-        shell: bash
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-${{ matrix.platform }}
-          path: wheelhouse/*.whl
-
-  build_arch_wheels:
-    name: Build wheels for ${{ matrix.arch }} (skip ${{ matrix.skip_image }})
-    if: startsWith(github.ref, 'refs/tags') || startsWith(github.head_ref, 'release-') || github.event_name == 'workflow_dispatch'
+  tests-py:
+    name: Test | ${{ matrix.python }}
     runs-on: ubuntu-latest
-
+    needs:
+      - build
     strategy:
       matrix:
-        arch:
-          - aarch64
-          - ppc64le
-          - s390x
-        # Building in QEMU is very slow, so parallelize the tasks.
-        skip_image:
-          - musllinux
-          - manylinux
-
-    env:
-      CIBW_ARCHS: ${{ matrix.arch }}
-      CIBW_SKIP: "*${{ matrix.skip_image }}*"
-
+        python:
+          - "3.10"
+          - "3.11"
+          - "3.12"
+          - "3.13"
+          - "3.14"
+          - "pypy-3.10"
+          - "pypy-3.11"
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
+      - name: Restore build artifacts
+        uses: actions/download-artifact@v6
         with:
-          submodules: true
-      - uses: actions/setup-python@v5
+          name: build
+          path: dist
+      - name: Setup Python ${{ matrix.python }}
+        uses: actions/setup-python@v6
         with:
-          python-version: ${{ env.PYTHON_VER }}
+          python-version: ${{ matrix.python }}
+      - name: Install wheel
+        run: python -m pip install dist/*.whl
+      - name: Test
+        run: python -m unittest discover tests -v
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Build wheels
-        run: |
-          python -m pip install -U cibuildwheel
-          python -m cibuildwheel --output-dir wheelhouse
-
-      - name: List distributions
-        run: ls -lR wheelhouse
-
-      - name: Upload wheels
-        uses: actions/upload-artifact@v4
-        with:
-          name: cibw-wheels-${{ matrix.arch }}-${{ matrix.skip_image }}
-          path: wheelhouse/*.whl
-
-  upload_pypi:
+  publish:
     name: Publish to PyPI
     if: startsWith(github.ref, 'refs/tags')
     needs:
-      - build_sdist
-      - build_wheels
-      - build_arch_wheels
+      - build
+      - tests-py
     runs-on: ubuntu-latest
     environment: publish
     permissions:
       id-token: write # This permission is mandatory for trusted publishing
-
     steps:
-      - name: Download wheels
-        uses: actions/download-artifact@v4
+      - name: Restore build artifacts
+        uses: actions/download-artifact@v6
         with:
-          pattern: cibw-*
+          name: build
           path: dist
-          merge-multiple: true
-
       - name: List distributions
         run: ls -lR dist
-
-      - name: Upload to PyPI
+      - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@release/v1
         with:
-          skip-existing: true
           verbose: true
           print-hash: true

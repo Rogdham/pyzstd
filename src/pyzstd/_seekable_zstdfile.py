@@ -6,12 +6,9 @@ from os.path import isfile
 from struct import Struct
 import warnings
 
-from pyzstd import _ZSTD_DStreamSizes, ZstdCompressor, ZstdDecompressor
-from pyzstd._zstdfile import _DEPRECATED_PLACEHOLDER
+from pyzstd import ZstdCompressor, ZstdDecompressor, _DEPRECATED_PLACEHOLDER
 
 __all__ = ('SeekableFormatError', 'SeekableZstdFile')
-
-_ZSTD_DStreamOutSize = _ZSTD_DStreamSizes[1]
 
 _MODE_CLOSED = 0
 _MODE_READ = 1
@@ -590,7 +587,7 @@ class SeekableZstdFile(io.BufferedIOBase):
                 zstd_dict=zstd_dict,
                 option=level_or_option,
                 read_size=read_size)
-            self._buffer = io.BufferedReader(raw, _ZSTD_DStreamOutSize)
+            self._buffer = io.BufferedReader(raw)
 
         elif mode == "a":
             if self._fp.seekable():
@@ -758,7 +755,7 @@ class SeekableZstdFile(io.BufferedIOBase):
         """
         self._check_can_read()
         if size < 0:
-            size = _ZSTD_DStreamOutSize
+            size = io.DEFAULT_BUFFER_SIZE
         return self._buffer.read1(size)
 
     def readinto(self, b):

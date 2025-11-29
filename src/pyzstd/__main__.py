@@ -9,7 +9,7 @@ from pyzstd import \
                    CParameter, DParameter, \
                    train_dict, ZstdDict, ZstdFile, \
                    compressionLevel_values, zstd_version, \
-                   __version__ as pyzstd_version, PYZSTD_CONFIG
+                   __version__ as pyzstd_version
 
 # buffer sizes recommended by zstd
 C_READ_BUFFER = 131072
@@ -343,16 +343,10 @@ def range_action(min, max, bits_msg=False):
 
             # check range
             if not (min <= v <= max):
-                # 32/64 bits message
-                if bits_msg:
-                    bits = 'in {}-bit build, '.format(PYZSTD_CONFIG[0])
-                else:
-                    bits = ''
-
                 # message
-                msg = ('{}{} value should: {} <= v <= {}. '
+                msg = ('{} value should: {} <= v <= {}. '
                        'provided value is {}.').format(
-                        bits, option_string, min, max, v)
+                        option_string, min, max, v)
                 raise ValueError(msg)
 
             setattr(args, self.dest, v)
@@ -463,7 +457,7 @@ def parse_arg():
         args.dict.close()
         # Magic_Number: 4 bytes, value 0xEC30A437, little-endian format.
         is_raw = zd_content[:4] != b'\x37\xA4\x30\xEC'
-        args.zd = ZstdDict(zd_content, is_raw)
+        args.zd = ZstdDict(zd_content, is_raw=is_raw)
     else:
         args.zd = None
 

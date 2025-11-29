@@ -1,0 +1,709 @@
+import sys
+import warnings
+
+from collections import namedtuple
+from enum import IntEnum
+
+if sys.version_info < (3, 14):
+    from backports import zstd
+else:
+    from compression import zstd
+
+try:
+    from warnings import deprecated
+except ImportError:
+    from typing_extensions import deprecated
+
+from pyzstd._version import __version__
+
+
+__doc__ = """\
+Python bindings to Zstandard (zstd) compression library, the API style is
+similar to Python's bz2/lzma/zlib modules.
+
+Command line interface of this module: python -m pyzstd --help
+
+Documentation: https://pyzstd.readthedocs.io
+GitHub: https://github.com/Rogdham/pyzstd
+PyPI: https://pypi.org/project/pyzstd"""
+
+__all__ = (
+    "ZstdCompressor",
+    "RichMemZstdCompressor",
+    "ZstdDecompressor",
+    "EndlessZstdDecompressor",
+    "CParameter",
+    "DParameter",
+    "Strategy",
+    "ZstdError",
+    "compress",
+    "richmem_compress",
+    "decompress",
+    "compress_stream",
+    "decompress_stream",
+    "ZstdDict",
+    "train_dict",
+    "finalize_dict",
+    "get_frame_info",
+    "get_frame_size",
+    "ZstdFile",
+    "open",
+    "zstd_version",
+    "zstd_version_info",
+    "zstd_support_multithread",
+    "compressionLevel_values",
+    "SeekableZstdFile",
+    "SeekableFormatError",
+)
+
+
+class _DeprecatedPlaceholder:
+    def __repr__(self):
+        return "<DEPRECATED>"
+
+
+_DEPRECATED_PLACEHOLDER = _DeprecatedPlaceholder()
+
+
+class CParameter(IntEnum):
+    """Compression parameters"""
+
+    compressionLevel = zstd.CompressionParameter.compression_level
+    windowLog = zstd.CompressionParameter.window_log
+    hashLog = zstd.CompressionParameter.hash_log
+    chainLog = zstd.CompressionParameter.chain_log
+    searchLog = zstd.CompressionParameter.search_log
+    minMatch = zstd.CompressionParameter.min_match
+    targetLength = zstd.CompressionParameter.target_length
+    strategy = zstd.CompressionParameter.strategy
+    targetCBlockSize = 130  # not part of PEP-784
+
+    enableLongDistanceMatching = zstd.CompressionParameter.enable_long_distance_matching
+    ldmHashLog = zstd.CompressionParameter.ldm_hash_log
+    ldmMinMatch = zstd.CompressionParameter.ldm_min_match
+    ldmBucketSizeLog = zstd.CompressionParameter.ldm_bucket_size_log
+    ldmHashRateLog = zstd.CompressionParameter.ldm_hash_rate_log
+
+    contentSizeFlag = zstd.CompressionParameter.content_size_flag
+    checksumFlag = zstd.CompressionParameter.checksum_flag
+    dictIDFlag = zstd.CompressionParameter.dict_id_flag
+
+    nbWorkers = zstd.CompressionParameter.nb_workers
+    jobSize = zstd.CompressionParameter.job_size
+    overlapLog = zstd.CompressionParameter.overlap_log
+
+    def bounds(self):
+        """Return lower and upper bounds of a compression parameter, both inclusive."""
+        return zstd.CompressionParameter(self).bounds()
+
+
+class DParameter(IntEnum):
+    """Decompression parameters"""
+
+    windowLogMax = zstd.DecompressionParameter.window_log_max
+
+    def bounds(self):
+        """Return lower and upper bounds of a decompression parameter, both inclusive."""
+        return zstd.DecompressionParameter(self).bounds()
+
+
+def _convert_level_or_option(level_or_option, mode):
+    """Transform pyzstd params into PEP-784 `options` param"""
+    if not isinstance(mode, str):
+        raise ValueError(f"Invalid mode type: {mode}")
+    read_mode = mode.startswith("r")
+    if isinstance(level_or_option, int):
+        if read_mode:
+            raise TypeError(
+                (
+                    "In read mode (decompression), level_or_option argument "
+                    "should be a dict object, that represents decompression "
+                    "option. It doesn't support int type compression level "
+                    "in this case."
+                )
+            )
+        return {
+            CParameter.compressionLevel: level_or_option,
+        }
+    if level_or_option is not None:
+        invalid_class = CParameter if read_mode else DParameter
+        for key in level_or_option:
+            if isinstance(key, invalid_class):
+                raise TypeError(
+                    "Key of compression option dict should "
+                    f"NOT be {invalid_class.__name__}."
+                )
+    return level_or_option
+
+
+class ZstdCompressor:
+    """A streaming compressor. Thread-safe at method level."""
+
+    CONTINUE = zstd.ZstdCompressor.CONTINUE
+    """Used for mode parameter in .compress() method.
+
+    Collect more data, encoder decides when to output compressed result, for optimal
+    compression ratio. Usually used for traditional streaming compression.
+    """
+
+    FLUSH_BLOCK = zstd.ZstdCompressor.FLUSH_BLOCK
+    """Used for mode parameter in .compress(), .flush() methods.
+
+    Flush any remaining data, but don't close the current frame. Usually used for
+    communication scenarios.
+
+    If there is data, it creates at least one new block, that can be decoded
+    immediately on reception. If no remaining data, no block is created, return b''.
+
+    Note: Abuse of this mode will reduce compression ratio. Use it only when
+    necessary.
+    """
+
+    FLUSH_FRAME = zstd.ZstdCompressor.FLUSH_FRAME
+    """Used for mode parameter in .compress(), .flush() methods.
+
+    Flush any remaining data, and close the current frame. Usually used for
+    traditional flush.
+
+    Since zstd data consists of one or more independent frames, data can still be
+    provided after a frame is closed.
+
+    Note: Abuse of this mode will reduce compression ratio, and some programs can
+    only decompress single frame data. Use it only when necessary.
+    """
+
+    def __init__(self, level_or_option=None, zstd_dict=None):
+        """Initialize a ZstdCompressor object.
+
+        Parameters
+        level_or_option: When it's an int object, it represents the compression level.
+                         When it's a dict object, it contains advanced compression
+                         parameters.
+        zstd_dict:       A ZstdDict object, pre-trained zstd dictionary.
+        """
+        self._compressor = zstd.ZstdCompressor(
+            options=_convert_level_or_option(level_or_option, "w"), zstd_dict=zstd_dict
+        )
+
+    def compress(self, data, mode=zstd.ZstdCompressor.CONTINUE):
+        """Provide data to the compressor object.
+        Return a chunk of compressed data if possible, or b'' otherwise.
+
+        Parameters
+        data: A bytes-like object, data to be compressed.
+        mode: Can be these 3 values .CONTINUE, .FLUSH_BLOCK, .FLUSH_FRAME.
+        """
+        return self._compressor.compress(data, mode)
+
+    def flush(self, mode=zstd.ZstdCompressor.FLUSH_FRAME):
+        """Flush any remaining data in internal buffer.
+
+        Since zstd data consists of one or more independent frames, the compressor
+        object can still be used after this method is called.
+
+        Parameter
+        mode: Can be these 2 values .FLUSH_FRAME, .FLUSH_BLOCK.
+        """
+        return self._compressor.flush(mode)
+
+    def _set_pledged_input_size(self, size):
+        """*This is an undocumented method, because it may be used incorrectly.*
+
+        Set uncompressed content size of a frame, the size will be written into the
+        frame header.
+        1, If called when (.last_mode != .FLUSH_FRAME), a RuntimeError will be raised.
+        2, If the actual size doesn't match the value, a ZstdError will be raised, and
+           the last compressed chunk is likely to be lost.
+        3, The size is only valid for one frame, then it restores to "unknown size".
+
+        Parameter
+        size: Uncompressed content size of a frame, None means "unknown size".
+        """
+        return self._compressor.set_pledged_input_size(size)
+
+    @property
+    def last_mode(self):
+        """The last mode used to this compressor object, its value can be .CONTINUE,
+        .FLUSH_BLOCK, .FLUSH_FRAME. Initialized to .FLUSH_FRAME.
+
+        It can be used to get the current state of a compressor, such as, data flushed,
+        a frame ended.
+        """
+        return self._compressor.last_mode
+
+    def __reduce__(self):
+        raise TypeError(f"Cannot pickle {type(self)} object.")
+
+
+class ZstdDecompressor:
+    """A streaming decompressor, it stops after a frame is decompressed.
+    Thread-safe at method level."""
+
+    def __init__(self, zstd_dict=None, option=None):
+        """Initialize a ZstdDecompressor object.
+
+        Parameters
+        zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+        option:    A dict object that contains advanced decompression parameters.
+        """
+        self._decompressor = zstd.ZstdDecompressor(
+            zstd_dict=zstd_dict, options=_convert_level_or_option(option, "r")
+        )
+
+    def decompress(self, data, max_length=-1):
+        """Decompress data, return a chunk of decompressed data if possible, or b''
+        otherwise.
+
+        It stops after a frame is decompressed.
+
+        Parameters
+        data:       A bytes-like object, zstd data to be decompressed.
+        max_length: Maximum size of returned data. When it is negative, the size of
+                    output buffer is unlimited. When it is nonnegative, returns at
+                    most max_length bytes of decompressed data.
+        """
+        return self._decompressor.decompress(data, max_length)
+
+    @property
+    def eof(self):
+        """True means the end of the first frame has been reached. If decompress data
+        after that, an EOFError exception will be raised."""
+        return self._decompressor.eof
+
+    @property
+    def needs_input(self):
+        """If the max_length output limit in .decompress() method has been reached, and
+        the decompressor has (or may has) unconsumed input data, it will be set to
+        False. In this case, pass b'' to .decompress() method may output further data.
+        """
+        return self._decompressor.needs_input
+
+    @property
+    def unused_data(self):
+        """A bytes object. When ZstdDecompressor object stops after a frame is
+        decompressed, unused input data after the frame. Otherwise this will be b''."""
+        return self._decompressor.unused_data
+
+    def __reduce__(self):
+        raise TypeError(f"Cannot pickle {type(self)} object.")
+
+
+class EndlessZstdDecompressor:
+    """A streaming decompressor, accepts multiple concatenated frames.
+    Thread-safe at method level."""
+
+    def __init__(self, zstd_dict=None, option=None):
+        """Initialize an EndlessZstdDecompressor object.
+
+        Parameters
+        zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+        option:    A dict object that contains advanced decompression parameters.
+        """
+        self._zstd_dict = zstd_dict
+        self._options = _convert_level_or_option(option, "r")
+        self._reset()
+
+    def _reset(self, data=b""):
+        self._decompressor = zstd.ZstdDecompressor(
+            zstd_dict=self._zstd_dict, options=self._options
+        )
+        self._buffer = data
+        self._at_frame_edge = not data
+
+    def decompress(self, data, max_length=-1):
+        """Decompress data, return a chunk of decompressed data if possible, or b''
+        otherwise.
+
+        Parameters
+        data:       A bytes-like object, zstd data to be decompressed.
+        max_length: Maximum size of returned data. When it is negative, the size of
+                    output buffer is unlimited. When it is nonnegative, returns at
+                    most max_length bytes of decompressed data.
+        """
+        if not isinstance(data, bytes) or not isinstance(max_length, int):
+            raise TypeError
+        self._buffer += data
+        self._at_frame_edge &= not self._buffer
+        out = b""
+        while True:
+            try:
+                out += self._decompressor.decompress(self._buffer, max_length)
+            except ZstdError:
+                self._reset()
+                raise
+            if self._decompressor.eof:
+                self._reset(self._decompressor.unused_data)
+                max_length -= len(out)
+            else:
+                self._buffer = b""
+                break
+        return out
+
+    @property
+    def at_frame_edge(self):
+        """True when both the input and output streams are at a frame edge, means a
+        frame is completely decoded and fully flushed, or the decompressor just be
+        initialized.
+
+        This flag could be used to check data integrity in some cases.
+        """
+        return self._at_frame_edge
+
+    @property
+    def needs_input(self):
+        """If the max_length output limit in .decompress() method has been reached, and
+        the decompressor has (or may has) unconsumed input data, it will be set to
+        False. In this case, pass b'' to .decompress() method may output further data.
+        """
+        return not self._buffer and (
+            self._at_frame_edge or self._decompressor.needs_input
+        )
+
+    def __reduce__(self):
+        raise TypeError(f"Cannot pickle {type(self)} object.")
+
+
+def compress(data, level_or_option=None, zstd_dict=None):
+    """Compress a block of data, return a bytes object.
+
+    Compressing b'' will get an empty content frame (9 bytes or more).
+
+    Parameters
+    data:            A bytes-like object, data to be compressed.
+    level_or_option: When it's an int object, it represents compression level.
+                     When it's a dict object, it contains advanced compression
+                     parameters.
+    zstd_dict:       A ZstdDict object, pre-trained dictionary for compression.
+    """
+    return zstd.compress(
+        data,
+        options=_convert_level_or_option(level_or_option, "w"),
+        zstd_dict=zstd_dict,
+    )
+
+
+def decompress(data, zstd_dict=None, option=None):
+    """Decompress a zstd data, return a bytes object.
+
+    Support multiple concatenated frames.
+
+    Parameters
+    data:      A bytes-like object, compressed zstd data.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option:    A dict object, contains advanced decompression parameters.
+    """
+    return zstd.decompress(
+        data, options=_convert_level_or_option(option, "r"), zstd_dict=zstd_dict
+    )
+
+
+@deprecated(
+    "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.RichMemZstdCompressor"
+)
+class RichMemZstdCompressor:
+    def __init__(self, level_or_option=None, zstd_dict=None):
+        self._compress_kwargs = {
+            "options": _convert_level_or_option(level_or_option, "w"),
+            "zstd_dict": zstd_dict,
+        }
+
+    def compress(self, data):
+        return zstd.compress(data, **self._compress_kwargs)
+
+    def __reduce__(self):
+        raise TypeError(f"Cannot pickle {type(self)} object.")
+
+
+class ZstdFile(zstd.ZstdFile):
+    """A file object providing transparent zstd (de)compression.
+
+    A ZstdFile can act as a wrapper for an existing file object, or refer
+    directly to a named file on disk.
+
+    Note that ZstdFile provides a *binary* file interface - data read is
+    returned as bytes, and data to be written should be an object that
+    supports the Buffer Protocol.
+    """
+
+    FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
+    FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
+
+    def __init__(
+        self,
+        filename,
+        mode="r",
+        *,
+        level_or_option=None,
+        zstd_dict=None,
+        read_size=_DEPRECATED_PLACEHOLDER,
+        write_size=_DEPRECATED_PLACEHOLDER,
+    ):
+        """Open a zstd compressed file in binary mode.
+
+        filename can be either an actual file name (given as a str, bytes, or
+        PathLike object), in which case the named file is opened, or it can be
+        an existing file object to read from or write to.
+
+        mode can be "r" for reading (default), "w" for (over)writing, "x" for
+        creating exclusively, or "a" for appending. These can equivalently be
+        given as "rb", "wb", "xb" and "ab" respectively.
+
+        Parameters
+        level_or_option: When it's an int object, it represents compression
+            level. When it's a dict object, it contains advanced compression
+            parameters. Note, in read mode (decompression), it can only be a
+            dict object, that represents decompression option. It doesn't
+            support int type compression level in this case.
+        zstd_dict: A ZstdDict object, pre-trained dictionary for compression /
+            decompression.
+        """
+        if read_size != _DEPRECATED_PLACEHOLDER:
+            warnings.warn(
+                "pyzstd.ZstdFile()'s read_size parameter is deprecated",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        if write_size != _DEPRECATED_PLACEHOLDER:
+            warnings.warn(
+                "pyzstd.ZstdFile()'s write_size parameter is deprecated",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        super().__init__(
+            filename,
+            mode,
+            options=_convert_level_or_option(level_or_option, mode),
+            zstd_dict=zstd_dict,
+        )
+
+
+def open(
+    filename,
+    mode="rb",
+    *,
+    level_or_option=None,
+    zstd_dict=None,
+    encoding=None,
+    errors=None,
+    newline=None,
+):
+    """Open a zstd compressed file in binary or text mode.
+
+    filename can be either an actual file name (given as a str, bytes, or
+    PathLike object), in which case the named file is opened, or it can be an
+    existing file object to read from or write to.
+
+    The mode parameter can be "r", "rb" (default), "w", "wb", "x", "xb", "a",
+    "ab" for binary mode, or "rt", "wt", "xt", "at" for text mode.
+
+    The level_or_option and zstd_dict parameters specify the settings, as for
+    ZstdCompressor, ZstdDecompressor and ZstdFile.
+
+    When using read mode (decompression), the level_or_option parameter can
+    only be a dict object, that represents decompression option. It doesn't
+    support int type compression level in this case.
+
+    For binary mode, this function is equivalent to the ZstdFile constructor:
+    ZstdFile(filename, mode, ...). In this case, the encoding, errors and
+    newline parameters must not be provided.
+
+    For text mode, an ZstdFile object is created, and wrapped in an
+    io.TextIOWrapper instance with the specified encoding, error handling
+    behavior, and line ending(s).
+    """
+    return zstd.open(
+        filename,
+        mode,
+        options=_convert_level_or_option(level_or_option, mode),
+        zstd_dict=zstd_dict,
+        encoding=encoding,
+        errors=errors,
+        newline=newline,
+    )
+
+
+def _create_callback(output_stream, callback):
+    if output_stream is None:
+        if callback is None:
+            raise TypeError(
+                "At least one of output_stream argument and callback argument should be non-None."
+            )
+
+        def cb(total_input, total_output, data_in, data_out):
+            callback(
+                total_input, total_output, memoryview(data_in), memoryview(data_out)
+            )
+
+    elif callback is None:
+
+        def cb(total_input, total_output, data_in, data_out):
+            output_stream.write(data_out)
+
+    else:
+
+        def cb(total_input, total_output, data_in, data_out):
+            output_stream.write(data_out)
+            callback(
+                total_input, total_output, memoryview(data_in), memoryview(data_out)
+            )
+
+    return cb
+
+
+@deprecated(
+    "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.compress_stream"
+)
+def compress_stream(
+    input_stream,
+    output_stream,
+    *,
+    level_or_option=None,
+    zstd_dict=None,
+    pledged_input_size=None,
+    read_size=131_072,
+    write_size=_DEPRECATED_PLACEHOLDER,
+    callback=None,
+):
+    """Compresses input_stream and writes the compressed data to output_stream, it
+    doesn't close the streams.
+
+    ----
+    DEPRECATION NOTICE
+    The (de)compress_stream are deprecated and will be removed in a future version.
+    See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives
+    ----
+
+    If input stream is b'', nothing will be written to output stream.
+
+    Return a tuple, (total_input, total_output), the items are int objects.
+
+    Parameters
+    input_stream: Input stream that has a .readinto(b) method.
+    output_stream: Output stream that has a .write(b) method. If use callback
+        function, this parameter can be None.
+    level_or_option: When it's an int object, it represents the compression
+        level. When it's a dict object, it contains advanced compression
+        parameters.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    pledged_input_size: If set this parameter to the size of input data, the
+        size will be written into the frame header. If the actual input data
+        doesn't match it, a ZstdError will be raised.
+    read_size: Input buffer size, in bytes.
+    callback: A callback function that accepts four parameters:
+        (total_input, total_output, read_data, write_data), the first two are
+        int objects, the last two are readonly memoryview objects.
+    """
+    if not hasattr(input_stream, "read"):
+        raise TypeError("input_stream argument should have a .read() method.")
+    if output_stream is not None and not hasattr(output_stream, "write"):
+        raise TypeError("output_stream argument should have a .write() method.")
+    if read_size < 1:
+        raise ValueError("read_size argument should be a positive number.")
+    callback = _create_callback(output_stream, callback)
+    total_input = 0
+    total_output = 0
+    compressor = ZstdCompressor(level_or_option, zstd_dict)
+    if pledged_input_size is not None and pledged_input_size != 2**64 - 1:
+        compressor._set_pledged_input_size(pledged_input_size)
+    while data_in := input_stream.read(read_size):
+        total_input += len(data_in)
+        data_out = compressor.compress(data_in)
+        total_output += len(data_out)
+        callback(total_input, total_output, data_in, data_out)
+    if not total_input:
+        return total_input, total_output
+    data_out = compressor.flush()
+    total_output += len(data_out)
+    callback(total_input, total_output, b"", data_out)
+    return total_input, total_output
+
+
+@deprecated(
+    "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.decompress_stream"
+)
+def decompress_stream(
+    input_stream,
+    output_stream,
+    *,
+    zstd_dict=None,
+    option=None,
+    read_size=131_075,
+    write_size=131_072,
+    callback=None,
+):
+    """Decompresses input_stream and writes the decompressed data to output_stream,
+    it doesn't close the streams.
+
+    ----
+    DEPRECATION NOTICE
+    The (de)compress_stream are deprecated and will be removed in a future version.
+    See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives
+    ----
+
+    Supports multiple concatenated frames.
+
+    Return a tuple, (total_input, total_output), the items are int objects.
+
+    Parameters
+    input_stream: Input stream that has a .readinto(b) method.
+    output_stream: Output stream that has a .write(b) method. If use callback
+        function, this parameter can be None.
+    zstd_dict: A ZstdDict object, pre-trained zstd dictionary.
+    option: A dict object, contains advanced decompression parameters.
+    read_size: Input buffer size, in bytes.
+    write_size: Output buffer size, in bytes.
+    callback: A callback function that accepts four parameters:
+        (total_input, total_output, read_data, write_data), the first two are
+        int objects, the last two are readonly memoryview objects.
+    """
+    if not hasattr(input_stream, "read"):
+        raise TypeError("input_stream argument should have a .read() method.")
+    if output_stream is not None and not hasattr(output_stream, "write"):
+        raise TypeError("output_stream argument should have a .write() method.")
+    if read_size < 1 or write_size < 1:
+        raise ValueError(
+            "read_size argument and write_size argument should be positive numbers."
+        )
+    callback = _create_callback(output_stream, callback)
+    total_input = 0
+    total_output = 0
+    decompressor = EndlessZstdDecompressor(zstd_dict, option)
+    while True:
+        if decompressor.needs_input:
+            data_in = input_stream.read(read_size)
+            if not data_in:
+                break
+        else:
+            data_in = b""
+        total_input += len(data_in)
+        data_out = decompressor.decompress(data_in, write_size)
+        total_output += len(data_out)
+        callback(total_input, total_output, data_in, data_out)
+    if not decompressor.at_frame_edge:
+        raise ZstdError(
+            "Decompression failed: zstd data ends in an incomplete frame,"
+            " maybe the input data was truncated."
+            f" Total input {total_input} bytes, total output {total_output} bytes."
+        )
+    return total_input, total_output
+
+
+Strategy = zstd.Strategy
+ZstdError = zstd.ZstdError
+richmem_compress = deprecated(
+    "See https://pyzstd.readthedocs.io/en/stable/deprecated.html for alternatives to pyzstd.richmem_compress"
+)(compress)
+ZstdDict = zstd.ZstdDict
+train_dict = zstd.train_dict
+finalize_dict = zstd.finalize_dict
+get_frame_info = zstd.get_frame_info
+get_frame_size = zstd.get_frame_size
+zstd_version = zstd.zstd_version
+zstd_version_info = zstd.zstd_version_info
+zstd_support_multithread = CParameter.nbWorkers.bounds() != (0, 0)
+compressionLevel_values = namedtuple("values", ["default", "min", "max"])(
+    zstd.COMPRESSION_LEVEL_DEFAULT, *CParameter.compressionLevel.bounds()
+)
+
+# import here to avoid circular dependency issues
+from ._seekable_zstdfile import SeekableFormatError, SeekableZstdFile

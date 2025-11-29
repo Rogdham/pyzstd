@@ -9,11 +9,7 @@ The pyzstd module provides classes and functions for compressing and decompressi
 
 The API style is similar to Python's bz2/lzma/zlib modules.
 
-* Includes the latest zstd library source code
-* Can also dynamically link to zstd library provided by system, see :ref:`this note<build_pyzstd>`.
-* Has a CFFI implementation that can work with PyPy
-* Support sub-interpreter on CPython 3.12+
-* :py:class:`ZstdFile` class has C language level performance
+* Pure-Python package relying on the `compression.zstd` module internally (`PEP 784 <https://peps.python.org/pep-0784/>`_).
 * Supports `Zstandard Seekable Format <https://github.com/facebook/zstd/blob/dev/contrib/seekable_format/zstd_seekable_compression_format.md>`__
 * Has a command line interface, ``python -m pyzstd --help``.
 
@@ -1409,90 +1405,6 @@ Use zstd as a patching engine
 
         # get VER_2 from (VER_1 + PATCH)
         VER_2 = decompress(PATCH, zstd_dict=v1.as_prefix, option=option)
-
-
-Build pyzstd module with options
->>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-
-.. _build_pyzstd:
-
-.. note:: Build pyzstd module with options
-
-    1️⃣ If provide ``--avx2`` build option, it will build with AVX2/BMI2 instructions. In MSVC build (static link), this brings some performance improvements. GCC/CLANG builds already dynamically dispatch some functions for BMI2 instructions, so no significant improvement, or worse.
-
-    .. sourcecode:: shell
-
-        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
-        # build and install
-        pip install --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
-        # build a redistributable wheel
-        pip wheel --config-settings="--build-option=--avx2" -v pyzstd-0.15.4.tar.gz
-        # 🟠 legacy commands:
-        # build and install
-        python setup.py install --avx2
-        # build a redistributable wheel
-        python setup.py bdist_wheel --avx2
-
-    2️⃣ Pyzstd module supports:
-
-        * Dynamically link to zstd library (provided by system or a DLL library), then the zstd source code in ``zstd`` folder will be ignored.
-        * Provide a `CFFI <https://doc.pypy.org/en/latest/extending.html#cffi>`_ implementation that can work with PyPy.
-
-    On CPython, provide these build options:
-
-        #. no option: C implementation, statically link to zstd library.
-        #. ``--dynamic-link-zstd``: C implementation, dynamically link to zstd library.
-        #. ``--cffi``: CFFI implementation (slower), statically link to zstd library.
-        #. ``--cffi --dynamic-link-zstd``: CFFI implementation (slower), dynamically link to zstd library.
-
-    On PyPy, only CFFI implementation can be used, so ``--cffi`` is added implicitly. ``--dynamic-link-zstd`` is optional.
-
-    .. sourcecode:: shell
-
-        # 🟠 pyzstd 0.15.4+ and pip 22.1+ support PEP-517:
-        # build and install
-        pip3 install --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
-        # build a redistributable wheel
-        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd" -v pyzstd-0.15.4.tar.gz
-        # specify more than one option
-        pip3 wheel --config-settings="--build-option=--dynamic-link-zstd --cffi" -v pyzstd-0.15.4.tar.gz
-        # 🟠 legacy commands:
-        # build and install
-        python3 setup.py install --dynamic-link-zstd
-        # build a redistributable wheel
-        python3 setup.py bdist_wheel --dynamic-link-zstd
-
-    Some notes:
-
-        * The wheels on `PyPI <https://pypi.org/project/pyzstd>`_ use static linking, the packages on `Anaconda <https://anaconda.org/conda-forge/pyzstd>`_ use dynamic linking.
-        * No matter static or dynamic linking, pyzstd module requires zstd v1.4.0+.
-        * Static linking: Use zstd's official release without any change. If want to upgrade or downgrade the zstd library, just replace ``zstd`` folder.
-        * Dynamic linking: If new zstd API is used at compile-time, linking to lower version run-time zstd library will fail. Use v1.5.0 new API if possible.
-
-    On Windows, there is no system-wide zstd library. Pyzstd module can dynamically link to a DLL library, modify ``setup.py``:
-
-    .. sourcecode:: python
-
-        # E:\zstd_dll folder has zstd.h / zdict.h / libzstd.lib that
-        # along with libzstd.dll
-        if DYNAMIC_LINK:
-            kwargs = {
-            'include_dirs': ['E:\zstd_dll'], # .h directory
-            'library_dirs': ['E:\zstd_dll'], # .lib directory
-            'libraries': ['libzstd'],        # lib name, not filename, for the linker.
-            ...
-
-    And put ``libzstd.dll`` into one of these directories:
-
-        * Directory added by `os.add_dll_directory() <https://docs.python.org/3/library/os.html#os.add_dll_directory>`_ function. (The unit-tests and the CLI can't utilize this)
-        * Python's root directory that has python.exe.
-        * %SystemRoot%\System32
-
-    Note that the above list doesn't include the current working directory and %PATH% directories.
-
-    3️⃣ Disable mremap output buffer on CPython+Linux.
-
-    On CPython(3.5~3.12)+Linux, pyzstd uses another output buffer code that can utilize the ``mremap`` mechanism, which brings some performance improvements. If this causes problems, you may use ``--no-mremap`` option to disable this code.
 
 
 Deprecations
