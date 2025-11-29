@@ -40,8 +40,8 @@ def _check_deprecated(testcase):
     testcase.assertIn(
         str(warn.message),
         [
-            "pyzstd.ZstdFile()'s read_size parameter is deprecated",
-            "pyzstd.ZstdFile()'s write_size parameter is deprecated",
+            "pyzstd.SeekableZstdFile()'s read_size parameter is deprecated",
+            "pyzstd.SeekableZstdFile()'s write_size parameter is deprecated",
         ]
     )
 

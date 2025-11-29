@@ -1,11 +1,6 @@
 import io
 import warnings
-try:
-    from os import PathLike
-except ImportError:
-    # For Python 3.5
-    class PathLike:
-        pass
+from os import PathLike
 
 from pyzstd import ZstdCompressor, _ZstdFileReader, \
                    _ZstdFileWriter, _ZSTD_DStreamSizes
@@ -127,11 +122,15 @@ class ZstdFile(io.BufferedIOBase):
             warnings.warn("pyzstd.ZstdFile()'s write_size parameter is deprecated", DeprecationWarning, stacklevel=2)
 
         self._fp = None
-        self._closefp = False
+        self._close_fp = False
         self._mode = _MODE_CLOSED
 
+        if not isinstance(mode, str):
+            raise ValueError('mode must be a str')
+        mode = mode.removesuffix('b')  # handle rb, wb, xb, ab
+
         # Read or write mode
-        if mode in ("r", "rb"):
+        if mode == "r":
             if not isinstance(level_or_option, (type(None), dict)):
                 raise TypeError(
                     ("In read mode (decompression), level_or_option argument "
@@ -142,7 +141,7 @@ class ZstdFile(io.BufferedIOBase):
                 raise ValueError(
                     "write_size argument is only valid in write modes.")
             mode_code = _MODE_READ
-        elif mode in ("w", "wb", "a", "ab", "x", "xb"):
+        elif mode in {"w", "a", "x"}:
             if not isinstance(level_or_option, (type(None), int, dict)):
                 raise TypeError(("level_or_option argument "
                                  "should be int or dict object."))
@@ -155,17 +154,15 @@ class ZstdFile(io.BufferedIOBase):
 
         # File object
         if isinstance(filename, (str, bytes, PathLike)):
-            if "b" not in mode:
-                mode += "b"
-            self._fp = io.open(filename, mode)
-            self._closefp = True
+            self._fp = io.open(filename, mode + "b")
+            self._close_fp = True
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
         else:
             raise TypeError(("filename must be a str, bytes, "
                              "file or PathLike object"))
 
-        # Set ._mode here for ._closefp in .close(). If the following code
+        # Set ._mode here for ._close_fp in .close(). If the following code
         # fails, IOBase's cleanup code will call .close(), so that ._fp can
         # be closed.
         self._mode = mode_code
@@ -212,11 +209,11 @@ class ZstdFile(io.BufferedIOBase):
                     self._writer = None
         finally:
             try:
-                if self._closefp:
+                if self._close_fp:
                     self._fp.close()
             finally:
                 self._fp = None
-                self._closefp = False
+                self._close_fp = False
                 self._mode = _MODE_CLOSED
 
     # None argument means the file should be closed

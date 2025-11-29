@@ -5,11 +5,12 @@ All notable changes to this project will be documented in this file.
 ## Unreleased
 
 - Drop support for Python 3.9 and below
+- Build free-threaded wheels for CPython 3.13 and 3.14, even if the feature is not supported
+- Refactor SeekableZstdFile to make it independent of ZstdFile
 
 ## 0.18.0 (October 5, 2025)
 
 - Support for Python 3.14
-- Build free-threaded wheels for CPython 3.13 and 3.14, even if the feature is not supported
 - Deprecate the `read_size` and `write_size` parameters of `ZstdFile` and `SeekableZstdFile`
 - Deprecate `richmem_compress` and `RichMemZstdCompressor`
 - Rework documentation to suggest using `compression.zstd` from Python stdlib, and provide a migration guide
