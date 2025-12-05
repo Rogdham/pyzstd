@@ -187,6 +187,7 @@ jobs:
         arch:
           - aarch64
           - ppc64le
+          - riscv64
           - s390x
         # Building in QEMU is very slow, so parallelize the tasks.
         skip_image:
