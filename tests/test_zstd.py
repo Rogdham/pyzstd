@@ -2295,7 +2295,7 @@ class FileTestCase(unittest.TestCase):
             os.remove(filename)
 
     def test_init_bad_mode(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), (3, "x"))
         with self.assertRaises(ValueError):
             ZstdFile(BytesIO(COMPRESSED_100_PLUS_32KB), "")

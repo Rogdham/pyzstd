@@ -10,6 +10,7 @@ All notable changes to this project will be documented in this file.
 - Changes in build dependency: remove `setuptools` and C build toolchain, add `hatchling` and `hatch-vcs`
 - Remove git submodule usage
 - Drop support for Python 3.9 and below
+- Use `ruff` as formatter and linter
 
 ## 0.18.0 (October 5, 2025)
 
