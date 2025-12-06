@@ -58,3 +58,45 @@ version-file = "src/pyzstd/_version.py"
 
 [tool.hatch.version]
 source = "vcs"
+
+
+#
+# ruff
+#
+
+[tool.ruff]
+src = ["src"]
+target-version = "py310"
+extend-exclude = [
+    "tests",
+    '*.pyi', # FIXME
+]
+
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+    "ANN",     # FIXME
+    "C901",
+    "COM812",
+    "D",
+    "E501",
+    "EM",
+    "ERA001",
+    "FA100",
+    "ISC001",
+    "PLR0912",
+    "PLR0913",
+    "PLR0915",
+    "PLR2004",
+    "PTH",
+    "TRY003",
+    "TRY301",
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/pyzstd/__main__.py" = ["PLC0415", "T201"]
+"docs/conf.py" = ["A001", "INP001"]
+
+[tool.ruff.lint.isort]
+force-sort-within-sections = true
+known-first-party = ["pyzstd"]

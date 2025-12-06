@@ -707,7 +707,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             os.remove(filename)
 
     def test_init_bad_mode(self):
-        with self.assertRaises(ValueError):
+        with self.assertRaises(TypeError):
             SeekableZstdFile(BytesIO(COMPRESSED), (3, "x"))
         with self.assertRaises(ValueError):
             SeekableZstdFile(BytesIO(COMPRESSED), "")
@@ -856,7 +856,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             return get_file
 
         # test .close() method
-        with patch("io.open", mock_open(io.open)):
+        with patch("builtins.open", mock_open(io.open)):
             with self.assertRaisesRegex(OSError, 'xyz'):
                 SeekableZstdFile(filename, 'ab')
 
@@ -1407,7 +1407,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             return get_file
 
         # append 1
-        with patch("io.open", mock_open(io.open)):
+        with patch("builtins.open", mock_open(io.open)):
             with self.assertWarnsRegex(RuntimeWarning,
                                        (r"at the end of the file "
                                         r"can't be overwritten"
@@ -1419,7 +1419,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             f.close()
 
         # append 2
-        with patch("io.open", mock_open(io.open)):
+        with patch("builtins.open", mock_open(io.open)):
             with self.assertWarnsRegex(RuntimeWarning,
                                        (r"at the end of the file "
                                         r"can't be overwritten"
@@ -1465,7 +1465,7 @@ class SeekableZstdFileCase(unittest.TestCase):
             return get_file
 
         # append
-        with patch("io.open", mock_open(io.open)):
+        with patch("builtins.open", mock_open(io.open)):
             with self.assertRaisesRegex(
                     TypeError,
                     (r"In SeekableZstdFile's append mode \('a', 'ab'\),"
