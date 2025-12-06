@@ -1,8 +1,7 @@
-import sys
-import warnings
-
-from collections import namedtuple
 from enum import IntEnum
+import sys
+from typing import NamedTuple
+import warnings
 
 if sys.version_info < (3, 14):
     from backports import zstd
@@ -14,8 +13,7 @@ try:
 except ImportError:
     from typing_extensions import deprecated
 
-from pyzstd._version import __version__
-
+from pyzstd._version import __version__  # noqa: F401
 
 __doc__ = """\
 Python bindings to Zstandard (zstd) compression library, the API style is
@@ -28,32 +26,32 @@ GitHub: https://github.com/Rogdham/pyzstd
 PyPI: https://pypi.org/project/pyzstd"""
 
 __all__ = (
-    "ZstdCompressor",
-    "RichMemZstdCompressor",
-    "ZstdDecompressor",
-    "EndlessZstdDecompressor",
     "CParameter",
     "DParameter",
+    "EndlessZstdDecompressor",
+    "RichMemZstdCompressor",
+    "SeekableFormatError",
+    "SeekableZstdFile",
     "Strategy",
-    "ZstdError",
-    "compress",
-    "richmem_compress",
-    "decompress",
-    "compress_stream",
-    "decompress_stream",
+    "ZstdCompressor",
+    "ZstdDecompressor",
     "ZstdDict",
-    "train_dict",
+    "ZstdError",
+    "ZstdFile",
+    "compress",
+    "compress_stream",
+    "compressionLevel_values",
+    "decompress",
+    "decompress_stream",
     "finalize_dict",
     "get_frame_info",
     "get_frame_size",
-    "ZstdFile",
     "open",
+    "richmem_compress",
+    "train_dict",
+    "zstd_support_multithread",
     "zstd_version",
     "zstd_version_info",
-    "zstd_support_multithread",
-    "compressionLevel_values",
-    "SeekableZstdFile",
-    "SeekableFormatError",
 )
 
 
@@ -68,29 +66,29 @@ _DEPRECATED_PLACEHOLDER = _DeprecatedPlaceholder()
 class CParameter(IntEnum):
     """Compression parameters"""
 
-    compressionLevel = zstd.CompressionParameter.compression_level
-    windowLog = zstd.CompressionParameter.window_log
-    hashLog = zstd.CompressionParameter.hash_log
-    chainLog = zstd.CompressionParameter.chain_log
-    searchLog = zstd.CompressionParameter.search_log
-    minMatch = zstd.CompressionParameter.min_match
-    targetLength = zstd.CompressionParameter.target_length
+    compressionLevel = zstd.CompressionParameter.compression_level  # noqa: N815
+    windowLog = zstd.CompressionParameter.window_log  # noqa: N815
+    hashLog = zstd.CompressionParameter.hash_log  # noqa: N815
+    chainLog = zstd.CompressionParameter.chain_log  # noqa: N815
+    searchLog = zstd.CompressionParameter.search_log  # noqa: N815
+    minMatch = zstd.CompressionParameter.min_match  # noqa: N815
+    targetLength = zstd.CompressionParameter.target_length  # noqa: N815
     strategy = zstd.CompressionParameter.strategy
-    targetCBlockSize = 130  # not part of PEP-784
+    targetCBlockSize = 130  # not part of PEP-784 # noqa: N815
 
-    enableLongDistanceMatching = zstd.CompressionParameter.enable_long_distance_matching
-    ldmHashLog = zstd.CompressionParameter.ldm_hash_log
-    ldmMinMatch = zstd.CompressionParameter.ldm_min_match
-    ldmBucketSizeLog = zstd.CompressionParameter.ldm_bucket_size_log
-    ldmHashRateLog = zstd.CompressionParameter.ldm_hash_rate_log
+    enableLongDistanceMatching = zstd.CompressionParameter.enable_long_distance_matching  # noqa: N815
+    ldmHashLog = zstd.CompressionParameter.ldm_hash_log  # noqa: N815
+    ldmMinMatch = zstd.CompressionParameter.ldm_min_match  # noqa: N815
+    ldmBucketSizeLog = zstd.CompressionParameter.ldm_bucket_size_log  # noqa: N815
+    ldmHashRateLog = zstd.CompressionParameter.ldm_hash_rate_log  # noqa: N815
 
-    contentSizeFlag = zstd.CompressionParameter.content_size_flag
-    checksumFlag = zstd.CompressionParameter.checksum_flag
-    dictIDFlag = zstd.CompressionParameter.dict_id_flag
+    contentSizeFlag = zstd.CompressionParameter.content_size_flag  # noqa: N815
+    checksumFlag = zstd.CompressionParameter.checksum_flag  # noqa: N815
+    dictIDFlag = zstd.CompressionParameter.dict_id_flag  # noqa: N815
 
-    nbWorkers = zstd.CompressionParameter.nb_workers
-    jobSize = zstd.CompressionParameter.job_size
-    overlapLog = zstd.CompressionParameter.overlap_log
+    nbWorkers = zstd.CompressionParameter.nb_workers  # noqa: N815
+    jobSize = zstd.CompressionParameter.job_size  # noqa: N815
+    overlapLog = zstd.CompressionParameter.overlap_log  # noqa: N815
 
     def bounds(self):
         """Return lower and upper bounds of a compression parameter, both inclusive."""
@@ -100,7 +98,7 @@ class CParameter(IntEnum):
 class DParameter(IntEnum):
     """Decompression parameters"""
 
-    windowLogMax = zstd.DecompressionParameter.window_log_max
+    windowLogMax = zstd.DecompressionParameter.window_log_max  # noqa: N815
 
     def bounds(self):
         """Return lower and upper bounds of a decompression parameter, both inclusive."""
@@ -110,17 +108,15 @@ class DParameter(IntEnum):
 def _convert_level_or_option(level_or_option, mode):
     """Transform pyzstd params into PEP-784 `options` param"""
     if not isinstance(mode, str):
-        raise ValueError(f"Invalid mode type: {mode}")
+        raise TypeError(f"Invalid mode type: {mode}")
     read_mode = mode.startswith("r")
     if isinstance(level_or_option, int):
         if read_mode:
             raise TypeError(
-                (
-                    "In read mode (decompression), level_or_option argument "
-                    "should be a dict object, that represents decompression "
-                    "option. It doesn't support int type compression level "
-                    "in this case."
-                )
+                "In read mode (decompression), level_or_option argument "
+                "should be a dict object, that represents decompression "
+                "option. It doesn't support int type compression level "
+                "in this case."
             )
         return {
             CParameter.compressionLevel: level_or_option,
@@ -477,7 +473,7 @@ class ZstdFile(zstd.ZstdFile):
         )
 
 
-def open(
+def open(  # noqa: A001
     filename,
     mode="rb",
     *,
@@ -536,7 +532,7 @@ def _create_callback(output_stream, callback):
 
     elif callback is None:
 
-        def cb(total_input, total_output, data_in, data_out):
+        def cb(total_input, total_output, data_in, data_out):  # noqa: ARG001
             output_stream.write(data_out)
 
     else:
@@ -561,7 +557,7 @@ def compress_stream(
     zstd_dict=None,
     pledged_input_size=None,
     read_size=131_072,
-    write_size=_DEPRECATED_PLACEHOLDER,
+    write_size=_DEPRECATED_PLACEHOLDER,  # noqa: ARG001
     callback=None,
 ):
     """Compresses input_stream and writes the compressed data to output_stream, it
@@ -604,7 +600,7 @@ def compress_stream(
     total_output = 0
     compressor = ZstdCompressor(level_or_option, zstd_dict)
     if pledged_input_size is not None and pledged_input_size != 2**64 - 1:
-        compressor._set_pledged_input_size(pledged_input_size)
+        compressor._set_pledged_input_size(pledged_input_size)  # noqa: SLF001
     while data_in := input_stream.read(read_size):
         total_input += len(data_in)
         data_out = compressor.compress(data_in)
@@ -701,9 +697,17 @@ get_frame_size = zstd.get_frame_size
 zstd_version = zstd.zstd_version
 zstd_version_info = zstd.zstd_version_info
 zstd_support_multithread = CParameter.nbWorkers.bounds() != (0, 0)
-compressionLevel_values = namedtuple("values", ["default", "min", "max"])(
+
+
+class CompressionValues(NamedTuple):
+    default: int
+    min: int
+    max: int
+
+
+compressionLevel_values = CompressionValues(  # noqa: N816
     zstd.COMPRESSION_LEVEL_DEFAULT, *CParameter.compressionLevel.bounds()
 )
 
 # import here to avoid circular dependency issues
-from ._seekable_zstdfile import SeekableFormatError, SeekableZstdFile
+from ._seekable_zstdfile import SeekableFormatError, SeekableZstdFile  # noqa: E402
