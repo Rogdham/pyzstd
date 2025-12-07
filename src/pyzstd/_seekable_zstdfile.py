@@ -4,9 +4,30 @@ import io
 from os import PathLike
 from os.path import isfile
 from struct import Struct
+import sys
+from typing import BinaryIO, ClassVar, Literal, cast
 import warnings
 
-from pyzstd import _DEPRECATED_PLACEHOLDER, ZstdCompressor, ZstdDecompressor
+from pyzstd import (
+    _DEPRECATED_PLACEHOLDER,
+    ZstdCompressor,
+    ZstdDecompressor,
+    _DeprecatedPlaceholder,
+    _LevelOrOption,
+    _Option,
+    _StrOrBytesPath,
+    _ZstdDict,
+)
+
+if sys.version_info < (3, 12):
+    from typing_extensions import Buffer
+else:
+    from collections.abc import Buffer
+
+if sys.version_info < (3, 11):
+    from typing_extensions import Self
+else:
+    from typing import Self
 
 __all__ = ("SeekableFormatError", "SeekableZstdFile")
 
@@ -18,7 +39,7 @@ _MODE_WRITE = 2
 class SeekableFormatError(Exception):
     "An error related to Zstandard Seekable Format."
 
-    def __init__(self, msg):
+    def __init__(self, msg: str) -> None:
         super().__init__("Zstandard Seekable Format error: " + msg)
 
 
@@ -52,11 +73,11 @@ class _SeekTable:
     _s_footer = Struct("<IBI")
 
     # read_mode is True for read mode, False for write/append modes.
-    def __init__(self, read_mode):
+    def __init__(self, *, read_mode: bool) -> None:
         self._read_mode = read_mode
         self._clear_seek_table()
 
-    def _clear_seek_table(self):
+    def _clear_seek_table(self) -> None:
         self._has_checksum = False
         # The seek table frame size, used for append mode.
         self._seek_frame_size = 0
@@ -83,7 +104,7 @@ class _SeekTable:
             # I is uint32_t.
             self._frames = array("I")
 
-    def append_entry(self, compressed_size, decompressed_size):
+    def append_entry(self, compressed_size: int, decompressed_size: int) -> None:
         if compressed_size == 0:
             if decompressed_size == 0:
                 # (0, 0) frame is no sense
@@ -104,7 +125,7 @@ class _SeekTable:
 
     # seek_to_0 is True or False.
     # In read mode, seeking to 0 is necessary.
-    def load_seek_table(self, fp, seek_to_0):
+    def load_seek_table(self, fp: BinaryIO, seek_to_0: bool) -> None:  # noqa: FBT001
         # Get file size
         fsize = fp.seek(0, 2)  # 2 is SEEK_END
         if fsize == 0:
@@ -211,7 +232,7 @@ class _SeekTable:
         self._file_size = fsize
 
     # Find frame index by decompressed position
-    def index_by_dpos(self, pos):
+    def index_by_dpos(self, pos: int) -> int | None:
         # Array's first item is 0, so need this.
         pos = max(pos, 0)
 
@@ -221,19 +242,19 @@ class _SeekTable:
         # None means >= EOF
         return None
 
-    def get_frame_sizes(self, i):
+    def get_frame_sizes(self, i: int) -> tuple[int, int]:
         return (self._cumulated_c_size[i - 1], self._cumulated_d_size[i - 1])
 
-    def get_full_c_size(self):
+    def get_full_c_size(self) -> int:
         return self._full_c_size
 
-    def get_full_d_size(self):
+    def get_full_d_size(self) -> int:
         return self._full_d_size
 
     # Merge the seek table to max_frames frames.
     # The format allows up to 0xFFFF_FFFF frames. When frames
     # number exceeds, use this method to merge.
-    def _merge_frames(self, max_frames):
+    def _merge_frames(self, max_frames: int) -> None:
         if self._frames_count <= max_frames:
             return
 
@@ -258,7 +279,7 @@ class _SeekTable:
 
             pos += length
 
-    def write_seek_table(self, fp):
+    def write_seek_table(self, fp: BinaryIO) -> None:
         # Exceeded format limit
         if self._frames_count > 0xFFFFFFFF:
             # Emit a warning
@@ -294,17 +315,17 @@ class _SeekTable:
         fp.write(ba)
 
     @property
-    def seek_frame_size(self):
+    def seek_frame_size(self) -> int:
         return self._seek_frame_size
 
     @property
-    def file_size(self):
+    def file_size(self) -> int:
         return self._file_size
 
-    def __len__(self):
+    def __len__(self) -> int:
         return self._frames_count
 
-    def get_info(self):
+    def get_info(self) -> tuple[int, int, int]:
         return (self._frames_count, self._full_c_size, self._full_d_size)
 
 
@@ -313,7 +334,9 @@ class _EOFSuccess(EOFError):  # noqa: N818
 
 
 class _SeekableDecompressReader(io.RawIOBase):
-    def __init__(self, fp, zstd_dict, option, read_size):
+    def __init__(
+        self, fp: BinaryIO, zstd_dict: _ZstdDict, option: _Option, read_size: int
+    ) -> None:
         # Check fp readable/seekable
         if not hasattr(fp, "readable") or not hasattr(fp, "seekable"):
             raise TypeError(
@@ -343,22 +366,24 @@ class _SeekableDecompressReader(io.RawIOBase):
         self._size = self._seek_table.get_full_d_size()
 
         self._pos = 0
-        self._decompressor = ZstdDecompressor(self._zstd_dict, self._option)
+        self._decompressor: ZstdDecompressor | None = ZstdDecompressor(
+            self._zstd_dict, self._option
+        )
 
-    def close(self):
+    def close(self) -> None:
         self._decompressor = None
         return super().close()
 
-    def readable(self):
+    def readable(self) -> bool:
         return True
 
-    def seekable(self):
+    def seekable(self) -> bool:
         return True
 
-    def tell(self):
+    def tell(self) -> int:
         return self._pos
 
-    def _decompress(self, size):
+    def _decompress(self, size: int) -> bytes:
         """
         Decompress up to size bytes.
         May return b"", in which case try again.
@@ -387,7 +412,7 @@ class _SeekableDecompressReader(io.RawIOBase):
         self._pos += len(out)
         return out
 
-    def readinto(self, b):
+    def readinto(self, b: Buffer) -> int:
         with memoryview(b) as view, view.cast("B") as byte_view:
             try:
                 while True:
@@ -399,7 +424,7 @@ class _SeekableDecompressReader(io.RawIOBase):
 
     # If the new position is within BufferedReader's buffer,
     # this method may not be called.
-    def seek(self, offset, whence=0):
+    def seek(self, offset: int, whence: int = 0) -> int:
         # offset is absolute file position
         if whence == 0:  # SEEK_SET
             pass
@@ -443,7 +468,7 @@ class _SeekableDecompressReader(io.RawIOBase):
 
         return self._pos
 
-    def get_seek_table_info(self):
+    def get_seek_table_info(self) -> tuple[int, int, int]:
         return self._seek_table.get_info()
 
 
@@ -459,24 +484,24 @@ class SeekableZstdFile(io.BufferedIOBase):
 
     # The format uses uint32_t for compressed/decompressed sizes. If flush
     # block a lot, compressed_size may exceed the limit, so set a max size.
-    FRAME_MAX_C_SIZE = 2 * 1024 * 1024 * 1024
+    FRAME_MAX_C_SIZE: ClassVar[int] = 2 * 1024 * 1024 * 1024
     # Zstd seekable format's example code also use 1GiB as max content size.
-    FRAME_MAX_D_SIZE = 1 * 1024 * 1024 * 1024
+    FRAME_MAX_D_SIZE: ClassVar[int] = 1 * 1024 * 1024 * 1024
 
-    FLUSH_BLOCK = ZstdCompressor.FLUSH_BLOCK
-    FLUSH_FRAME = ZstdCompressor.FLUSH_FRAME
+    FLUSH_BLOCK: ClassVar[Literal[1]] = ZstdCompressor.FLUSH_BLOCK
+    FLUSH_FRAME: ClassVar[Literal[2]] = ZstdCompressor.FLUSH_FRAME
 
     def __init__(
         self,
-        filename,
-        mode="r",
+        filename: _StrOrBytesPath | BinaryIO,
+        mode: Literal["r", "rb", "w", "wb", "a", "ab", "x", "xb"] = "r",
         *,
-        level_or_option=None,
-        zstd_dict=None,
-        read_size=_DEPRECATED_PLACEHOLDER,
-        write_size=_DEPRECATED_PLACEHOLDER,
-        max_frame_content_size=1024 * 1024 * 1024,
-    ):
+        level_or_option: _LevelOrOption | _Option = None,
+        zstd_dict: _ZstdDict = None,
+        read_size: int | _DeprecatedPlaceholder = _DEPRECATED_PLACEHOLDER,  # type: ignore[has-type]
+        write_size: int | _DeprecatedPlaceholder = _DEPRECATED_PLACEHOLDER,  # type: ignore[has-type]
+        max_frame_content_size: int = 1024 * 1024 * 1024,
+    ) -> None:
         """Open a Zstandard Seekable Format file in binary mode. In read mode,
         the file can be 0-size file.
 
@@ -514,6 +539,7 @@ class SeekableZstdFile(io.BufferedIOBase):
                 DeprecationWarning,
                 stacklevel=2,
             )
+            read_size = cast("int", read_size)
         if write_size == _DEPRECATED_PLACEHOLDER:
             write_size = 131591
         else:
@@ -522,15 +548,16 @@ class SeekableZstdFile(io.BufferedIOBase):
                 DeprecationWarning,
                 stacklevel=2,
             )
+            write_size = cast("int", write_size)
 
-        self._fp = None
+        self._fp: BinaryIO | None = None
         self._close_fp = False
         self._mode = _MODE_CLOSED
         self._buffer = None
 
         if not isinstance(mode, str):
             raise TypeError("mode must be a str")
-        mode = mode.removesuffix("b")  # handle rb, wb, xb, ab
+        mode = mode.removesuffix("b")  # type: ignore[assignment]  # handle rb, wb, xb, ab
 
         # Read or write mode
         if mode == "r":
@@ -572,10 +599,10 @@ class SeekableZstdFile(io.BufferedIOBase):
             # For seekable format
             self._max_frame_content_size = max_frame_content_size
             self._reset_frame_sizes()
-            self._seek_table = _SeekTable(read_mode=False)
+            self._seek_table: _SeekTable | None = _SeekTable(read_mode=False)
 
             mode_code = _MODE_WRITE
-            self._compressor = ZstdCompressor(
+            self._compressor: ZstdCompressor | None = ZstdCompressor(
                 level_or_option=level_or_option, zstd_dict=zstd_dict
             )
             self._pos = 0
@@ -606,7 +633,7 @@ class SeekableZstdFile(io.BufferedIOBase):
 
         # File object
         if isinstance(filename, (str, bytes, PathLike)):
-            self._fp = open(filename, mode + "b")  # noqa: SIM115
+            self._fp = cast("BinaryIO", open(filename, mode + "b"))  # noqa: SIM115
             self._close_fp = True
         elif hasattr(filename, "read") or hasattr(filename, "write"):
             self._fp = filename
@@ -619,19 +646,19 @@ class SeekableZstdFile(io.BufferedIOBase):
             raw = _SeekableDecompressReader(
                 self._fp,
                 zstd_dict=zstd_dict,
-                option=level_or_option,
+                option=cast("_Option", level_or_option),  # checked earlier on
                 read_size=read_size,
             )
             self._buffer = io.BufferedReader(raw)
 
         elif mode == "a":
             if self._fp.seekable():
-                self._fp.seek(self._seek_table.get_full_c_size())
+                self._fp.seek(self._seek_table.get_full_c_size())  # type: ignore[union-attr]
                 # Necessary if the current table has many (0, 0) entries
                 self._fp.truncate()
             else:
                 # Add the seek table frame
-                self._seek_table.append_entry(self._seek_table.seek_frame_size, 0)
+                self._seek_table.append_entry(self._seek_table.seek_frame_size, 0)  # type: ignore[union-attr]
                 # Emit a warning
                 warnings.warn(
                     (
@@ -641,31 +668,31 @@ class SeekableZstdFile(io.BufferedIOBase):
                         "zstd skippable frame) at the end of the file "
                         "can't be overwritten. Each time open such file "
                         "in append mode, it will waste some storage "
-                        f"space. {self._seek_table.seek_frame_size} bytes "
+                        f"space. {self._seek_table.seek_frame_size} bytes "  # type: ignore[union-attr]
                         "were wasted this time."
                     ),
                     RuntimeWarning,
                     2,
                 )
 
-    def _reset_frame_sizes(self):
+    def _reset_frame_sizes(self) -> None:
         self._current_c_size = 0
         self._current_d_size = 0
         self._left_d_size = self._max_frame_content_size
 
-    def _check_not_closed(self):
+    def _check_not_closed(self) -> None:
         if self.closed:
             raise ValueError("I/O operation on closed file")
 
-    def _check_can_read(self):
+    def _check_can_read(self) -> None:
         if not self.readable():
             raise io.UnsupportedOperation("File not open for reading")
 
-    def _check_can_write(self):
+    def _check_can_write(self) -> None:
         if not self.writable():
             raise io.UnsupportedOperation("File not open for writing")
 
-    def close(self):
+    def close(self) -> None:
         """Flush and close the file.
 
         May be called more than once without error. Once the file is
@@ -679,11 +706,11 @@ class SeekableZstdFile(io.BufferedIOBase):
         try:
             if self._mode == _MODE_READ:
                 if getattr(self, "_buffer", None):
-                    self._buffer.close()
+                    self._buffer.close()  # type: ignore[union-attr]
                     self._buffer = None
             elif self._mode == _MODE_WRITE:
                 self.flush(self.FLUSH_FRAME)
-                self._seek_table.write_seek_table(self._fp)
+                self._seek_table.write_seek_table(self._fp)  # type: ignore[union-attr]
                 self._compressor = None
         finally:
             self._mode = _MODE_CLOSED
@@ -695,7 +722,7 @@ class SeekableZstdFile(io.BufferedIOBase):
                 self._fp = None
                 self._close_fp = False
 
-    def write(self, data):
+    def write(self, data: Buffer) -> int:
         """Write a bytes-like object to the file.
 
         Returns the number of uncompressed bytes written, which is
@@ -715,10 +742,10 @@ class SeekableZstdFile(io.BufferedIOBase):
                 write_size = min(nbytes, self._left_d_size)
 
                 # Compress & write
-                compressed = self._compressor.compress(
+                compressed = self._compressor.compress(  # type: ignore[union-attr]
                     byte_view[pos : pos + write_size]
                 )
-                output_size = self._fp.write(compressed)
+                output_size = self._fp.write(compressed)  # type: ignore[union-attr]
                 self._pos += write_size
 
                 pos += write_size
@@ -738,7 +765,7 @@ class SeekableZstdFile(io.BufferedIOBase):
 
             return pos
 
-    def flush(self, mode=ZstdCompressor.FLUSH_BLOCK):
+    def flush(self, mode: Literal[1, 2] = ZstdCompressor.FLUSH_BLOCK) -> None:
         """Flush remaining data to the underlying stream.
 
         The mode argument can be ZstdFile.FLUSH_BLOCK, ZstdFile.FLUSH_FRAME.
@@ -761,12 +788,12 @@ class SeekableZstdFile(io.BufferedIOBase):
                 "ZstdFile.FLUSH_BLOCK"
             )
 
-        if self._compressor.last_mode != mode:
+        if self._compressor.last_mode != mode:  # type: ignore[union-attr]
             # Flush zstd block/frame, and write.
-            compressed = self._compressor.flush(mode)
-            output_size = self._fp.write(compressed)
+            compressed = self._compressor.flush(mode)  # type: ignore[union-attr]
+            output_size = self._fp.write(compressed)  # type: ignore[union-attr]
             if hasattr(self._fp, "flush"):
-                self._fp.flush()
+                self._fp.flush()  # type: ignore[union-attr]
 
             # Cumulate
             self._current_c_size += output_size
@@ -775,10 +802,10 @@ class SeekableZstdFile(io.BufferedIOBase):
 
         if mode == self.FLUSH_FRAME and self._current_c_size != 0:
             # Add an entry to seek table
-            self._seek_table.append_entry(self._current_c_size, self._current_d_size)
+            self._seek_table.append_entry(self._current_c_size, self._current_d_size)  # type: ignore[union-attr]
             self._reset_frame_sizes()
 
-    def read(self, size=-1):
+    def read(self, size: int | None = -1) -> bytes:
         """Read up to size uncompressed bytes from the file.
 
         If size is negative or omitted, read until EOF is reached.
@@ -787,9 +814,9 @@ class SeekableZstdFile(io.BufferedIOBase):
         if size is None:
             size = -1
         self._check_can_read()
-        return self._buffer.read(size)
+        return self._buffer.read(size)  # type: ignore[union-attr]
 
-    def read1(self, size=-1):
+    def read1(self, size: int = -1) -> bytes:
         """Read up to size uncompressed bytes, while trying to avoid
         making multiple reads from the underlying stream. Reads up to a
         buffer's worth of data if size is negative.
@@ -799,26 +826,26 @@ class SeekableZstdFile(io.BufferedIOBase):
         self._check_can_read()
         if size < 0:
             size = io.DEFAULT_BUFFER_SIZE
-        return self._buffer.read1(size)
+        return self._buffer.read1(size)  # type: ignore[union-attr]
 
-    def readinto(self, b):
+    def readinto(self, b: Buffer) -> int:
         """Read bytes into b.
 
         Returns the number of bytes read (0 for EOF).
         """
         self._check_can_read()
-        return self._buffer.readinto(b)
+        return self._buffer.readinto(b)  # type: ignore[union-attr]
 
-    def readinto1(self, b):
+    def readinto1(self, b: Buffer) -> int:
         """Read bytes into b, while trying to avoid making multiple reads
         from the underlying stream.
 
         Returns the number of bytes read (0 for EOF).
         """
         self._check_can_read()
-        return self._buffer.readinto1(b)
+        return self._buffer.readinto1(b)  # type: ignore[union-attr]
 
-    def readline(self, size=-1):
+    def readline(self, size: int | None = -1) -> bytes:
         """Read a line of uncompressed bytes from the file.
 
         The terminating newline (if present) is retained. If size is
@@ -826,9 +853,9 @@ class SeekableZstdFile(io.BufferedIOBase):
         case the line may be incomplete). Returns b'' if already at EOF.
         """
         self._check_can_read()
-        return self._buffer.readline(size)
+        return self._buffer.readline(size)  # type: ignore[union-attr]
 
-    def seek(self, offset, whence=io.SEEK_SET):
+    def seek(self, offset: int, whence: int = io.SEEK_SET) -> int:
         """Change the file position.
 
         The new position is specified by offset, relative to the
@@ -844,68 +871,68 @@ class SeekableZstdFile(io.BufferedIOBase):
         this operation may be extremely slow.
         """
         self._check_can_read()
-        return self._buffer.seek(offset, whence)
+        return self._buffer.seek(offset, whence)  # type: ignore[union-attr]
 
-    def peek(self, size=-1):
+    def peek(self, size: int = -1) -> bytes:
         """Return buffered data without advancing the file position.
 
         Always returns at least one byte of data, unless at EOF.
         The exact number of bytes returned is unspecified.
         """
         self._check_can_read()
-        return self._buffer.peek(size)
+        return self._buffer.peek(size)  # type: ignore[union-attr]
 
-    def __iter__(self):
+    def __iter__(self) -> Self:
         self._check_can_read()
         return self
 
-    def __next__(self):
+    def __next__(self) -> bytes:
         self._check_can_read()
-        if ret := self._buffer.readline():
+        if ret := self._buffer.readline():  # type: ignore[union-attr]
             return ret
         raise StopIteration
 
-    def tell(self):
+    def tell(self) -> int:
         """Return the current file position."""
         self._check_not_closed()
         if self._mode == _MODE_READ:
-            return self._buffer.tell()
+            return self._buffer.tell()  # type: ignore[union-attr]
         if self._mode == _MODE_WRITE:
             return self._pos
         raise RuntimeError  # impossible code path
 
-    def fileno(self):
+    def fileno(self) -> int:
         """Return the file descriptor for the underlying file."""
         self._check_not_closed()
-        return self._fp.fileno()
+        return self._fp.fileno()  # type: ignore[union-attr]
 
     @property
-    def name(self):
+    def name(self) -> str:
         """Return the file name for the underlying file."""
         self._check_not_closed()
-        return self._fp.name
+        return self._fp.name  # type: ignore[union-attr]
 
     @property
-    def closed(self):
+    def closed(self) -> bool:
         """True if this file is closed."""
         return self._mode == _MODE_CLOSED
 
-    def writable(self):
+    def writable(self) -> bool:
         """Return whether the file was opened for writing."""
         self._check_not_closed()
         return self._mode == _MODE_WRITE
 
-    def readable(self):
+    def readable(self) -> bool:
         """Return whether the file was opened for reading."""
         self._check_not_closed()
         return self._mode == _MODE_READ
 
-    def seekable(self):
+    def seekable(self) -> bool:
         """Return whether the file supports seeking."""
-        return self.readable() and self._buffer.seekable()
+        return self.readable() and self._buffer.seekable()  # type: ignore[union-attr]
 
     @property
-    def seek_table_info(self):
+    def seek_table_info(self) -> tuple[int, int, int] | None:
         """A tuple: (frames_number, compressed_size, decompressed_size)
         1, Frames_number and compressed_size don't count the seek table
            frame (a zstd skippable frame at the end of the file).
@@ -914,14 +941,13 @@ class SeekableZstdFile(io.BufferedIOBase):
         3, If the SeekableZstdFile object is closed, it's None.
         """
         if self._mode == _MODE_WRITE:
-            return self._seek_table.get_info()
+            return self._seek_table.get_info()  # type: ignore[union-attr]
         if self._mode == _MODE_READ:
-            return self._buffer.raw.get_seek_table_info()
-        # Closed
+            return self._buffer.raw.get_seek_table_info()  # type: ignore[union-attr]
         return None
 
     @staticmethod
-    def is_seekable_format_file(filename):
+    def is_seekable_format_file(filename: _StrOrBytesPath | BinaryIO) -> bool:
         """Check if a file is Zstandard Seekable Format file or 0-size file.
 
         It parses the seek table at the end of the file, returns True if no
@@ -932,7 +958,7 @@ class SeekableZstdFile(io.BufferedIOBase):
         """
         # Check argument
         if isinstance(filename, (str, bytes, PathLike)):
-            fp = open(filename, "rb")  # noqa: SIM115
+            fp: BinaryIO = open(filename, "rb")  # noqa: SIM115
             is_file_path = True
         elif (
             hasattr(filename, "readable")

@@ -1,3 +1,4 @@
 -e .
 
 -r requirements-lint.txt
+-r requirements-type.txt

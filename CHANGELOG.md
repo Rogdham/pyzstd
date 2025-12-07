@@ -11,6 +11,7 @@ All notable changes to this project will be documented in this file.
 - Remove git submodule usage
 - Drop support for Python 3.9 and below
 - Use `ruff` as formatter and linter
+- Embed type hints in Python code, and check with `mypy`
 
 ## 0.18.0 (October 5, 2025)
 

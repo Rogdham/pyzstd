@@ -51,7 +51,7 @@ DICT = ZstdDict(b'a'*1024, is_raw=True)
 
 class SeekTableCase(unittest.TestCase):
     def create_table(self, sizes_lst, read_mode=True):
-        table = _SeekTable(read_mode)
+        table = _SeekTable(read_mode=read_mode)
         for item in sizes_lst:
             table.append_entry(*item)
         return table

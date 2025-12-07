@@ -61,21 +61,59 @@ source = "vcs"
 
 
 #
+# mypy
+#
+
+[tool.mypy]
+# Import discovery
+files = "src"
+ignore_missing_imports = false
+follow_imports = "normal"
+# Platform configuration
+python_version = "3.14"
+# Disallow dynamic typing
+disallow_any_unimported = true
+disallow_any_decorated = true
+disallow_any_generics = true
+disallow_subclassing_any = true
+# Untyped definitions and calls
+disallow_untyped_calls = true
+disallow_untyped_defs = true
+disallow_incomplete_defs = true
+check_untyped_defs = true
+disallow_untyped_decorators = true
+# None and Optional handling
+no_implicit_optional = true
+strict_optional = true
+# Configuring warning
+warn_redundant_casts = true
+warn_unused_ignores = true
+warn_no_return = true
+warn_return_any = true
+warn_unreachable = true
+# Suppressing errors
+ignore_errors = false
+# Miscellaneous strictness flags
+strict_equality = true
+# Configuring error messages
+show_error_context = true
+show_error_codes = true
+# Miscellaneous
+warn_unused_configs = true
+
+
+#
 # ruff
 #
 
 [tool.ruff]
 src = ["src"]
 target-version = "py310"
-extend-exclude = [
-    "tests",
-    '*.pyi', # FIXME
-]
+extend-exclude = ["tests"]
 
 [tool.ruff.lint]
 select = ["ALL"]
 ignore = [
-    "ANN",     # FIXME
     "C901",
     "COM812",
     "D",

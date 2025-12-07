@@ -1,8 +1,10 @@
 # CLI of pyzstd module: python -m pyzstd --help
 import argparse
+from collections.abc import Mapping, Sequence
 import os
 from shutil import copyfileobj
 from time import time
+from typing import Any, BinaryIO, Protocol, cast
 
 from pyzstd import (
     CParameter,
@@ -15,13 +17,36 @@ from pyzstd import (
 )
 from pyzstd import __version__ as pyzstd_version
 
+
+class Args(Protocol):
+    dict: str
+    f: bool
+    compress: str
+    tar_input_dir: str
+    level: int
+    threads: int
+    long: int
+    checksum: bool
+    write_dictID: bool  # noqa: N815
+    decompress: str
+    tar_output_dir: str
+    test: str | None
+    windowLogMax: int  # noqa: N815
+    train: str
+    maxdict: int
+    dictID: int  # noqa: N815
+    output: BinaryIO | None
+    input: BinaryIO | None
+    zd: ZstdDict | None
+
+
 # buffer sizes recommended by zstd
 C_READ_BUFFER = 131072
 D_READ_BUFFER = 131075
 
 
 # open output file and assign to args.output
-def open_output(args, path):
+def open_output(args: Args, path: str) -> None:
     if not args.f and os.path.isfile(path):
         answer = input(f"output file already exists:\n{path}\noverwrite? (y/n) ")
         print()
@@ -32,7 +57,7 @@ def open_output(args, path):
     args.output = open(path, "wb")  # noqa: SIM115
 
 
-def close_files(args):
+def close_files(args: Args) -> None:
     if args.input is not None:
         args.input.close()
 
@@ -40,7 +65,7 @@ def close_files(args):
         args.output.close()
 
 
-def compress_option(args):
+def compress_option(args: Args) -> Mapping[int, int]:
     # threads message
     if args.threads == 0:
         threads_msg = "single-thread mode"
@@ -58,7 +83,7 @@ def compress_option(args):
         long_msg = "no"
 
     # option
-    option = {
+    option: Mapping[int, int] = {
         CParameter.compressionLevel: args.level,
         CParameter.nbWorkers: args.threads,
         CParameter.enableLongDistanceMatching: use_long,
@@ -80,10 +105,13 @@ def compress_option(args):
     return option
 
 
-def compress(args):
+def compress(args: Args) -> None:
+    args.input = cast("BinaryIO", args.input)
+
     # output file
     if args.output is None:
         open_output(args, args.input.name + ".zst")
+        args.output = cast("BinaryIO", args.output)
 
     # pre-compress message
     msg = (
@@ -114,7 +142,9 @@ def compress(args):
     print(msg)
 
 
-def decompress(args):
+def decompress(args: Args) -> None:
+    args.input = cast("BinaryIO", args.input)
+
     # output file
     if args.output is None:
         if args.test is None:
@@ -126,9 +156,10 @@ def decompress(args):
         else:
             out_path = os.devnull
         open_output(args, out_path)
+        args.output = cast("BinaryIO", args.output)
 
     # option
-    option = {DParameter.windowLogMax: args.windowLogMax}
+    option: Mapping[int, int] = {DParameter.windowLogMax: args.windowLogMax}
 
     # pre-decompress message
     output_name = args.output.name
@@ -159,7 +190,7 @@ def decompress(args):
     print(msg)
 
 
-def train(args):
+def train(args: Args) -> None:
     from glob import glob
 
     # check output file
@@ -225,7 +256,7 @@ def train(args):
     print(msg)
 
 
-def tarfile_create(args):
+def tarfile_create(args: Args) -> None:
     import sys
 
     if sys.version_info < (3, 14):
@@ -244,6 +275,7 @@ def tarfile_create(args):
     if args.output is None:
         out_path = os.path.join(dirname, basename + ".tar.zst")
         open_output(args, out_path)
+        args.output = cast("BinaryIO", args.output)
 
     # pre-compress message
     msg = (
@@ -263,7 +295,7 @@ def tarfile_create(args):
         None, fileobj=args.output, mode="w", options=option, zstd_dict=args.zd
     ) as f:
         f.add(args.tar_input_dir, basename)
-        uncompressed_size = f.fileobj.tell()
+        uncompressed_size = f.fileobj.tell()  # type: ignore[union-attr]
     t2 = time()
 
     output_file_size = args.output.tell()
@@ -282,7 +314,7 @@ def tarfile_create(args):
     print(msg)
 
 
-def tarfile_extract(args):
+def tarfile_extract(args: Args) -> None:
     import sys
 
     if sys.version_info < (3, 14):
@@ -302,7 +334,7 @@ def tarfile_extract(args):
         raise NotADirectoryError(msg)
 
     # option
-    option = {DParameter.windowLogMax: args.windowLogMax}
+    option: Mapping[int, int] = {DParameter.windowLogMax: args.windowLogMax}
 
     # pre-extract message
     msg = (
@@ -320,7 +352,7 @@ def tarfile_extract(args):
         None, fileobj=args.input, mode="r", zstd_dict=args.zd, options=option
     ) as f:
         f.extractall(args.tar_output_dir, filter="data")
-        uncompressed_size = f.fileobj.tell()
+        uncompressed_size = f.fileobj.tell()  # type: ignore[union-attr]
     t2 = time()
     close_files(args)
 
@@ -336,12 +368,18 @@ def tarfile_extract(args):
     print(msg)
 
 
-def range_action(start, end):
+def range_action(start: int, end: int) -> type[argparse.Action]:
     class RangeAction(argparse.Action):
-        def __call__(self, parser, args, values, option_string=None):  # noqa: ARG002
+        def __call__(
+            self,
+            _: object,
+            namespace: object,
+            values: str | Sequence[Any] | None,
+            option_string: str | None = None,
+        ) -> None:
             # convert to int
             try:
-                v = int(values)
+                v = int(values)  # type: ignore[arg-type]
             except ValueError:
                 raise TypeError(f"{option_string} should be an integer") from None
 
@@ -354,12 +392,12 @@ def range_action(start, end):
                 )
                 raise ValueError(msg)
 
-            setattr(args, self.dest, v)
+            setattr(namespace, self.dest, v)
 
     return RangeAction
 
 
-def parse_arg():
+def parse_arg() -> Args:
     p = argparse.ArgumentParser(
         prog="CLI of pyzstd module",
         description=(
@@ -546,7 +584,7 @@ def parse_arg():
     return args
 
 
-def main():
+def main() -> None:
     print(f"*** pyzstd module v{pyzstd_version}, zstd library v{zstd_version}. ***\n")
 
     args = parse_arg()

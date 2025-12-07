@@ -89,6 +89,22 @@ jobs:
       - name: ruff format
         run: ruff format --check
 
+  type:
+    name: Type
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: 3.14
+      - name: Install dependencies
+        run: python -m pip install -r requirements-type.txt
+      - name: Create _version.py
+        run: echo '__version__ = ""' > src/pyzstd/_version.py
+      - name: mypy
+        run: mypy
+
   publish:
     name: Publish to PyPI
     if: startsWith(github.ref, 'refs/tags')
