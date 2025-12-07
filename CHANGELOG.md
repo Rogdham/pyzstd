@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.19.0 (November 7, 2025)
 
 - The project has been completely refactored to use the Zstandard implementation from the standard library ([PEP-784](https://peps.python.org/pep-0784/))
 - The refactor has some minor impact on public APIs, such as changing the exception raised on invalid input
