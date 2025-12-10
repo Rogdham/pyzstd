@@ -12,6 +12,7 @@ import warnings
 
 from io import BytesIO
 from math import ceil
+from sysconfig import get_config_var
 from unittest.mock import patch
 
 from pyzstd import (
@@ -539,6 +540,7 @@ class SeekTableCase(unittest.TestCase):
                                     'cumulated compressed size'):
             t.load_seek_table(b, seek_to_0=True)
 
+    @unittest.skipIf(get_config_var('SIZEOF_SIZE_T') == 4, 'skip in 32-bit build')
     def test_write_table(self):
         class MockError(Exception):
             pass
