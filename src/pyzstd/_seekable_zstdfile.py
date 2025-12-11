@@ -305,8 +305,9 @@ class _SeekTable:
         self._s_2uint32.pack_into(ba, offset, 0x184D2A5E, size - 8)
         offset += 8
         # Entries
-        for i in range(0, len(self._frames), 2):
-            self._s_2uint32.pack_into(ba, offset, self._frames[i], self._frames[i + 1])
+        iter_frames = iter(self._frames)
+        for frame_c, frame_d in zip(iter_frames, iter_frames, strict=True):
+            self._s_2uint32.pack_into(ba, offset, frame_c, frame_d)
             offset += 8
         # Footer
         self._s_footer.pack_into(ba, offset, self._frames_count, 0, 0x8F92EAB1)
