@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.19.1 (November 13, 2025)
 
 - Fix `SeekableZstdFile` write table entries on 32-bits architectures when there is a huge number of entries
 
