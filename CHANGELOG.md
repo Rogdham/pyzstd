@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- Support for PyPy 3.12
 - End of Python 3.10 support
 - Necessary code changes following dev dependency update: `mypy`, `ruff`
 
