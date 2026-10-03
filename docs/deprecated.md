@@ -4,13 +4,13 @@
 
 ```python
 # before
-with io.open(input_file_path, 'rb') as ifh:
-    with io.open(output_file_path, 'wb') as ofh:
+with io.open(input_file_path, "rb") as ifh:
+    with io.open(output_file_path, "wb") as ofh:
         compress_stream(ifh, ofh, level_or_option=5)
 
 # after
-with io.open(input_file_path, 'rb') as ifh:
-    with pyzstd.open(output_file_path, 'w', level_or_option=5) as ofh:
+with io.open(input_file_path, "rb") as ifh:
+    with pyzstd.open(output_file_path, "w", level_or_option=5) as ofh:
         shutil.copyfileobj(ifh, ofh)
 ```
 
@@ -23,8 +23,8 @@ Alternatively, you can use `ZstdCompressor` to have more control:
 
 ```python
 # after: more complex alternative
-with io.open(input_file_path, 'rb') as ifh:
-    with io.open(output_file_path, 'wb') as ofh:
+with io.open(input_file_path, "rb") as ifh:
+    with io.open(output_file_path, "wb") as ofh:
         compressor = ZstdCompressor(level_or_option=5)
         compressor._set_pledged_input_size(pledged_input_size)  # optional
         while data := ifh.read(read_size):
@@ -39,13 +39,13 @@ _Deprecated in version 0.17.0._
 
 ```python
 # before
-with io.open(input_file_path, 'rb') as ifh:
-    with io.open(output_file_path, 'wb') as ofh:
+with io.open(input_file_path, "rb") as ifh:
+    with io.open(output_file_path, "wb") as ofh:
         decompress_stream(ifh, ofh)
 
 # after
 with pyzstd.open(input_file_path) as ifh:
-    with io.open(output_file_path, 'wb') as ofh:
+    with io.open(output_file_path, "wb") as ofh:
         shutil.copyfileobj(ifh, ofh)
 ```
 
@@ -58,8 +58,8 @@ Alternatively, you can use `EndlessZstdDecompressor` to have more control:
 
 ```python
 # after: more complex alternative
-with io.open(input_file_path, 'rb') as ifh:
-    with io.open(output_file_path, 'wb') as ofh:
+with io.open(input_file_path, "rb") as ifh:
+    with io.open(output_file_path, "wb") as ofh:
         decompressor = EndlessZstdDecompressor()
         while True:
             if decompressor.needs_input:

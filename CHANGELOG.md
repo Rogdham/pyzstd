@@ -4,7 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
-- Necessary code changes following dev dependency update: `mypy`
+- Necessary code changes following dev dependency update: `mypy`, `ruff`
 
 ## 0.19.1 (December 13, 2025)
 
