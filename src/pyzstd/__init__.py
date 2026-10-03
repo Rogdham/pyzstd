@@ -703,7 +703,7 @@ def compress_stream(
         raise TypeError("output_stream argument should have a .write() method.")
     if read_size < 1:
         raise ValueError("read_size argument should be a positive number.")
-    callback = _create_callback(output_stream, callback)
+    callback_bytes = _create_callback(output_stream, callback)
     total_input = 0
     total_output = 0
     compressor = ZstdCompressor(level_or_option, zstd_dict)
@@ -713,12 +713,12 @@ def compress_stream(
         total_input += len(data_in)
         data_out = compressor.compress(data_in)
         total_output += len(data_out)
-        callback(total_input, total_output, data_in, data_out)
+        callback_bytes(total_input, total_output, data_in, data_out)
     if not total_input:
         return total_input, total_output
     data_out = compressor.flush()
     total_output += len(data_out)
-    callback(total_input, total_output, b"", data_out)
+    callback_bytes(total_input, total_output, b"", data_out)
     return total_input, total_output
 
 
@@ -768,7 +768,7 @@ def decompress_stream(
         raise ValueError(
             "read_size argument and write_size argument should be positive numbers."
         )
-    callback = _create_callback(output_stream, callback)
+    callback_bytes = _create_callback(output_stream, callback)
     total_input = 0
     total_output = 0
     decompressor = EndlessZstdDecompressor(zstd_dict, option)
@@ -782,7 +782,7 @@ def decompress_stream(
         total_input += len(data_in)
         data_out = decompressor.decompress(data_in, write_size)
         total_output += len(data_out)
-        callback(total_input, total_output, data_in, data_out)
+        callback_bytes(total_input, total_output, data_in, data_out)
     if not decompressor.at_frame_edge:
         raise ZstdError(
             "Decompression failed: zstd data ends in an incomplete frame,"

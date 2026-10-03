@@ -295,7 +295,7 @@ def tarfile_create(args: Args) -> None:
         None, fileobj=args.output, mode="w", options=option, zstd_dict=args.zd
     ) as f:
         f.add(args.tar_input_dir, basename)
-        uncompressed_size = f.fileobj.tell()  # type: ignore[union-attr]
+        uncompressed_size = f.fileobj.tell()
     t2 = time()
 
     output_file_size = args.output.tell()
@@ -352,7 +352,7 @@ def tarfile_extract(args: Args) -> None:
         None, fileobj=args.input, mode="r", zstd_dict=args.zd, options=option
     ) as f:
         f.extractall(args.tar_output_dir, filter="data")
-        uncompressed_size = f.fileobj.tell()  # type: ignore[union-attr]
+        uncompressed_size = f.fileobj.tell()
     t2 = time()
     close_files(args)
 
