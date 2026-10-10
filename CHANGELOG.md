@@ -4,6 +4,7 @@ All notable changes to this project will be documented in this file.
 
 ## Unreleased
 
+- End of Python 3.10 support
 - Necessary code changes following dev dependency update: `mypy`, `ruff`
 
 ## 0.19.1 (December 13, 2025)

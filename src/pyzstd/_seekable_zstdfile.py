@@ -5,7 +5,7 @@ from os import PathLike
 from os.path import isfile
 from struct import Struct
 import sys
-from typing import BinaryIO, ClassVar, Literal, cast
+from typing import BinaryIO, ClassVar, Literal, Self, cast
 import warnings
 
 from pyzstd import (
@@ -23,12 +23,6 @@ if sys.version_info < (3, 12):
     from typing_extensions import Buffer
 else:
     from collections.abc import Buffer
-
-if sys.version_info < (3, 11):
-    from typing_extensions import Self
-else:
-    from typing import Self
-
 __all__ = ("SeekableFormatError", "SeekableZstdFile")
 
 _MODE_CLOSED = 0
