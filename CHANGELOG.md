@@ -2,7 +2,7 @@
 
 All notable changes to this project will be documented in this file.
 
-## Unreleased
+## 0.20.0 (October 11, 2026)
 
 - Support for 3.15 and PyPy 3.12
 - End of Python 3.10 support
