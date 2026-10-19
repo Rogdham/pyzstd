@@ -368,20 +368,22 @@ class EndlessZstdDecompressor:
             raise TypeError
         self._buffer += data
         self._at_frame_edge &= not self._buffer
-        out = b""
+        out_chunks: list[bytes] = []
         while True:
             try:
-                out += self._decompressor.decompress(self._buffer, max_length)
+                out_chunks.append(
+                    self._decompressor.decompress(self._buffer, max_length)
+                )
             except ZstdError:
                 self._reset()
                 raise
             if self._decompressor.eof:
                 self._reset(self._decompressor.unused_data)
-                max_length -= len(out)
+                max_length -= len(out_chunks[-1])
             else:
                 self._buffer = b""
                 break
-        return out
+        return b"".join(out_chunks)
 
     @property
     def at_frame_edge(self) -> bool:
