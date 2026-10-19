@@ -2,6 +2,10 @@
 
 All notable changes to this project will be documented in this file.
 
+## Unreleased
+
+- Fix issue with `max_length` not always being respected in `EndlessZstdDecompressor`
+
 ## 0.20.0 (October 11, 2026)
 
 - Support for 3.15 and PyPy 3.12
